@@ -2,8 +2,8 @@
 """
 Universal Camera Service & Comprehensive Port Discovery Module
 Author: Merlin / Antigravity
-Scans camera ports across TCP and UDP, identifies protocols, and audits against
-declared IXIT interfaces to detect undeclared / unauthorized ports (QCVN 11 Clause 2.6.1).
+Scans network ports across TCP and UDP, identifies protocols, and audits against
+declared baseline interfaces to detect undeclared / unauthorized ports.
 """
 
 import socket
@@ -552,7 +552,7 @@ def scan_external_apis(ip: str, web_ports: List[int], tls_ports: List[int]) -> L
     """
     Probes standard IP Camera API endpoints across open web ports (80, 443, 8080, 8443...)
     to discover active management, video, and machine-to-machine interfaces.
-    Audits against IXIT 28-ExtAPI and Clause 2.6.2 (Unauthenticated Information Disclosure).
+    Audits against baseline external APIs and unauthenticated endpoints.
     """
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -625,7 +625,7 @@ def scan_external_apis(ip: str, web_ports: List[int], tls_ports: List[int]) -> L
     return discovered
 
 # --------------------------------------------------------------------------
-# Main Scanner Function & IXIT Discrepancy Auditor
+# Main Scanner Function & Discrepancy Auditor
 # --------------------------------------------------------------------------
 def scan_camera_services(
     ip: str,
@@ -634,11 +634,11 @@ def scan_camera_services(
     declared_ixit_ports: Optional[Set[int]] = None
 ) -> Dict[str, Any]:
     """
-    Exhaustively scans camera ports, identifies services, discovers external APIs,
-    and compares with IXIT declarations (QCVN 11 Khoản 2.6.1 & 2.10.1).
+    Exhaustively scans target ports, identifies services, discovers external APIs,
+    and compares with baseline declarations.
     Scan modes:
-      - 'camera_known': Standard known camera ports (~50 ports)
-      - 'top_1000' / 'auto': Top common TCP ports + camera ports + UDP probes
+      - 'camera_known': Standard known ports (~50 ports)
+      - 'top_1000' / 'auto': Top common TCP ports + probes
       - 'full_range': Full TCP 1-65535 ports (high-speed) + UDP probes
       - 'custom': Custom port list specified by user
     """
@@ -658,7 +658,7 @@ def scan_camera_services(
         ports_list = sorted([p for p, v in CAMERA_KNOWN_PORTS.items() if v[2] == "tcp"])
         max_workers = 120
 
-    # Load declared IXIT ports
+    # Load declared ports
     if declared_ixit_ports is None:
         declared_ixit_ports = get_declared_ixit_ports()
 
@@ -725,7 +725,7 @@ def scan_camera_services(
     if web_ports:
         results["external_apis"] = scan_external_apis(ip, web_ports, results["tls_ports"])
 
-    # 5. Perform IXIT Discrepancy Audit (Clause 2.6.1 / ETSI 5.6-1)
+    # 5. Perform Discrepancy Audit
     all_open_ports = set(results["tcp_open"] + results["udp_open"])
 
     for p in declared_ixit_ports:
@@ -740,9 +740,9 @@ def scan_camera_services(
 
     # Compliance status
     if results["ixit_audit"]["undeclared_open_ports"]:
-        results["ixit_audit"]["compliance_status"] = "CẢNH BÁO BẤT THƯỜNG (CÓ CỔNG NGOÀI IXIT)"
+        results["ixit_audit"]["compliance_status"] = "CẢNH BÁO BẤT THƯỜNG (CÓ CỔNG NGOÀI DANH MỤC)"
     else:
-        results["ixit_audit"]["compliance_status"] = "ĐẠT (HOÀN TOÀN KHỚP IXIT)"
+        results["ixit_audit"]["compliance_status"] = "ĐẠT (HOÀN TOÀN HỢP LỆ)"
 
     results["elapsed_seconds"] = round(time.time() - start_time, 2)
 
@@ -770,12 +770,12 @@ def display_service_scan(results: Dict[str, Any]):
     console.print(f"[dim]Chế độ: {mode_str} | Số cổng thăm dò: {probed} | Thời gian quét: {elapsed}s[/dim]\n")
 
     # Table 1: Network Ports & Services (TCP & UDP)
-    table = Table(title=f"BẢNG 1: CÁC CỔNG MẠNG & DỊCH VỤ PHÁT HIỆN TRÊN CAMERA ({ip})", show_lines=True, expand=True)
+    table = Table(title=f"BẢNG 1: CÁC CỔNG MẠNG & DỊCH VỤ PHÁT HIỆN TRÊN THIẾT BỊ ({ip})", show_lines=True, expand=True)
     table.add_column("Cổng (Port)", style="bold yellow", justify="center", width=12)
     table.add_column("Giao thức", justify="center", width=10)
     table.add_column("Dịch vụ nhận diện", style="bold white", width=22)
     table.add_column("Kênh truyền", justify="center", width=18)
-    table.add_column("Đối chiếu IXIT 15-Intf", justify="center", width=26)
+    table.add_column("Trạng thái / Đánh giá", justify="center", width=26)
     table.add_column("Chi tiết / Banner", style="dim")
 
     if not results["services"]:
@@ -791,12 +791,12 @@ def display_service_scan(results: Dict[str, Any]):
             if info.get("tls_version"):
                 enc_str += f"\n[dim]({info['tls_version']})[/dim]"
 
-            # IXIT Status Column
+            # Status Column
             is_declared = info.get("ixit_declared", False)
             if is_declared:
-                ixit_str = "[bold green][ĐÃ KHAI BÁO IXIT][/bold green]"
+                ixit_str = "[bold green][HỢP LỆ / CHO PHÉP][/bold green]"
             else:
-                ixit_str = "[bold red blink][!] NGOÀI KHAI BÁO IXIT[/bold red blink]"
+                ixit_str = "[bold red blink][!] CỔNG MỞ NGOÀI DANH MỤC[/bold red blink]"
 
             desc_str = info.get("desc", "")
             if info.get("banner"):
@@ -806,7 +806,7 @@ def display_service_scan(results: Dict[str, Any]):
 
         console.print(table)
 
-    # Table 2: External APIs & Web Endpoints (IXIT 28-ExtAPI & Clause 2.6.2)
+    # Table 2: External APIs & Web Endpoints
     apis = results.get("external_apis", [])
     if apis:
         api_table = Table(title=f"BẢNG 2: BỀ MẶT GIAO DIỆN API & ĐIỂM VÀO ĐIỀU KHIỂN TỪ XA ({ip})", show_lines=True, expand=True)
@@ -815,7 +815,7 @@ def display_service_scan(results: Dict[str, Any]):
         api_table.add_column("Phân loại Giao diện", style="bold white", width=16)
         api_table.add_column("Mã HTTP", justify="center", width=10)
         api_table.add_column("Kiểm soát Truy cập", justify="center", width=24)
-        api_table.add_column("Đánh giá An toàn / Tiết lộ (2.6.2 & 2.10.1)", style="dim")
+        api_table.add_column("Đánh giá An toàn / Tiết lộ", style="dim")
 
         for a in apis:
             port_txt = f"{a['port']}/{a['proto'].upper()}"
@@ -845,27 +845,26 @@ def display_service_scan(results: Dict[str, Any]):
 
     panel_content = [
         f"[bold white]Tổng số cổng mở phát hiện:[/bold white] [bold yellow]{len(results['services'])}[/bold yellow] (TCP: {len(results['tcp_open'])}, UDP: {len(results['udp_open'])})",
-        f"[bold white]Cổng khớp với khai báo IXIT (15-Intf):[/bold white] [bold green]{declared_open}[/bold green]",
-        f"[bold white]Cổng khai báo trong IXIT nhưng đang tắt (An toàn):[/bold white] [dim]{declared_closed}[/dim]",
-        f"[bold white]Số Endpoint API bên ngoài phát hiện (28-ExtAPI):[/bold white] [bold cyan]{len(apis)} điểm vào[/bold cyan]"
+        f"[bold white]Cổng khớp với danh mục cho phép (Baseline):[/bold white] [bold green]{declared_open}[/bold green]",
+        f"[bold white]Cổng trong danh mục nhưng đang tắt (An toàn):[/bold white] [dim]{declared_closed}[/dim]",
+        f"[bold white]Số Endpoint API bên ngoài phát hiện:[/bold white] [bold cyan]{len(apis)} điểm vào[/bold cyan]"
     ]
 
     if undeclared:
         panel_content.append(
-            f"\n[bold red][CẢNH BÁO BẤT THƯỜNG] Phát hiện các cổng mở KHÔNG ĐƯỢC MÔ TẢ TRONG IXIT:[/bold red] [bold red blink]{undeclared}[/bold red blink]\n"
-            f"[yellow]↳ Đánh giá theo QCVN 11 Khoản 2.6.1 & ETSI EN 303 645 Clause 5.6-1:[/yellow]\n"
-            f"  - Thiết bị đang mở giao diện logic / dịch vụ mạng mà nhà sản xuất chưa công bố trong tài liệu kỹ thuật.\n"
+            f"\n[bold red][CẢNH BÁO BẤT THƯỜNG] Phát hiện các cổng mở NGOÀI DANH MỤC CHO PHÉP:[/bold red] [bold red blink]{undeclared}[/bold red blink]\n"
+            f"  - Thiết bị đang mở giao diện logic / dịch vụ mạng chưa được khai báo hoặc phê duyệt trong danh mục.\n"
             f"  - Tiềm ẩn nguy cơ tấn công qua giao diện không kiểm soát hoặc dịch vụ thừa.\n"
-            f"  - [bold white]Khuyến nghị kiểm thử:[/bold white] Yêu cầu nhà sản xuất giải trình mục đích sử dụng hoặc vô hiệu hóa cổng trước khi cấp chứng nhận."
+            f"  - [bold white]Khuyến nghị kiểm thử:[/bold white] Cần rà soát mục đích sử dụng hoặc vô hiệu hóa các cổng này."
         )
         border_col = "red"
     else:
         panel_content.append(
-            f"\n[bold green][ĐẠT] 100% cổng mở trên thiết bị đều đã được mô tả và công bố minh bạch trong tài liệu IXIT.[/bold green]"
+            f"\n[bold green][ĐẠT] 100% cổng mở trên thiết bị đều nằm trong danh mục dịch vụ được phép.[/bold green]"
         )
         border_col = "green"
 
-    console.print(Panel("\n".join(panel_content), title="[bold cyan]KẾT QUẢ ĐỐI SOÁT HỒ SƠ IXIT (QCVN 11 KHOẢN 2.6.1 & KHOẢN 2.10.1)[/bold cyan]", border_style=border_col))
+    console.print(Panel("\n".join(panel_content), title="[bold cyan]KẾT QUẢ ĐỐI SOÁT DANH MỤC CỔNG DỊCH VỤ (BASELINE)[/bold cyan]", border_style=border_col))
     console.print(f"[dim]Bằng chứng đã được lưu tự động tại: captures/port_scan_ixit_audit.json[/dim]\n")
 
 # --------------------------------------------------------------------------
@@ -879,10 +878,9 @@ def interactive_menu(ip: str):
     while True:
         console.clear()
         console.print(Panel(
-            f"[bold cyan]MÔ-ĐUN DÒ QUÉT CỔNG TOÀN DIỆN & ĐỐI CHIẾU HỒ SƠ IXIT[/bold cyan]\n"
-            f"[dim]Tiêu chuẩn: QCVN 11:2026/BCA (Khoản 2.6.1) & ETSI EN 303 645 (Clause 5.6-1)[/dim]\n"
+            f"[bold cyan]MÔ-ĐUN DÒ QUÉT CỔNG TOÀN DIỆN & NHẬN DIỆN DỊCH VỤ[/bold cyan]\n"
             f"Thiết bị mục tiêu: [bold white]{ip} ({model})[/bold white]\n"
-            f"Cổng khai báo theo IXIT: [bold yellow]{sorted(list(declared))}[/bold yellow]",
+            f"Cổng trong danh mục cho phép (Baseline): [bold yellow]{sorted(list(declared))}[/bold yellow]",
             border_style="cyan"
         ))
 
@@ -891,11 +889,11 @@ def interactive_menu(ip: str):
         t.add_column("Chế độ quét cổng & Đối chiếu", style="bold white", width=38)
         t.add_column("Chi tiết kỹ thuật & Mục đích kiểm thử", style="dim")
 
-        t.add_row("1", "Quét danh mục cổng Camera mở rộng", "Quét ~50 cổng đặc trưng camera (Web, RTSP, SSH, Telnet, Hik, Dahua, XM, Axis) & UDP")
+        t.add_row("1", "Quét danh mục cổng dịch vụ mở rộng", "Quét ~50 cổng phổ biến (Web, RTSP, SSH, Telnet, Hik, Dahua, XM, Axis) & UDP")
         t.add_row("2", "Quét Top 1000 cổng TCP phổ biến", "Quét nhanh 1000 cổng phổ biến nhất mạng TCP bằng đa luồng socket")
         t.add_row("3", "Quét TOÀN DIỆN dải cổng 1 - 65535", "Quét vét cạn 100% không gian cổng 1-65535 siêu tốc (ThreadPool 250 luồng)")
         t.add_row("4", "Quét dải cổng tùy chỉnh", "Nhập danh sách cổng hoặc dải cổng cụ thể (ví dụ: 1-1024, 8000-9000)")
-        t.add_row("5", "Cập nhật danh sách cổng khai báo IXIT", "Thay đổi danh sách cổng IXIT dùng để đối chiếu cho camera này")
+        t.add_row("5", "Cập nhật danh sách cổng cho phép (Baseline)", "Thay đổi danh sách cổng dùng để đối chiếu cho thiết bị này")
         t.add_row("0", "[bold red]Quay lại Menu chính[/bold red]", "")
         console.print(t)
 
@@ -904,7 +902,7 @@ def interactive_menu(ip: str):
         if choice == "0":
             break
         elif choice == "1":
-            console.print(f"\n[*] Đang quét danh mục cổng Camera mở rộng trên {ip}...")
+            console.print(f"\n[*] Đang quét danh mục cổng dịch vụ mở rộng trên {ip}...")
             res = scan_camera_services(ip, scan_mode="camera_known", declared_ixit_ports=declared)
             display_service_scan(res)
             input("\nBấm Enter để tiếp tục...")
@@ -938,7 +936,7 @@ def interactive_menu(ip: str):
             input("\nBấm Enter để tiếp tục...")
         elif choice == "5":
             curr_str = ",".join([str(p) for p in sorted(list(declared))])
-            new_str = Prompt.ask("Nhập danh sách cổng IXIT (phân tách bởi dấu phẩy)", default=curr_str).strip()
+            new_str = Prompt.ask("Nhập danh sách cổng cho phép (phân tách bởi dấu phẩy)", default=curr_str).strip()
             try:
                 new_ports = set([int(p.strip()) for p in new_str.split(",") if p.strip().isdigit()])
                 declared = new_ports
@@ -946,13 +944,13 @@ def interactive_menu(ip: str):
                 cfg["ixit_declared_ports"] = sorted(list(new_ports))
                 with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                     json.dump(cfg, f, indent=2, ensure_ascii=False)
-                console.print(f"[green][OK] Đã cập nhật danh sách cổng IXIT: {sorted(list(new_ports))}[/green]")
+                console.print(f"[green][OK] Đã cập nhật danh sách cổng cho phép: {sorted(list(new_ports))}[/green]")
             except Exception as e:
                 console.print(f"[red]Lỗi lưu cấu hình: {e}[/red]")
             input("\nBấm Enter để tiếp tục...")
 
 def main():
-    parser = argparse.ArgumentParser(description="Universal Camera Service & Comprehensive Port Discovery Module (QCVN 11:2026/BCA)")
+    parser = argparse.ArgumentParser(description="Universal Service & Comprehensive Port Discovery Module")
     parser.add_argument("target_ip", nargs="?", default=None, help="Địa chỉ IP của Camera DUT")
     parser.add_argument("--ip", default=None, help="Địa chỉ IP của Camera DUT")
     parser.add_argument("--full", action="store_true", help="Quét toàn bộ 1 - 65535 cổng TCP + UDP + API endpoints (Toàn diện)")

@@ -213,21 +213,6 @@
 
     <!-- Quick Action Button Group -->
     <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 3.0', 'Đo kiểm Toàn bộ Xác thực (AuthMech)')" class="bg-[#191d30] hover:bg-[#232942] text-[#c7d2fe] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#2f3659] shadow-sm transition">
-        <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-        <span>Audit AuthMech</span>
-      </button>
-
-      <button onclick="runCommand('python tool17_commech_auditor.py --id all --wait 3.0', 'Đo kiểm Toàn bộ Kênh Truyền thông (ComMech)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d3d63] shadow-sm transition">
-        <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        <span>Audit ComMech</span>
-      </button>
-
-      <button onclick="runCommand('python tool18_api_input_validation.py --mode rtsp', 'Fuzzing Luồng RTSP')" class="bg-[#24171d] hover:bg-[#331f28] text-[#fca5a5] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#522533] shadow-sm transition">
-        <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-        <span>Fuzz RTSP</span>
-      </button>
-
       <!-- Nút Kiểm tra & Cập nhật Cumera Trực tiếp -->
       <button onclick="checkAppUpdate()" id="btn_check_update" class="bg-[#102422] hover:bg-[#153430] text-[#5eead4] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d4d47] shadow-sm transition cursor-pointer" title="Kiểm tra và cập nhật Cumera trực tiếp từ GitHub">
         <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -481,7 +466,7 @@
               </div>
 
               <div class="pt-1.5 border-t border-[#272c3a] flex items-center gap-2">
-                <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Quét Cổng Dịch vụ & Đối chiếu IXIT')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
+                <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Quét Cổng & Nhận diện Dịch vụ')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
                   Quét cổng (TCP/UDP)
                 </button>
                 <button onclick="triggerAutoLink()" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#38bdf8] border border-[#2e3547]">
@@ -1532,7 +1517,7 @@
         <div id="tab_content_surface" class="tab-pane hidden space-y-3">
           <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
             <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API & Dịch vụ Mạng</h2>
-            <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535 & Đối chiếu IXIT)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
+            <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               <span>Dò quét Cổng Toàn diện</span>
             </button>
