@@ -879,46 +879,58 @@
         <!-- TAB: LOCKOUT & RATE LIMIT (CLAUSE 2.1.5) -->
         <!-- ============================================================== -->
         <div id="tab_content_lockout" class="tab-pane hidden space-y-3">
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Khóa tài khoản & Rate Limit (Brute-Force)</h2>
-            <span class="text-[11px] text-[#848c9e]">Ngưỡng: <strong class="text-rose-400 font-mono">10 fail (RTSP/SSH/ONVIF)</strong> • <strong class="text-amber-400 font-mono">6 fail (Web)</strong></span>
+          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </div>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Brute-Force</h2>
+            </div>
+            <div class="text-[11px] text-[#848c9e] flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#171c28] border border-[#262f42]">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                <span>Ngưỡng mặc định: <strong class="text-rose-400 font-mono">10 fail</strong> (RTSP/SSH/ONVIF) • <strong class="text-amber-400 font-mono">6 fail</strong> (Web)</span>
+              </span>
+            </div>
           </div>
 
           <!-- 4 Distinct Sub-Modules Grid -->
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-3.5">
 
             <!-- ================= SUB-PANEL 1: ONVIF SOAP ================= -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            <div class="border border-[#222938] hover:border-[#35415c] rounded-xl p-3.5 bg-[#10141f] space-y-3 flex flex-col justify-between transition-all duration-200 shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                    </div>
                     <span class="font-bold text-xs text-white">1. ONVIF SOAP (Device Service)</span>
                   </div>
-                  <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 443 / 80</span>
+                  <span class="font-mono text-sky-400 text-[11px] bg-[#162233] px-2 py-0.5 rounded border border-sky-800/40">TCP 443 / 80</span>
                 </div>
 
                 <!-- Parameter Form -->
-                <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-[#0b0e15] p-3 rounded-lg border border-[#1d2331] grid grid-cols-2 gap-2.5 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
-                    <input id="onvif_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Số lần sai:</label>
+                    <input id="onvif_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
-                    <input id="onvif_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
+                    <label class="block text-[#848c9e] font-medium mb-1">Thử đúng tại:</label>
+                    <input id="onvif_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 rounded px-2.5 py-1 text-emerald-400 font-mono outline-none transition" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
-                    <select id="onvif_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Tốc độ:</label>
+                    <select id="onvif_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
                       <option value="1.0">1.0 conn/s (Khóa logic)</option>
                       <option value="0.0">Tối đa (Không trễ)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
-                    <select id="onvif_port" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Cổng:</label>
+                    <select id="onvif_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="443" selected>443 (HTTPS)</option>
                       <option value="80">80 (HTTP)</option>
                     </select>
@@ -926,57 +938,49 @@
                 </div>
               </div>
 
-              <!-- Action Controls -->
-              <div class="space-y-1.5 pt-1">
-                <button onclick="runCustomLockout('onvif')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy tùy biến ONVIF</span>
+              <!-- Action Button -->
+              <div class="pt-1">
+                <button onclick="runCustomLockout('onvif')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Test</span>
                 </button>
-                <div class="grid grid-cols-3 gap-1.5">
-                  <button onclick="runPresetLockout('onvif', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
-                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
-                  </button>
-                  <button onclick="runPresetLockout('onvif', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
-                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
-                  </button>
-                  <button onclick="runCommand('python tool11_onvif_lockout.py --mode burst --burst-count 8', 'ONVIF Firewall Burst')" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="Bắn 8 kết nối đồng thời">
-                    <span class="font-bold text-[11px] text-blue-400">Burst (8/s)</span>
-                  </button>
-                </div>
               </div>
             </div>
 
             <!-- ================= SUB-PANEL 2: RTSP / RTSPS MEDIA ================= -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <div class="border border-[#222938] hover:border-[#35415c] rounded-xl p-3.5 bg-[#10141f] space-y-3 flex flex-col justify-between transition-all duration-200 shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    </div>
                     <span class="font-bold text-xs text-white">2. Luồng Media RTSP / RTSPS</span>
                   </div>
-                  <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 322 / 554</span>
+                  <span class="font-mono text-indigo-400 text-[11px] bg-[#1a1c33] px-2 py-0.5 rounded border border-indigo-800/40">TCP 322 / 554</span>
                 </div>
 
                 <!-- Parameter Form -->
-                <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-[#0b0e15] p-3 rounded-lg border border-[#1d2331] grid grid-cols-2 gap-2.5 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
-                    <input id="rtsp_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Số lần sai:</label>
+                    <input id="rtsp_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
-                    <input id="rtsp_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
+                    <label class="block text-[#848c9e] font-medium mb-1">Thử đúng tại:</label>
+                    <input id="rtsp_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 rounded px-2.5 py-1 text-emerald-400 font-mono outline-none transition" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
-                    <select id="rtsp_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Tốc độ:</label>
+                    <select id="rtsp_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
                       <option value="1.0">1.0 conn/s (Khóa logic)</option>
                       <option value="0.0">Tối đa (Không trễ)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
-                    <select id="rtsp_port" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Cổng:</label>
+                    <select id="rtsp_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="322" selected>322 (RTSPS TLS)</option>
                       <option value="554">554 (RTSP Cleartext)</option>
                     </select>
@@ -984,127 +988,110 @@
                 </div>
               </div>
 
-              <!-- Action Controls -->
-              <div class="space-y-1.5 pt-1">
-                <button onclick="runCustomLockout('rtsp')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy tùy biến RTSP</span>
+              <!-- Action Button -->
+              <div class="pt-1">
+                <button onclick="runCustomLockout('rtsp')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Test</span>
                 </button>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('rtsp', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
-                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
-                  </button>
-                  <button onclick="runPresetLockout('rtsp', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
-                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
-                  </button>
-                </div>
               </div>
             </div>
 
             <!-- ================= SUB-PANEL 3: SSH LINUX OS ================= -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <div class="border border-[#222938] hover:border-[#35415c] rounded-xl p-3.5 bg-[#10141f] space-y-3 flex flex-col justify-between transition-all duration-200 shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
                     <span class="font-bold text-xs text-white">3. Dòng lệnh Quản trị SSH (Linux OS)</span>
                   </div>
-                  <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 22</span>
+                  <span class="font-mono text-emerald-400 text-[11px] bg-[#12241d] px-2 py-0.5 rounded border border-emerald-800/40">TCP 22</span>
                 </div>
 
                 <!-- Parameter Form -->
-                <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-[#0b0e15] p-3 rounded-lg border border-[#1d2331] grid grid-cols-2 gap-2.5 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
-                    <input id="ssh_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Số lần sai:</label>
+                    <input id="ssh_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
-                    <input id="ssh_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
+                    <label class="block text-[#848c9e] font-medium mb-1">Thử đúng tại:</label>
+                    <input id="ssh_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 rounded px-2.5 py-1 text-emerald-400 font-mono outline-none transition" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
-                    <select id="ssh_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Tốc độ:</label>
+                    <select id="ssh_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="3.0" selected>3.0 conn/s (Firewall SSH)</option>
                       <option value="1.0">1.0 conn/s (Khóa logic)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
-                    <div class="w-full bg-[#141822] border border-[#2e3547] rounded px-2 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
+                    <label class="block text-[#848c9e] font-medium mb-1">Cổng:</label>
+                    <div class="w-full bg-[#141924] border border-[#2a3449] rounded px-2.5 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
                       <span>22 / TCP</span>
-                      <span class="text-[10px] text-emerald-400">SSHv2</span>
+                      <span class="text-[10px] text-emerald-400 font-semibold">SSHv2</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Action Controls -->
-              <div class="space-y-1.5 pt-1">
-                <button onclick="runCustomLockout('ssh')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy tùy biến SSH</span>
+              <!-- Action Button -->
+              <div class="pt-1">
+                <button onclick="runCustomLockout('ssh')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Test</span>
                 </button>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('ssh', 10, 11, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
-                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
-                  </button>
-                  <button onclick="runPresetLockout('ssh', 4, 5, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
-                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
-                  </button>
-                </div>
               </div>
             </div>
 
             <!-- ================= SUB-PANEL 4: WEB ADMIN HTTPS ================= -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+            <div class="border border-[#222938] hover:border-[#35415c] rounded-xl p-3.5 bg-[#10141f] space-y-3 flex flex-col justify-between transition-all duration-200 shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                      <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
                     <span class="font-bold text-xs text-white">4. Giao diện Quản trị Web Admin (HTTPS)</span>
                   </div>
-                  <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 443</span>
+                  <span class="font-mono text-rose-400 text-[11px] bg-[#29161e] px-2 py-0.5 rounded border border-rose-800/40">TCP 443</span>
                 </div>
 
                 <!-- Parameter Form -->
-                <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-[#0b0e15] p-3 rounded-lg border border-[#1d2331] grid grid-cols-2 gap-2.5 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
-                    <input id="web_fail_count" type="number" value="6" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Số lần sai:</label>
+                    <input id="web_fail_count" type="number" value="6" min="1" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
-                    <input id="web_success_at" type="number" value="7" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 4 = Trước ngưỡng (Reset); 7 = Sau ngưỡng (Khóa)">
+                    <label class="block text-[#848c9e] font-medium mb-1">Thử đúng tại:</label>
+                    <input id="web_success_at" type="number" value="7" min="0" max="100" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 rounded px-2.5 py-1 text-emerald-400 font-mono outline-none transition" title="0 = Không thử đúng; 4 = Trước ngưỡng (Reset); 7 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
-                    <select id="web_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
+                    <label class="block text-[#848c9e] font-medium mb-1">Tốc độ:</label>
+                    <select id="web_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
                       <option value="2.5" selected>2.5 conn/s (Chuẩn Web)</option>
                       <option value="1.0">1.0 conn/s (Khóa logic)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
-                    <div class="w-full bg-[#141822] border border-[#2e3547] rounded px-2 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
+                    <label class="block text-[#848c9e] font-medium mb-1">Cổng:</label>
+                    <div class="w-full bg-[#141924] border border-[#2a3449] rounded px-2.5 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
                       <span>443 / TCP</span>
-                      <span class="text-[10px] text-cyan-400">HTTPS TLS 1.3</span>
+                      <span class="text-[10px] text-rose-400 font-semibold">HTTPS TLS</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Action Controls -->
-              <div class="space-y-1.5 pt-1">
-                <button onclick="runCustomLockout('web')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy tùy biến Web</span>
+              <!-- Action Button -->
+              <div class="pt-1">
+                <button onclick="runCustomLockout('web')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Test</span>
                 </button>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('web', 6, 7, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="6 lần sai -> lượt 7 thử đúng">
-                    <span class="font-bold text-[11px] text-rose-400">Khóa (6 fail)</span>
-                  </button>
-                  <button onclick="runPresetLockout('web', 3, 4, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="3 lần sai -> lượt 4 thử đúng">
-                    <span class="font-bold text-[11px] text-emerald-400">Reset (3 fail)</span>
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -2225,26 +2212,26 @@
         const rate = document.getElementById('onvif_rate')?.value || '4.0';
         const port = document.getElementById('onvif_port')?.value || '443';
         cmd = `python tool11_onvif_lockout.py --port ${port} --fail-count ${fc} --success-at ${sa} --rate ${rate} --mode custom`;
-        label = `ONVIF SOAP Kịch bản: ${fc} Sai, Thử đúng ở #${sa} (${rate} conn/s)`;
+        label = `ONVIF Brute-Force (${fc} Sai, #${sa} Đúng)`;
       } else if (type === 'rtsp') {
         const fc = document.getElementById('rtsp_fail_count')?.value || 10;
         const sa = document.getElementById('rtsp_success_at')?.value || 0;
         const rate = document.getElementById('rtsp_rate')?.value || '4.0';
         const port = document.getElementById('rtsp_port')?.value || '322';
         cmd = `python tool10_rtsp_lockout.py --port ${port} --fail-count ${fc} --success-at ${sa} --rate ${rate} --mode custom`;
-        label = `RTSP Kịch bản: Cổng ${port}, ${fc} Sai, Thử đúng ở #${sa} (${rate} conn/s)`;
+        label = `RTSP Brute-Force (${fc} Sai, #${sa} Đúng)`;
       } else if (type === 'ssh') {
         const fc = document.getElementById('ssh_fail_count')?.value || 10;
         const sa = document.getElementById('ssh_success_at')?.value || 0;
         const rate = document.getElementById('ssh_rate')?.value || '3.0';
         cmd = `python tool15_ssh_lockout.py --fail-count ${fc} --success-at ${sa} --rate ${rate} --mode custom`;
-        label = `SSH Kịch bản: ${fc} Sai, Thử đúng ở #${sa} (${rate} conn/s)`;
+        label = `SSH Brute-Force (${fc} Sai, #${sa} Đúng)`;
       } else if (type === 'web') {
         const fc = document.getElementById('web_fail_count')?.value || 6;
         const sa = document.getElementById('web_success_at')?.value || 0;
         const rate = document.getElementById('web_rate')?.value || '2.5';
         cmd = `python tool16_web_lockout.py --fail-count ${fc} --success-at ${sa} --rate ${rate} --mode custom`;
-        label = `Web HTTPS Kịch bản: ${fc} Sai, Thử đúng ở #${sa} (${rate} conn/s)`;
+        label = `Web HTTPS Brute-Force (${fc} Sai, #${sa} Đúng)`;
       }
       if (cmd) {
         runCommand(cmd, label);
