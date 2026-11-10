@@ -490,7 +490,7 @@ def main():
             console.clear()
             daemon_status = "[bold green][OK] MÁY CHỦ THU NHẬN CLIENT ĐANG CHẠY NGẦM TRÊN TOÀN BỘ CỔNG (SẴN SÀNG)[/bold green]" if rd.is_daemon_running() else "[bold yellow][!] Máy chủ thu nhận đang khởi động...[/bold yellow]"
             console.print(Panel(
-                f"[bold cyan]BỘ CÔNG CỤ ĐO KIỂM AN TOÀN BẢO MẬT & MẬT MÃ CAMERA IP TOÀN DIỆN[/bold cyan]\n"
+                f"[bold cyan]CUMERA - BỘ CÔNG CỤ ĐO KIỂM AN TOÀN BẢO MẬT & MẬT MÃ CAMERA IP[/bold cyan]\n"
                 f"[dim]Tiêu chuẩn QCVN 11:2026/BCA & Quốc tế | Thiết bị mục tiêu: [bold white]{ip} ({model})[/bold white][/dim]\n"
                 f"{daemon_status}\n"
                 f"[dim]↳ IP Máy tính điền trên Web Camera: [bold yellow]{primary_ip}[/bold yellow] ({all_ips_str}) | Cổng: SFTP(22), FTP(21), Mail(25/465/587), Alarm(8088/8443)[/dim]",

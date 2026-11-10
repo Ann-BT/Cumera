@@ -13,6 +13,9 @@ import os
 import time
 import json
 import struct
+import urllib.request
+import urllib.error
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Any, Optional, Tuple, Set
 
@@ -510,19 +513,132 @@ def scan_tcp_ports_fast(ip: str, ports_to_scan: List[int], timeout: float = 0.35
     return sorted(open_ports)
 
 # --------------------------------------------------------------------------
+# External API & Web Interfaces Surface Scanner (QCVN 11 Khoản 2.6.2 & 2.10.1)
+# --------------------------------------------------------------------------
+API_PROBE_ENDPOINTS = [
+    # ONVIF SOAP Services
+    ("/onvif/device_service", "ONVIF SOAP", "Điểm vào dịch vụ thiết bị ONVIF Profile S/G/T (Device Management)", "POST"),
+    ("/onvif/media_service", "ONVIF SOAP", "Dịch vụ quản lý cấu hình luồng phát Media ONVIF", "POST"),
+    ("/onvif/ptz_service", "ONVIF SOAP", "Dịch vụ điều khiển xoay quét phóng to PTZ", "POST"),
+    ("/onvif/imaging_service", "ONVIF SOAP", "Dịch vụ tinh chỉnh thông số cảm biến hình ảnh", "POST"),
+    ("/onvif/events", "ONVIF SOAP", "Dịch vụ nhận thông báo sự kiện / cảnh báo", "POST"),
+
+    # AXIS VAPIX Management & Media APIs
+    ("/axis-cgi/basicdeviceinfo.cgi", "Axis VAPIX", "Thuộc tính cơ bản thiết bị (BasicDeviceInfo API)", "GET/POST"),
+    ("/axis-cgi/param.cgi?action=list&group=root", "Axis VAPIX", "Quản lý toàn bộ tham số hệ thống VAPIX", "GET"),
+    ("/axis-cgi/systeminfo.cgi", "Axis VAPIX", "Báo cáo trạng thái hệ điều hành & phần cứng", "GET"),
+    ("/axis-cgi/firmwareversion.cgi", "Axis VAPIX", "Kiểm tra phiên bản Firmware hiện tại", "GET"),
+    ("/axis-media/media.amp", "Axis Media", "Luồng phát Media RTSP qua HTTP/HTTPS", "GET"),
+    ("/axis-cgi/jpg/image.cgi", "Axis Snapshot", "Trích xuất ảnh tĩnh Snapshot JPEG", "GET"),
+    ("/axis-cgi/mjpg/video.mjpg", "Axis MJPEG", "Luồng video Motion-JPEG", "GET"),
+
+    # Hikvision ISAPI
+    ("/ISAPI/System/deviceInfo", "Hikvision ISAPI", "Thông tin định danh thiết bị ISAPI", "GET"),
+    ("/ISAPI/Security/users", "Hikvision ISAPI", "Danh mục tài khoản người dùng ISAPI", "GET"),
+    ("/ISAPI/Streaming/channels", "Hikvision ISAPI", "Kênh phát luồng ISAPI Video", "GET"),
+
+    # Generic Web & Remote Management Interfaces
+    ("/", "Web Portal", "Giao diện Web Quản trị chính (Web GUI Root)", "GET"),
+    ("/index.html", "Web Portal", "Trang đăng nhập Web Admin", "GET"),
+    ("/api/", "REST API", "Giao diện REST API gốc", "GET"),
+    ("/api/v1/", "REST API", "Giao diện REST API v1", "GET"),
+    ("/RPC2", "XML-RPC / Dahua", "Cổng điều khiển máy-với-máy XML-RPC", "POST"),
+    ("/cgi-bin/", "CGI Gateway", "Giao diện cổng CGI hệ thống", "GET"),
+    ("/swagger", "API Docs", "Tài liệu API Swagger / OpenAPI", "GET"),
+    ("/openapi.json", "API Docs", "Đặc tả OpenAPI JSON", "GET"),
+]
+
+def scan_external_apis(ip: str, web_ports: List[int], tls_ports: List[int]) -> List[Dict[str, Any]]:
+    """
+    Probes standard IP Camera API endpoints across open web ports (80, 443, 8080, 8443...)
+    to discover active management, video, and machine-to-machine interfaces.
+    Audits against IXIT 28-ExtAPI and Clause 2.6.2 (Unauthenticated Information Disclosure).
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    discovered = []
+    for port in web_ports:
+        is_tls = port in tls_ports
+        scheme = "https" if is_tls else "http"
+        for path, svc_type, desc, expected_method in API_PROBE_ENDPOINTS:
+            url = f"{scheme}://{ip}:{port}{path}"
+            req = urllib.request.Request(url, headers={"User-Agent": "QCVN11-Auditor/2.4"})
+            status_code = None
+            resp_body = ""
+            try:
+                with urllib.request.urlopen(req, timeout=0.8, context=ctx if is_tls else None) as resp:
+                    status_code = resp.status
+                    raw = resp.read(256)
+                    resp_body = raw.decode("latin1", errors="ignore").strip()
+            except urllib.error.HTTPError as e:
+                status_code = e.code
+                try:
+                    raw = e.read(256)
+                    resp_body = raw.decode("latin1", errors="ignore").strip()
+                except Exception:
+                    resp_body = str(e.reason)
+            except Exception:
+                continue
+
+            if status_code in [200, 301, 302, 401, 403, 405]:
+                # Evaluate auth & security
+                if status_code in [401, 403]:
+                    auth_eval = "BẢO VỆ (Yêu cầu xác thực)"
+                    eval_color = "green"
+                    risk_note = "Chặn truy cập trái phép an toàn"
+                elif status_code == 405:
+                    auth_eval = "HOẠT ĐỘNG (Cần SOAP/POST)"
+                    eval_color = "cyan"
+                    risk_note = "Endpoint SOAP/RPC đang lắng nghe"
+                elif status_code in [301, 302]:
+                    auth_eval = "CHUYỂN HƯỚNG (Redirect)"
+                    eval_color = "yellow"
+                    risk_note = "Chuyển tiếp kênh bảo mật"
+                elif status_code == 200:
+                    auth_eval = "MỞ TRỰC TIẾP (Không xác thực)"
+                    eval_color = "yellow"
+                    if any(k in resp_body.lower() for k in ["apiversion", "version", "model", "serial", "mac", "firmware"]):
+                        risk_note = "Tiết lộ phiên bản/API (Khoản 2.6.2)"
+                    else:
+                        risk_note = "Giao diện Web / Tài nguyên công khai"
+                else:
+                    auth_eval = f"HTTP {status_code}"
+                    eval_color = "white"
+                    risk_note = "Phản hồi dịch vụ"
+
+                discovered.append({
+                    "port": port,
+                    "proto": "https" if is_tls else "http",
+                    "path": path,
+                    "url": url,
+                    "service_type": svc_type,
+                    "description": desc,
+                    "status_code": status_code,
+                    "auth_status": auth_eval,
+                    "eval_color": eval_color,
+                    "risk_note": risk_note,
+                    "snippet": resp_body[:80].replace("\n", " ").replace("\r", " ")
+                })
+
+    return discovered
+
+# --------------------------------------------------------------------------
 # Main Scanner Function & IXIT Discrepancy Auditor
 # --------------------------------------------------------------------------
 def scan_camera_services(
     ip: str,
-    scan_mode: str = "camera_known",
+    scan_mode: str = "top_1000",
     custom_ports: Optional[List[int]] = None,
     declared_ixit_ports: Optional[Set[int]] = None
 ) -> Dict[str, Any]:
     """
-    Exhaustively scans camera ports, identifies services, and compares with IXIT declarations.
+    Exhaustively scans camera ports, identifies services, discovers external APIs,
+    and compares with IXIT declarations (QCVN 11 Khoản 2.6.1 & 2.10.1).
     Scan modes:
-      - 'camera_known': Standard known camera ports (~45 ports)
-      - 'top_1000': Top common TCP ports + UDP probes
+      - 'camera_known': Standard known camera ports (~50 ports)
+      - 'top_1000' / 'auto': Top common TCP ports + camera ports + UDP probes
       - 'full_range': Full TCP 1-65535 ports (high-speed) + UDP probes
       - 'custom': Custom port list specified by user
     """
@@ -531,12 +647,16 @@ def scan_camera_services(
     # Determine TCP ports to scan
     if scan_mode == "full_range":
         ports_list = list(range(1, 65536))
-    elif scan_mode == "top_1000":
+        max_workers = 250
+    elif scan_mode in ["top_1000", "auto"]:
         ports_list = sorted(list(set(TOP_TCP_PORTS + list(CAMERA_KNOWN_PORTS.keys()))))
+        max_workers = 150
     elif scan_mode == "custom" and custom_ports:
         ports_list = sorted(list(set(custom_ports)))
+        max_workers = 150
     else: # Default: camera_known
         ports_list = sorted([p for p, v in CAMERA_KNOWN_PORTS.items() if v[2] == "tcp"])
+        max_workers = 120
 
     # Load declared IXIT ports
     if declared_ixit_ports is None:
@@ -552,6 +672,7 @@ def scan_camera_services(
         "tls_ports": [],
         "cleartext_ports": [],
         "services": {},
+        "external_apis": [],
         "ixit_audit": {
             "declared_ports": sorted(list(declared_ixit_ports)),
             "declared_and_open": [],
@@ -562,7 +683,7 @@ def scan_camera_services(
     }
 
     # 1. High-speed TCP Scan
-    open_tcp = scan_tcp_ports_fast(ip, ports_list, timeout=0.35, max_workers=150)
+    open_tcp = scan_tcp_ports_fast(ip, ports_list, timeout=0.25 if scan_mode == "full_range" else 0.35, max_workers=max_workers)
     results["tcp_open"] = open_tcp
 
     # 2. Deep Protocol & Banner Identification on Open TCP Ports
@@ -594,7 +715,17 @@ def scan_camera_services(
         u_info["ixit_declared"] = u_port in declared_ixit_ports
         results["services"][u_port] = u_info
 
-    # 4. Perform IXIT Audit (Clause 2.6.1 / ETSI 5.6-1)
+    # 4. Probe External APIs & Web Interfaces
+    web_ports = [
+        p for p in results["tcp_open"]
+        if p in [80, 443, 8080, 8443, 8000, 8081, 8088, 8090, 8888, 9443, 10443]
+        or "http" in results["services"].get(p, {}).get("name", "").lower()
+        or "web" in results["services"].get(p, {}).get("category", "").lower()
+    ]
+    if web_ports:
+        results["external_apis"] = scan_external_apis(ip, web_ports, results["tls_ports"])
+
+    # 5. Perform IXIT Discrepancy Audit (Clause 2.6.1 / ETSI 5.6-1)
     all_open_ports = set(results["tcp_open"] + results["udp_open"])
 
     for p in declared_ixit_ports:
@@ -635,45 +766,76 @@ def display_service_scan(results: Dict[str, Any]):
     elapsed = results.get("elapsed_seconds", 0)
     probed = results.get("ports_probed_count", 0)
 
-    console.print(f"\n[bold cyan]THỐNG KÊ QUÉT CỔNG & DỊCH VỤ - THIẾT BỊ: {ip}[/bold cyan]")
-    console.print(f"[dim]Chế độ: {mode_str} | Số cổng thăm dò: {probed} | Thời gian: {elapsed}s[/dim]\n")
+    console.print(f"\n[bold cyan]THỐNG KÊ QUÉT CỔNG, DỊCH VỤ & BỀ MẶT API - THIẾT BỊ: {ip}[/bold cyan]")
+    console.print(f"[dim]Chế độ: {mode_str} | Số cổng thăm dò: {probed} | Thời gian quét: {elapsed}s[/dim]\n")
 
-    table = Table(title=f"DANH SÁCH CÁC CỔNG MỞ TRÊN CAMERA ({ip})", show_lines=True, expand=True)
+    # Table 1: Network Ports & Services (TCP & UDP)
+    table = Table(title=f"BẢNG 1: CÁC CỔNG MẠNG & DỊCH VỤ PHÁT HIỆN TRÊN CAMERA ({ip})", show_lines=True, expand=True)
     table.add_column("Cổng (Port)", style="bold yellow", justify="center", width=12)
     table.add_column("Giao thức", justify="center", width=10)
     table.add_column("Dịch vụ nhận diện", style="bold white", width=22)
     table.add_column("Kênh truyền", justify="center", width=18)
-    table.add_column("Đối chiếu IXIT", justify="center", width=26)
+    table.add_column("Đối chiếu IXIT 15-Intf", justify="center", width=26)
     table.add_column("Chi tiết / Banner", style="dim")
 
     if not results["services"]:
         console.print("[yellow][!] Không tìm thấy cổng mở nào trên camera trong dải quét đã chọn.[/yellow]")
-        return
+    else:
+        for p, info in sorted(results["services"].items()):
+            port_str = str(info["port"])
+            proto_str = info["proto"].upper()
+            svc_str = info.get("name", "Unknown")
+            is_tls = info.get("is_tls", False)
 
-    for p, info in sorted(results["services"].items()):
-        port_str = str(info["port"])
-        proto_str = info["proto"].upper()
-        svc_str = info.get("name", "Unknown")
-        is_tls = info.get("is_tls", False)
+            enc_str = "[bold green]MÃ HÓA TLS[/bold green]" if is_tls else "[yellow]DẠNG RÕ[/yellow]"
+            if info.get("tls_version"):
+                enc_str += f"\n[dim]({info['tls_version']})[/dim]"
 
-        enc_str = "[bold green]MÃ HÓA TLS[/bold green]" if is_tls else "[yellow]DẠNG RÕ[/yellow]"
-        if info.get("tls_version"):
-            enc_str += f"\n[dim]({info['tls_version']})[/dim]"
+            # IXIT Status Column
+            is_declared = info.get("ixit_declared", False)
+            if is_declared:
+                ixit_str = "[bold green][ĐÃ KHAI BÁO IXIT][/bold green]"
+            else:
+                ixit_str = "[bold red blink][!] NGOÀI KHAI BÁO IXIT[/bold red blink]"
 
-        # IXIT Status Column
-        is_declared = info.get("ixit_declared", False)
-        if is_declared:
-            ixit_str = "[bold green][ĐÃ KHAI BÁO IXIT][/bold green]"
-        else:
-            ixit_str = "[bold red blink][!] KHÔNG CÓ TRONG IXIT[/bold red blink]"
+            desc_str = info.get("desc", "")
+            if info.get("banner"):
+                desc_str += f"\n[dim cyan]Banner: {info['banner']}[/dim cyan]"
 
-        desc_str = info.get("desc", "")
-        if info.get("banner"):
-            desc_str += f"\n[dim cyan]Banner: {info['banner']}[/dim cyan]"
+            table.add_row(port_str, proto_str, svc_str, enc_str, ixit_str, desc_str)
 
-        table.add_row(port_str, proto_str, svc_str, enc_str, ixit_str, desc_str)
+        console.print(table)
 
-    console.print(table)
+    # Table 2: External APIs & Web Endpoints (IXIT 28-ExtAPI & Clause 2.6.2)
+    apis = results.get("external_apis", [])
+    if apis:
+        api_table = Table(title=f"BẢNG 2: BỀ MẶT GIAO DIỆN API & ĐIỂM VÀO ĐIỀU KHIỂN TỪ XA ({ip})", show_lines=True, expand=True)
+        api_table.add_column("Cổng", style="bold yellow", justify="center", width=8)
+        api_table.add_column("Endpoint API", style="bold cyan", width=32)
+        api_table.add_column("Phân loại Giao diện", style="bold white", width=16)
+        api_table.add_column("Mã HTTP", justify="center", width=10)
+        api_table.add_column("Kiểm soát Truy cập", justify="center", width=24)
+        api_table.add_column("Đánh giá An toàn / Tiết lộ (2.6.2 & 2.10.1)", style="dim")
+
+        for a in apis:
+            port_txt = f"{a['port']}/{a['proto'].upper()}"
+            status_txt = f"[bold white]{a['status_code']}[/bold white]"
+            auth_txt = f"[{a['eval_color']}]{a['auth_status']}[/{a['eval_color']}]"
+            risk_txt = a["risk_note"]
+            if a["snippet"]:
+                risk_txt += f"\n[dim]Trích xuất: {a['snippet'][:60]}[/dim]"
+
+            api_table.add_row(
+                port_txt,
+                a["path"],
+                a["service_type"],
+                status_txt,
+                auth_txt,
+                risk_txt
+            )
+
+        console.print("\n")
+        console.print(api_table)
 
     # Summary Panel
     audit = results.get("ixit_audit", {})
@@ -683,8 +845,9 @@ def display_service_scan(results: Dict[str, Any]):
 
     panel_content = [
         f"[bold white]Tổng số cổng mở phát hiện:[/bold white] [bold yellow]{len(results['services'])}[/bold yellow] (TCP: {len(results['tcp_open'])}, UDP: {len(results['udp_open'])})",
-        f"[bold white]Cổng khớp với khai báo IXIT:[/bold white] [bold green]{declared_open}[/bold green]",
-        f"[bold white]Cổng khai báo trong IXIT nhưng đang tắt (An toàn):[/bold white] [dim]{declared_closed}[/dim]"
+        f"[bold white]Cổng khớp với khai báo IXIT (15-Intf):[/bold white] [bold green]{declared_open}[/bold green]",
+        f"[bold white]Cổng khai báo trong IXIT nhưng đang tắt (An toàn):[/bold white] [dim]{declared_closed}[/dim]",
+        f"[bold white]Số Endpoint API bên ngoài phát hiện (28-ExtAPI):[/bold white] [bold cyan]{len(apis)} điểm vào[/bold cyan]"
     ]
 
     if undeclared:
@@ -702,7 +865,7 @@ def display_service_scan(results: Dict[str, Any]):
         )
         border_col = "green"
 
-    console.print(Panel("\n".join(panel_content), title="[bold cyan]KẾT QUẢ ĐỐI SOÁT HỒ SƠ IXIT (QCVN 11 KHOẢN 2.6.1)[/bold cyan]", border_style=border_col))
+    console.print(Panel("\n".join(panel_content), title="[bold cyan]KẾT QUẢ ĐỐI SOÁT HỒ SƠ IXIT (QCVN 11 KHOẢN 2.6.1 & KHOẢN 2.10.1)[/bold cyan]", border_style=border_col))
     console.print(f"[dim]Bằng chứng đã được lưu tự động tại: captures/port_scan_ixit_audit.json[/dim]\n")
 
 # --------------------------------------------------------------------------
@@ -730,7 +893,7 @@ def interactive_menu(ip: str):
 
         t.add_row("1", "Quét danh mục cổng Camera mở rộng", "Quét ~50 cổng đặc trưng camera (Web, RTSP, SSH, Telnet, Hik, Dahua, XM, Axis) & UDP")
         t.add_row("2", "Quét Top 1000 cổng TCP phổ biến", "Quét nhanh 1000 cổng phổ biến nhất mạng TCP bằng đa luồng socket")
-        t.add_row("3", "Quét TOÀN DIỆN dải cổng 1 - 65535", "Quét vét cạn 100% không gian cổng 1-65535 siêu tốc (ThreadPool 150 luồng)")
+        t.add_row("3", "Quét TOÀN DIỆN dải cổng 1 - 65535", "Quét vét cạn 100% không gian cổng 1-65535 siêu tốc (ThreadPool 250 luồng)")
         t.add_row("4", "Quét dải cổng tùy chỉnh", "Nhập danh sách cổng hoặc dải cổng cụ thể (ví dụ: 1-1024, 8000-9000)")
         t.add_row("5", "Cập nhật danh sách cổng khai báo IXIT", "Thay đổi danh sách cổng IXIT dùng để đối chiếu cho camera này")
         t.add_row("0", "[bold red]Quay lại Menu chính[/bold red]", "")
@@ -788,16 +951,38 @@ def interactive_menu(ip: str):
                 console.print(f"[red]Lỗi lưu cấu hình: {e}[/red]")
             input("\nBấm Enter để tiếp tục...")
 
-if __name__ == '__main__':
-    cfg = load_config()
-    dut_ip = sys.argv[1] if len(sys.argv) > 1 else cfg.get("target_camera", {}).get("ip", "192.168.20.38")
+def main():
+    parser = argparse.ArgumentParser(description="Universal Camera Service & Comprehensive Port Discovery Module (QCVN 11:2026/BCA)")
+    parser.add_argument("target_ip", nargs="?", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--ip", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--full", action="store_true", help="Quét toàn bộ 1 - 65535 cổng TCP + UDP + API endpoints (Toàn diện)")
+    parser.add_argument("--fast", action="store_true", help="Quét danh mục cổng camera đặc thù (~50 cổng) + UDP + API")
+    parser.add_argument("--auto", action="store_true", help="Tự động quét toàn diện không dừng tương tác (Mặc định)")
+    parser.add_argument("-i", "--interactive", action="store_true", help="Mở menu dòng lệnh tương tác (CLI)")
 
-    # If executed with flags or directly:
-    if len(sys.argv) > 2 and sys.argv[2] == "--fast":
-        res = scan_camera_services(dut_ip, scan_mode="camera_known")
-        display_service_scan(res)
-    elif len(sys.argv) > 2 and sys.argv[2] == "--full":
-        res = scan_camera_services(dut_ip, scan_mode="full_range")
-        display_service_scan(res)
-    else:
+    args = parser.parse_args()
+
+    cfg = load_config()
+    dut_ip = args.ip or args.target_ip or cfg.get("target_camera", {}).get("ip", "192.168.20.38")
+
+    # If user explicitly requested interactive mode in terminal:
+    if args.interactive and sys.stdin.isatty():
         interactive_menu(dut_ip)
+        return
+
+    # Non-interactive / Automated execution:
+    if args.full:
+        mode = "full_range"
+    elif args.fast:
+        mode = "camera_known"
+    else:
+        # Standard auto mode: scans all camera ports + top TCP ports + UDP + APIs
+        mode = "top_1000"
+
+    declared = get_declared_ixit_ports(cfg)
+    console.print(f"\n[bold cyan][*] Khởi chạy Dò quét Toàn diện trên mục tiêu:[/bold cyan] [bold white]{dut_ip}[/bold white] [dim](Chế độ: {mode})[/dim]...")
+    res = scan_camera_services(dut_ip, scan_mode=mode, declared_ixit_ports=declared)
+    display_service_scan(res)
+
+if __name__ == '__main__':
+    main()

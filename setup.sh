@@ -45,6 +45,29 @@ fi
 # Khởi tạo thư mục captures nếu chưa có
 mkdir -p captures/evidence/ComMech captures/evidence/AuthMech
 
+# Đăng ký icon và ứng dụng Cumera vào hệ thống Linux
+if [ -d "$HOME/.local/share/applications" ]; then
+    echo "[*] Đang đăng ký ứng dụng Cumera vào hệ thống Desktop Linux..."
+    mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps"
+    cp -f assets/icon.png "$HOME/.local/share/icons/cumera.png" 2>/dev/null || true
+    cp -f assets/icon.png "$HOME/.local/share/icons/hicolor/256x256/apps/cumera.png" 2>/dev/null || true
+    cat << EOF > "$HOME/.local/share/applications/cumera.desktop"
+[Desktop Entry]
+Name=Cumera
+GenericName=Camera Cybersecurity Audit Suite
+Comment=Bộ công cụ đo kiểm an toàn bảo mật & mật mã camera IP (QCVN 11:2026/BCA)
+Exec=$DIR/run_app.sh
+Icon=cumera
+Terminal=false
+Type=Application
+Categories=Network;Security;Utility;
+Keywords=cumera;camera;audit;qcvn11;security;
+StartupWMClass=cumera
+EOF
+    rm -f "$HOME/.local/share/applications/qcvn11-camera-auditor.desktop"
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+fi
+
 # Phân quyền thực thi cho các script
 chmod +x run_app.sh run_suite.sh setup.sh *.py 2>/dev/null || true
 

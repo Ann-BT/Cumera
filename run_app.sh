@@ -20,7 +20,7 @@ SERVER_URL="http://127.0.0.1:${PORT}"
 # Chế độ dòng lệnh (CLI/TUI) nếu người dùng truyền cờ --cli hoặc --tui
 if [ "$1" = "--cli" ] || [ "$1" = "--tui" ]; then
     shift
-    printf "\033]0;Camera Security Auditor (TUI)\007"
+    printf "\033]0;Cumera (TUI)\007"
     exec "$VENV_PY" "$DIR/toolkit_app.py" "$@"
 fi
 
@@ -42,11 +42,11 @@ export FONTCONFIG_PATH=/etc/fonts
 CHROME_FLAGS="--no-first-run --no-default-browser-check --disable-features=Translate --disable-sync"
 
 if [ -x "/usr/bin/vivaldi" ]; then
-    exec /usr/bin/vivaldi --app="${SERVER_URL}" --class=camera-security-auditor "$@"
+    exec /usr/bin/vivaldi --app="${SERVER_URL}" --class=cumera "$@"
 elif [ -x "/usr/bin/google-chrome" ]; then
-    exec /usr/bin/google-chrome --app="${SERVER_URL}" --class=camera-security-auditor --user-data-dir="/tmp/camera_auditor_chrome_profile" $CHROME_FLAGS "$@"
+    exec /usr/bin/google-chrome --app="${SERVER_URL}" --class=cumera --user-data-dir="/tmp/cumera_chrome_profile" $CHROME_FLAGS "$@"
 elif [ -x "/usr/bin/chromium" ]; then
-    exec /usr/bin/chromium --app="${SERVER_URL}" --class=camera-security-auditor --user-data-dir="/tmp/camera_auditor_chrome_profile" $CHROME_FLAGS "$@"
+    exec /usr/bin/chromium --app="${SERVER_URL}" --class=cumera --user-data-dir="/tmp/cumera_chrome_profile" $CHROME_FLAGS "$@"
 elif [ -x "/usr/bin/epiphany" ]; then
     exec /usr/bin/epiphany --application-mode "${SERVER_URL}" "$@"
 elif command -v xdg-open > /dev/null 2>&1; then

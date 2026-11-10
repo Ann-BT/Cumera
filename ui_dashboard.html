@@ -1358,36 +1358,29 @@
 
         </div>
 
-        </div>
-
         <!-- ============================================================== -->
         <!-- TAB: GIÁM SÁT TRUYỀN TIN QUỐC TẾ, ĐỊNH VỊ IP & TELEMETRY -->
         <!-- ============================================================== -->
         <div id="tab_content_telemetry_geoip" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1e1b4b] text-indigo-300 border border-indigo-800/60 font-bold tracking-wider">NETWORK MONITOR</span>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Giám sát Kết nối & Phân tích Telemetry</h2>
-              </div>
-              <p class="text-[11px] text-[#848c9e] mt-1 max-w-3xl">
-                Phân loại IP đích theo quốc gia (GeoIP), giám sát lưu lượng outbound và kiểm tra dữ liệu đo đạc từ xa.
-              </p>
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1e1b4b] text-indigo-300 border border-indigo-800/60 font-bold tracking-wider">GEOIP</span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Giám sát Kết nối & Telemetry</h2>
             </div>
             <div class="flex items-center gap-2">
               <select id="geo_duration_select" class="bg-[#10131a] border border-[#272c3a] text-xs text-[#e1e4ea] px-2.5 py-1.5 rounded outline-none cursor-pointer">
-                <option value="15">Giám sát 15 giây</option>
-                <option value="20" selected>Giám sát 20 giây (Chuẩn)</option>
-                <option value="30">Giám sát 30 giây</option>
-                <option value="60">Giám sát 60 giây (Chuyên sâu)</option>
+                <option value="15">15 giây</option>
+                <option value="20" selected>20 giây</option>
+                <option value="30">30 giây</option>
+                <option value="60">60 giây</option>
               </select>
               <button onclick="startLiveGeoAudit()" class="bg-[#4338ca] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-indigo-500 transition shadow-sm">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Bắt đầu Giám sát Trực tiếp</span>
+                <span>Giám sát Live</span>
               </button>
               <button onclick="analyzeLatestPcapGeo()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] px-2.5 py-1.5 rounded text-xs font-medium border border-[#2e3547] transition">
-                <span>Phân tích PCAP</span>
+                <span>Đọc PCAP</span>
               </button>
               <button onclick="loadTelemetryGeoIPData()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#848c9e] hover:text-white px-2 py-1.5 rounded text-xs font-medium border border-[#2e3547] transition" title="Tải lại kết quả">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -1395,78 +1388,31 @@
             </div>
           </div>
 
-          <!-- Compliance Verdict Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div id="card_clause_3114" class="bg-[#10131a] border-l-4 border-l-cyan-500 border border-[#272c3a] p-3 rounded card-interactive">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  GIÁM SÁT DỮ LIỆU ĐO ĐẠC TỪ XA (TELEMETRY)
-                </span>
-                <span id="badge_verdict_3114" class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#14281f] text-emerald-300 border border-emerald-800/60 font-bold">ĐANG CHỜ</span>
-              </div>
-              <p id="desc_verdict_3114" class="text-[11px] text-[#848c9e] mt-2 leading-relaxed">
-                Chưa có dữ liệu đo kiểm. Bấm "Bắt đầu Giám sát Trực tiếp" để thu thập gói tin và đánh giá.
-              </p>
-              <div class="mt-2.5 pt-2 border-t border-[#1e2330] text-[11px] font-mono flex items-center gap-4 text-[#848c9e]">
-                <span>Gói Telemetry: <b id="count_telemetry_pkts" class="text-white">0</b></span>
-                <span>Lộ dữ liệu cá nhân: <b id="count_sensitive_leaks" class="text-emerald-400">0</b></span>
-                <span>Phương thức: <span class="text-cyan-400">DPI Inspection</span></span>
-              </div>
-            </div>
-
-            <div id="card_clause_3115" class="bg-[#10131a] border-l-4 border-l-indigo-500 border border-[#272c3a] p-3 rounded card-interactive">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  ĐỊNH VỊ ĐỊA LÝ & LƯU LƯỢNG QUỐC TẾ (GEOIP)
-                </span>
-                <span id="badge_verdict_3115" class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#14281f] text-emerald-300 border border-emerald-800/60 font-bold">ĐANG CHỜ</span>
-              </div>
-              <p id="desc_verdict_3115" class="text-[11px] text-[#848c9e] mt-2 leading-relaxed">
-                Chưa có dữ liệu đo kiểm. Đánh giá vị trí địa lý của toàn bộ IP nhận gói tin từ Camera.
-              </p>
-              <div class="mt-2.5 pt-2 border-t border-[#1e2330] text-[11px] font-mono flex items-center gap-4 text-[#848c9e]">
-                <span>Gói truyền Nước ngoài: <b id="count_overseas_pkts" class="text-white">0</b></span>
-                <span>IP Quốc tế: <b id="count_overseas_ips" class="text-white">0</b></span>
-                <span>Dịch vụ GeoIP: <span class="text-indigo-300">RFC/RDAP/WHOIS</span></span>
-              </div>
-            </div>
+          <!-- Hidden Compatibility IDs for JS Engine -->
+          <div class="hidden">
+            <div id="card_clause_3114"><span id="badge_verdict_3114"></span><span id="desc_verdict_3114"></span><span id="count_telemetry_pkts"></span><span id="count_sensitive_leaks"></span></div>
+            <div id="card_clause_3115"><span id="badge_verdict_3115"></span><span id="desc_verdict_3115"></span><span id="count_overseas_pkts"></span><span id="count_overseas_ips"></span></div>
           </div>
 
           <!-- Quick Metrics Bar (KPI Cards) -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-              <div class="text-[10px] uppercase font-bold text-[#848c9e] flex items-center justify-between">
-                <span>Tổng lưu lượng</span>
-                <span class="text-[9px] font-mono text-[#5c6475]">PACKETS</span>
-              </div>
+              <div class="text-[10px] uppercase font-bold text-[#848c9e]">Tổng lưu lượng</div>
               <div id="stat_total_packets" class="text-lg font-bold text-white font-mono mt-0.5">0</div>
-              <div id="stat_total_bytes" class="text-[10px] font-mono text-cyan-300 mt-0.5">0 B trao đổi</div>
+              <div id="stat_total_bytes" class="text-[10px] font-mono text-cyan-300 mt-0.5">0 B</div>
             </div>
             <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-              <div class="text-[10px] uppercase font-bold text-emerald-400 flex items-center justify-between">
-                <span>Mạng Nội bộ (LAN)</span>
-                <span class="text-[9px] font-mono text-emerald-500">RFC 1918</span>
-              </div>
+              <div class="text-[10px] uppercase font-bold text-emerald-400">Nội bộ (LAN)</div>
               <div id="stat_local_ips" class="text-lg font-bold text-emerald-300 font-mono mt-0.5">0 IP</div>
-              <div class="text-[10px] text-[#848c9e] mt-0.5">100% hợp quy nội bộ</div>
             </div>
             <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-              <div class="text-[10px] uppercase font-bold text-cyan-400 flex items-center justify-between">
-                <span>Máy chủ Việt Nam</span>
-                <span class="text-[9px] font-mono text-cyan-500">VN REGISTRY</span>
-              </div>
+              <div class="text-[10px] uppercase font-bold text-cyan-400">Việt Nam</div>
               <div id="stat_vn_ips" class="text-lg font-bold text-cyan-300 font-mono mt-0.5">0 IP</div>
-              <div class="text-[10px] text-[#848c9e] mt-0.5">Hạ tầng trong nước</div>
             </div>
             <div id="card_kpi_overseas" class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-              <div class="text-[10px] uppercase font-bold text-rose-400 flex items-center justify-between">
-                <span>Máy chủ Nước ngoài</span>
-                <span class="text-[9px] font-mono text-rose-500">OVERSEAS</span>
-              </div>
+              <div class="text-[10px] uppercase font-bold text-rose-400">Nước ngoài</div>
               <div id="stat_overseas_ips" class="text-lg font-bold text-rose-300 font-mono mt-0.5">0 IP</div>
-              <div id="stat_overseas_pkts_desc" class="text-[10px] text-[#848c9e] mt-0.5">0 gói truyền ra ngoài</div>
+              <div id="stat_overseas_pkts_desc" class="text-[10px] text-[#848c9e] mt-0.5">0 gói</div>
             </div>
           </div>
 
@@ -1475,43 +1421,41 @@
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[11px] font-bold text-[#848c9e] uppercase mr-1">Bộ lọc:</span>
               <button onclick="setGeoFilter('all')" id="btn_filter_all" class="px-2.5 py-1 rounded text-xs font-semibold bg-[#1d4ed8] text-white border border-blue-600 transition">Tất cả</button>
-              <button onclick="setGeoFilter('overseas')" id="btn_filter_overseas" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-rose-300 border border-[#2e3547] transition">Nước ngoài (Overseas)</button>
-              <button onclick="setGeoFilter('vietnam')" id="btn_filter_vietnam" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] transition">Việt Nam (VN)</button>
-              <button onclick="setGeoFilter('local')" id="btn_filter_local" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition">Nội bộ (LAN)</button>
-              <button onclick="setGeoFilter('telemetry')" id="btn_filter_telemetry" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-amber-300 border border-[#2e3547] transition">Có Telemetry</button>
+              <button onclick="setGeoFilter('overseas')" id="btn_filter_overseas" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-rose-300 border border-[#2e3547] transition">Nước ngoài</button>
+              <button onclick="setGeoFilter('vietnam')" id="btn_filter_vietnam" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] transition">Việt Nam</button>
+              <button onclick="setGeoFilter('local')" id="btn_filter_local" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition">Nội bộ</button>
+              <button onclick="setGeoFilter('telemetry')" id="btn_filter_telemetry" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-amber-300 border border-[#2e3547] transition">Telemetry</button>
             </div>
             <div class="flex items-center gap-2">
-              <input type="text" id="geo_search_input" oninput="filterGeoTable()" placeholder="Tìm nhanh IP, Quốc gia, ISP, Cổng..." class="bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1 text-xs text-white placeholder-[#5c6475] outline-none focus:border-blue-500 w-56 transition font-mono">
+              <input type="text" id="geo_search_input" oninput="filterGeoTable()" placeholder="Tìm IP, Quốc gia, Cổng..." class="bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1 text-xs text-white placeholder-[#5c6475] outline-none focus:border-blue-500 w-48 transition font-mono">
               <span id="geo_filter_count" class="text-[10px] font-mono text-[#848c9e]">0 mục</span>
             </div>
           </div>
 
           <!-- Flow Accounting & GeoIP Table -->
           <div class="bg-[#14171f] border border-[#272c3a] rounded overflow-hidden">
-            <div class="p-2.5 border-b border-[#272c3a] flex items-center justify-between">
-              <div class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <span>Bảng Thống kê Lưu lượng 2 Chiều & Vị trí Địa lý (GeoIP Flow Table)</span>
-              </div>
+            <div class="p-2 border-b border-[#272c3a] flex items-center justify-between">
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Lưu lượng IP & GeoIP</span>
               <span id="geo_pcap_label" class="text-[10px] font-mono text-[#848c9e] bg-[#10131a] px-2 py-0.5 rounded border border-[#272c3a]">Chưa nạp PCAP</span>
             </div>
             <div class="overflow-x-auto max-h-[340px] custom-scrollbar">
               <table class="w-full text-left border-collapse text-xs">
                 <thead class="bg-[#10131a] text-[#848c9e] border-b border-[#272c3a] sticky top-0 z-10">
                   <tr>
-                    <th class="p-2 font-semibold">Địa chỉ IP</th>
-                    <th class="p-2 font-semibold">Quốc gia / Vị trí</th>
-                    <th class="p-2 font-semibold">Tổ chức / Nhà mạng (ISP & ASN)</th>
-                    <th class="p-2 font-semibold">Dịch vụ thẩm định</th>
-                    <th class="p-2 font-semibold text-right">Lưu lượng 2 chiều (Gửi / Nhận)</th>
+                    <th class="p-2 font-semibold">IP</th>
+                    <th class="p-2 font-semibold">Quốc gia</th>
+                    <th class="p-2 font-semibold">ISP / ASN</th>
+                    <th class="p-2 font-semibold">Dịch vụ</th>
+                    <th class="p-2 font-semibold text-right">Lưu lượng</th>
                     <th class="p-2 font-semibold text-right">Dung lượng</th>
                     <th class="p-2 font-semibold">Giao thức</th>
-                    <th class="p-2 font-semibold text-center">Định vị Lưu trữ</th>
-                    <th class="p-2 font-semibold text-center">Wireshark</th>
+                    <th class="p-2 font-semibold text-center">Vị trí</th>
+                    <th class="p-2 font-semibold text-center">PCAP</th>
                   </tr>
                 </thead>
                 <tbody id="geo_flow_tbody" class="divide-y divide-[#1e2330] font-mono text-[11px]">
                   <tr>
-                    <td colspan="9" class="p-4 text-center text-[#5c6475]">Chưa có dữ liệu. Bấm "Bắt đầu Giám sát Trực tiếp" để kiểm tra.</td>
+                    <td colspan="9" class="p-4 text-center text-[#5c6475]">Chưa có dữ liệu. Bấm "Giám sát Live" để kiểm tra.</td>
                   </tr>
                 </tbody>
               </table>
@@ -1520,70 +1464,60 @@
 
           <!-- Deep Packet Inspection & Telemetry Details -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded space-y-2">
+            <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
               <div class="text-xs font-bold text-white flex items-center justify-between">
-                <div class="flex items-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                  <span>Tên miền Phân giải DNS & Máy chủ TLS SNI</span>
-                </div>
-                <span id="badge_dns_count" class="text-[10px] font-mono bg-[#10131a] px-1.5 py-0.5 rounded text-cyan-400 border border-[#272c3a]">0 tên miền</span>
+                <span>DNS & TLS SNI</span>
+                <span id="badge_dns_count" class="text-[10px] font-mono bg-[#10131a] px-1.5 py-0.5 rounded text-cyan-400 border border-[#272c3a]">0</span>
               </div>
-              <div id="geo_dns_sni_list" class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] font-mono text-[11px] text-[#cad0dc] max-h-36 overflow-y-auto custom-scrollbar">
-                <div class="text-[#5c6475]">Không phát hiện truy vấn tên miền ra bên ngoài.</div>
+              <div id="geo_dns_sni_list" class="bg-[#10131a] p-2 rounded border border-[#272c3a] font-mono text-[11px] text-[#cad0dc] max-h-32 overflow-y-auto custom-scrollbar">
+                <div class="text-[#5c6475]">Không phát hiện truy vấn tên miền.</div>
               </div>
             </div>
 
-            <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded space-y-2">
+            <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
               <div class="text-xs font-bold text-white flex items-center justify-between">
-                <div class="flex items-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                  <span>Rà soát Lộ lọt Thông tin Cá nhân & Chữ ký Telemetry</span>
-                </div>
+                <span>DPI & Telemetry</span>
                 <span id="badge_privacy_status" class="text-[10px] font-mono bg-[#10131a] px-1.5 py-0.5 rounded text-emerald-400 border border-[#272c3a]">An toàn</span>
               </div>
-              <div id="geo_leak_list" class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] font-mono text-[11px] text-[#cad0dc] max-h-36 overflow-y-auto custom-scrollbar">
-                <div class="text-emerald-400">✓ Không phát hiện mật khẩu, tài khoản, tọa độ GPS hoặc dữ liệu cá nhân trong các gói tin.</div>
+              <div id="geo_leak_list" class="bg-[#10131a] p-2 rounded border border-[#272c3a] font-mono text-[11px] text-[#cad0dc] max-h-32 overflow-y-auto custom-scrollbar">
+                <div class="text-emerald-400">Không phát hiện dữ liệu nhạy cảm hoặc telemetry.</div>
               </div>
             </div>
           </div>
 
           <!-- Wireshark Quick Filters -->
-          <div class="bg-[#10131a] border border-[#272c3a] p-3 rounded space-y-2">
+          <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded space-y-2">
             <div class="flex items-center justify-between">
-              <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-                <span>Bộ lọc Wireshark Display Filter Đối soát Kết nối</span>
-              </div>
+              <span class="text-xs font-bold text-white">Bộ lọc Wireshark Display Filter</span>
               <button onclick="openWiresharkForGeo()" class="bg-[#1d4ed8]/20 hover:bg-[#1d4ed8]/40 text-[#38bdf8] border border-blue-500/40 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                <span>Mở Wireshark Bằng chứng</span>
+                <span>Mở Wireshark</span>
               </button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono">
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">1. Lọc gói tin Camera gửi ra Internet / Nước ngoài:</div>
+                  <div class="text-[#848c9e] text-[10px]">1. Outbound / Internet:</div>
                   <div class="text-rose-300 select-all cursor-pointer">ip.src == 192.168.20.38 &amp;&amp; !(ip.dst == 10.0.0.0/8 || ip.dst == 172.16.0.0/12 || ip.dst == 192.168.0.0/16 || ip.dst == 224.0.0.0/4 || ip.dst == 255.255.255.255)</div>
                 </div>
                 <button onclick="copyFilter('ip.src == 192.168.20.38 && !(ip.dst == 10.0.0.0/8 || ip.dst == 172.16.0.0/12 || ip.dst == 192.168.0.0/16 || ip.dst == 224.0.0.0/4 || ip.dst == 255.255.255.255)')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">2. Lọc truy vấn tên miền DNS phát sinh từ Camera:</div>
+                  <div class="text-[#848c9e] text-[10px]">2. DNS Query:</div>
                   <div class="text-cyan-300 select-all cursor-pointer">dns.flags.response == 0 &amp;&amp; ip.src == 192.168.20.38</div>
                 </div>
                 <button onclick="copyFilter('dns.flags.response == 0 && ip.src == 192.168.20.38')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">3. Lọc máy chủ đích TLS SNI ra Cloud nước ngoài:</div>
+                  <div class="text-[#848c9e] text-[10px]">3. TLS SNI:</div>
                   <div class="text-indigo-300 select-all cursor-pointer">tls.handshake.extension.type == 0 &amp;&amp; ip.src == 192.168.20.38</div>
                 </div>
                 <button onclick="copyFilter('tls.handshake.extension.type == 0 && ip.src == 192.168.20.38')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">4. Lọc nội dung chứa từ khóa Telemetry:</div>
+                  <div class="text-[#848c9e] text-[10px]">4. Telemetry Payload:</div>
                   <div class="text-amber-300 select-all cursor-pointer">frame matches &quot;(?i)telemetry|analytics|crashlog|coredump|heartbeat&quot;</div>
                 </div>
                 <button onclick="copyFilter('frame matches &quot;(?i)telemetry|analytics|crashlog|coredump|heartbeat&quot;')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
@@ -1596,38 +1530,32 @@
         <!-- TAB: DÒ QUÉT & BỀ MẶT TẤN CÔNG -->
         <!-- ============================================================== -->
         <div id="tab_content_surface" class="tab-pane hidden space-y-3">
-          <div class="bg-[#10131a] border border-[#272c3a] p-3 rounded flex items-center justify-between">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API & Dịch vụ Mạng</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Bộ công cụ rà soát cổng dịch vụ, tham số an toàn, phân quyền quản trị và đối soát luồng dữ liệu.</p>
-            </div>
+          <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API & Dịch vụ Mạng</h2>
             <button onclick="runCommand('python service_discovery.py 192.168.20.38', 'Dò quét Cổng & Dịch vụ toàn diện')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <span>Dò quét Cổng Toàn diện</span>
+              <span>Dò quét Cổng</span>
             </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <!-- Tool 1: Service Discovery -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-2.5 card-interactive">
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                  <span>1. Dò quét Cổng & Dịch vụ Mạng</span>
+                  <span>1. Dò quét Cổng & Dịch vụ</span>
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
               </div>
-              <p class="text-xs text-[#848c9e] leading-relaxed">Quét toàn bộ dải cổng TCP/UDP, nhận diện các dịch vụ mạng đang lắng nghe trên camera, phát hiện các cổng quản trị hoặc dịch vụ thừa không cần thiết.</p>
-              <div class="pt-1">
-                <button onclick="runCommand('python service_discovery.py 192.168.20.38', 'Dò quét Cổng & Dịch vụ mạng')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Chạy Dò quét Cổng & Dịch vụ</span>
-                </button>
-              </div>
+              <button onclick="runCommand('python service_discovery.py 192.168.20.38', 'Dò quét Cổng & Dịch vụ mạng')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Chạy Dò quét Cổng</span>
+              </button>
             </div>
 
             <!-- Tool 2: Security Parameters -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-2.5 card-interactive">
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -1635,35 +1563,29 @@
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
               </div>
-              <p class="text-xs text-[#848c9e] leading-relaxed">Kiểm tra lỗ hổng Path Traversal, Command Injection, Access Control phân quyền người dùng, chứng thư số TLS và cấu hình bảo mật hệ thống.</p>
-              <div class="pt-1">
-                <button onclick="runCommand('python tool13_security_params_auditor.py', 'Đo kiểm tham số an toàn & phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Đo kiểm Tham số An toàn</span>
-                </button>
-              </div>
+              <button onclick="runCommand('python tool13_security_params_auditor.py', 'Đo kiểm tham số an toàn & phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Chạy Đo kiểm Tham số</span>
+              </button>
             </div>
 
             <!-- Tool 3: RTSPS Wireshark Verifier -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-2.5 card-interactive">
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  <span>3. Đối soát & Giải mã Wireshark RTSPS</span>
+                  <span>3. Đối soát Wireshark RTSPS</span>
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool14_rtsp_verifier</span>
               </div>
-              <p class="text-xs text-[#848c9e] leading-relaxed">Thu thập gói tin RTSPS mã hóa, nạp sslkeys.log để giải mã luồng TLS và kiểm tra định dạng dữ liệu RTP âm thanh / hình ảnh.</p>
-              <div class="pt-1">
-                <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py', 'Đối soát & Giải mã Wireshark RTSPS')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Đối soát Wireshark RTSPS</span>
-                </button>
-              </div>
+              <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py', 'Đối soát & Giải mã Wireshark RTSPS')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Chạy Đối soát RTSPS</span>
+              </button>
             </div>
 
             <!-- Tool 4: Cleartext Protocols & Downgrade -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-2.5 card-interactive">
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -1671,13 +1593,10 @@
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool2_unencrypted</span>
               </div>
-              <p class="text-xs text-[#848c9e] leading-relaxed">Rà quét phát hiện các giao thức bản rõ không mã hóa (HTTP, Telnet, FTP, RTSP rõ) và thử nghiệm ép hạ cấp kênh truyền mã hóa sang kênh rõ.</p>
-              <div class="pt-1">
-                <button onclick="runCommand('python tool2_unencrypted_protocols.py', 'Kiểm tra giao thức bản rõ & hạ cấp')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Kiểm tra Giao thức Bản rõ</span>
-                </button>
-              </div>
+              <button onclick="runCommand('python tool2_unencrypted_protocols.py', 'Kiểm tra giao thức bản rõ & hạ cấp')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Kiểm tra Giao thức Bản rõ</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1687,10 +1606,7 @@
         <!-- ============================================================== -->
         <div id="tab_content_evidence" class="tab-pane hidden space-y-3">
           <div class="flex items-center justify-between bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Kho Dữ liệu Gói tin PCAP</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Lưu trữ bằng chứng bắt gói thực nghiệm phục vụ đối soát Wireshark.</p>
-            </div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Kho Dữ liệu PCAP</h2>
             <button onclick="refreshEvidenceList()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] px-2.5 py-1 rounded text-xs font-medium border border-[#2e3547] flex items-center gap-1 transition">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               <span>Làm mới</span>

@@ -90,7 +90,7 @@ def save_config(cfg: Dict[str, Any]) -> bool:
 class ToolkitApp(App):
     """Ứng dụng đo kiểm an toàn bảo mật camera IP chuyên nghiệp & đáp ứng."""
 
-    TITLE = "BỘ CÔNG CỤ ĐO KIỂM AN TOÀN BẢO MẬT & MẬT MÃ CAMERA IP (QCVN 11:2026/BCA)"
+    TITLE = "CUMERA - BỘ CÔNG CỤ ĐO KIỂM AN TOÀN BẢO MẬT & MẬT MÃ CAMERA IP (QCVN 11:2026/BCA)"
     SUB_TITLE = "Tiêu chuẩn QCVN 11:2026/BCA & ETSI EN 303 645 | Author: Merlin"
 
     CSS = """
