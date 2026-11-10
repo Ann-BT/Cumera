@@ -1,0 +1,84 @@
+{
+  "target_camera": {
+    "ip": "192.168.1.100",
+    "model": "Generic-Camera-Model",
+    "firmware": "1.0.0",
+    "username": "admin",
+    "password": "Password123#",
+    "ssh_username": "root",
+    "ssh_password": "Password123#"
+  },
+  "test_host": {
+    "ip": "192.168.1.200"
+  },
+  "ixit_declared_ports": [
+    22,
+    80,
+    161,
+    322,
+    332,
+    443,
+    554,
+    3702
+  ],
+  "service_ports": {
+    "http": 80,
+    "https": 443,
+    "rtsp": 554,
+    "rtsps": 322,
+    "rtsp_cleartext": 554,
+    "rtsps_tls": 322,
+    "rtsp_path": "/axis-media/media.amp",
+    "ssh": 22,
+    "snmp": 161,
+    "snmp_udp": 161,
+    "onvif_ws_discovery_udp": 3702,
+    "sftp_receiver": [
+      21,
+      22
+    ],
+    "smtp_receiver": [
+      25,
+      465,
+      587
+    ],
+    "alarm_receiver_http": 8088,
+    "alarm_receiver_https": 8443
+  },
+  "baseline_declaration": {
+    "tls_version_expected": "TLSv1.3",
+    "tls_ciphers_declared": [
+      "TLS_AES_256_GCM_SHA384",
+      "TLS_AES_128_GCM_SHA256",
+      "TLS_AES_128_CCM_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+    ],
+    "auth_value_mechanisms_declared": [
+      "Digest-SHA256",
+      "Basic"
+    ],
+    "prohibited_auth_found": [],
+    "lockout_thresholds": {
+      "web": 6,
+      "ssh": 10,
+      "rtsp": 10,
+      "onvif": 10,
+      "duration_minutes": 5
+    }
+  },
+  "snmp_v3": {
+    "user": "admin",
+    "auth_pass": "Password123#",
+    "priv_pass": "Password123#",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES256"
+  },
+  "snmp_credentials": {
+    "user": "admin",
+    "auth_pass": "Password123#",
+    "priv_pass": "Password123#",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES256"
+  }
+}

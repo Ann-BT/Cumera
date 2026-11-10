@@ -1,0 +1,55 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Configuration file containing real credentials and local IPs
+config.json
+
+# Local test captures and Wireshark secrets
+captures/*.pcap
+captures/*.cap
+captures/*.pcapng
+captures/*.log
+captures/*.json
+captures/*.html
+captures/sslkeys.log
+!captures/.gitkeep
+
+# Mock server certificates and keys
+*.key
+*.crt
+host_rsa.key
+host_ecdsa.key
+syslog_ca.key
+syslog_ca.crt
+
+# Local test reports from camera runs
+security_params_audit_result.json
+security_params_audit_report.md
+camera_security_audit_evidence.json
+camera_security_audit_report.md
+authmech_audit_report.json
+authmech_audit_report.md
+authmech_ciphers_nmap_enum.*
+commech_audit_report.json
+commech_audit_report.md
+commech_ciphers_nmap_enum.*
+telemetry_geoip_audit_report.md
+telemetry_geoip_audit_evidence.json
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+*.log
+*.pid

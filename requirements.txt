@@ -1,0 +1,31 @@
+# ==============================================================================
+# Danh sách thư viện phụ thuộc cho Bộ công cụ đo kiểm Camera IP (QCVN 11:2026/BCA)
+# Cài đặt bằng lệnh: pip install -r requirements.txt
+# ==============================================================================
+
+# Xử lý mật mã SOGIS, giải mã TLS, tạo chứng thư số SAN & RSA/ECDSA Host Keys
+cryptography>=42.0.0
+
+# Máy chủ SFTP & SSH giả lập (RFC 4253, hỗ trợ kiểm tra kexinit, cipher, mac, userauth)
+paramiko>=3.4.0
+
+# Đo kiểm giao thức SNMP-V3 (kiểm thử 8 ma trận authPriv & chống tấn công hạ cấp)
+pysnmp>=7.1.0
+
+# Kiểm tra Web API, Path Traversal, Command Injection, Digest HTTP
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Giao diện Terminal tương tác, hiển thị bảng đo kiểm và đối soát Wireshark màu
+rich>=13.7.0
+
+# Bắt và phân tích gói tin mạng chuyên sâu (Telemetry, DPI, PCAP)
+scapy>=2.5.0
+
+# Giao diện TUI Terminal chuyên dụng (chạy qua --cli / toolkit_app.py)
+textual>=0.50.0
+
+# Backend Web Server & WebSocket Streaming phục vụ Desktop Dashboard
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+websockets>=12.0
