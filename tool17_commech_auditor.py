@@ -115,11 +115,18 @@ def detect_local_host_ip(target_ip: str) -> str:
 
 HOST_IP = detect_local_host_ip(DUT_IP)
 DUT_MODEL = config.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-EVIDENCE_DIR = os.path.join(PROJECT_DIR, DUT_MODEL, "Mẫu lưu bằng chứng", "ComMech")
-if not os.path.exists(os.path.dirname(EVIDENCE_DIR)):
-    EVIDENCE_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "ComMech")
-if not os.path.exists(os.path.dirname(EVIDENCE_DIR)):
-    EVIDENCE_DIR = os.path.join(TOOLKIT_DIR, "captures", "evidence", "ComMech")
+
+custom_commech = config.get("evidence_commech_dir") or (
+    os.path.join(config.get("evidence_base_dir", ""), "ComMech") if config.get("evidence_base_dir") else None
+)
+if custom_commech:
+    EVIDENCE_DIR = custom_commech
+else:
+    EVIDENCE_DIR = os.path.join(PROJECT_DIR, DUT_MODEL, "Mẫu lưu bằng chứng", "ComMech")
+    if not os.path.exists(os.path.dirname(EVIDENCE_DIR)):
+        EVIDENCE_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "ComMech")
+    if not os.path.exists(os.path.dirname(EVIDENCE_DIR)):
+        EVIDENCE_DIR = os.path.join(TOOLKIT_DIR, "captures", "evidence", "ComMech")
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 
 # Khởi tạo SSL Context cho vai trò Server của Máy đo (MQTT, Syslog, SMTP, Webhook)

@@ -55,23 +55,54 @@ def get_current_model() -> str:
     return "AXIS Q1806-LE"
 
 def get_evidence_dirs():
-    current_model = get_current_model()
-    candidates_commech = [
-        PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech",
-        PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "ComMech",
-        PROJECT_DIR / "Mẫu lưu bằng chứng" / "ComMech",
-        CAPTURES_DIR / "evidence" / "ComMech",
-        CAPTURES_DIR
-    ]
-    candidates_authmech = [
-        PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech",
-        PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "AuthMech",
-        PROJECT_DIR / "Mẫu lưu bằng chứng" / "AuthMech",
-        CAPTURES_DIR / "evidence" / "AuthMech",
-        CAPTURES_DIR
-    ]
-    c_dir = next((d for d in candidates_commech if d.exists()), CAPTURES_DIR)
-    a_dir = next((d for d in candidates_authmech if d.exists()), CAPTURES_DIR)
+    cfg = {}
+    if CONFIG_FILE.exists():
+        try:
+            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    current_model = cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
+    base_custom = cfg.get("evidence_base_dir", "").strip()
+
+    # ComMech directory
+    custom_c = cfg.get("evidence_commech_dir", "").strip()
+    if custom_c:
+        c_dir = Path(custom_c)
+    elif base_custom:
+        c_dir = Path(base_custom) / "ComMech"
+    else:
+        candidates_commech = [
+            PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech",
+            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "ComMech",
+            PROJECT_DIR / "Mẫu lưu bằng chứng" / "ComMech",
+            CAPTURES_DIR / "evidence" / "ComMech",
+            CAPTURES_DIR
+        ]
+        c_dir = next((d for d in candidates_commech if d.exists()), CAPTURES_DIR)
+
+    # AuthMech directory
+    custom_a = cfg.get("evidence_authmech_dir", "").strip()
+    if custom_a:
+        a_dir = Path(custom_a)
+    elif base_custom:
+        a_dir = Path(base_custom) / "AuthMech"
+    else:
+        candidates_authmech = [
+            PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech",
+            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "AuthMech",
+            PROJECT_DIR / "Mẫu lưu bằng chứng" / "AuthMech",
+            CAPTURES_DIR / "evidence" / "AuthMech",
+            CAPTURES_DIR
+        ]
+        a_dir = next((d for d in candidates_authmech if d.exists()), CAPTURES_DIR)
+
+    try:
+        c_dir.mkdir(parents=True, exist_ok=True)
+        a_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
     return c_dir, a_dir
 
 EVIDENCE_DIR, EVIDENCE_AUTHMECH_DIR = get_evidence_dirs()
@@ -213,6 +244,13 @@ async def save_config(data: dict):
         if "rtsp_path" in data and data["rtsp_path"]:
             sp["rtsp_path"] = str(data["rtsp_path"]).strip()
 
+        if "evidence_base_dir" in data:
+            current["evidence_base_dir"] = str(data["evidence_base_dir"]).strip()
+        if "evidence_authmech_dir" in data:
+            current["evidence_authmech_dir"] = str(data["evidence_authmech_dir"]).strip()
+        if "evidence_commech_dir" in data:
+            current["evidence_commech_dir"] = str(data["evidence_commech_dir"]).strip()
+
         CONFIG_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False))
         return {
             "status": "ok", 
@@ -282,14 +320,97 @@ async def auto_link_api():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/evidence_folders")
+async def get_evidence_folders():
+    """Retrieve current resolved evidence folders and presets."""
+    c_dir, a_dir = get_evidence_dirs()
+    cfg = {}
+    if CONFIG_FILE.exists():
+        try:
+            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    current_model = cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
+    base_custom = cfg.get("evidence_base_dir", "").strip()
+
+    presets = [
+        {
+            "id": "model",
+            "name": f"Theo Model ({current_model})",
+            "path": str(PROJECT_DIR / current_model / "Mẫu lưu bằng chứng"),
+            "exists": (PROJECT_DIR / current_model / "Mẫu lưu bằng chứng").exists()
+        },
+        {
+            "id": "common",
+            "name": "Mẫu lưu bằng chứng Chung",
+            "path": str(PROJECT_DIR / "Mẫu lưu bằng chứng"),
+            "exists": (PROJECT_DIR / "Mẫu lưu bằng chứng").exists()
+        },
+        {
+            "id": "captures",
+            "name": "Nội bộ Toolkit (captures/)",
+            "path": str(CAPTURES_DIR),
+            "exists": CAPTURES_DIR.exists()
+        }
+    ]
+
+    return {
+        "evidence_base_dir": base_custom or str(c_dir.parent if c_dir.name in ["ComMech", "AuthMech"] else c_dir),
+        "commech_dir": str(c_dir),
+        "authmech_dir": str(a_dir),
+        "presets": presets
+    }
+
+
+@app.post("/api/open_folder")
+async def open_folder(data: dict):
+    """Open folder in native desktop file manager (Linux/Windows/macOS)."""
+    folder_type = data.get("type", "base")
+    custom_path = data.get("path", "").strip()
+
+    c_dir, a_dir = get_evidence_dirs()
+    if custom_path and os.path.exists(custom_path):
+        target = Path(custom_path)
+    elif folder_type == "authmech":
+        target = a_dir
+    elif folder_type == "commech":
+        target = c_dir
+    else:
+        cfg = {}
+        if CONFIG_FILE.exists():
+            try:
+                cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        base_dir = cfg.get("evidence_base_dir", "").strip()
+        if base_dir and os.path.exists(base_dir):
+            target = Path(base_dir)
+        else:
+            target = c_dir.parent if c_dir.name in ["ComMech", "AuthMech"] else c_dir
+
+    target.mkdir(parents=True, exist_ok=True)
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(target))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(target)])
+        else:
+            subprocess.Popen(["xdg-open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return {"status": "ok", "message": f"Đã mở thư mục: {target}", "path": str(target)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể mở thư mục: {e}")
+
+
 @app.get("/api/evidence")
 async def get_evidence():
     """List all captured PCAP files and compliance reports."""
     files = []
+    c_dir, a_dir = get_evidence_dirs()
     
-    # Check Evidence Dir
-    if EVIDENCE_DIR.exists():
-        for p in sorted(EVIDENCE_DIR.glob("*.pcap")):
+    # Check Evidence Dir (ComMech)
+    if c_dir.exists():
+        for p in sorted(c_dir.glob("*.pcap")):
             stat = p.stat()
             files.append({
                 "name": p.name,
@@ -302,8 +423,8 @@ async def get_evidence():
             })
 
     # Check AuthMech Evidence Dir
-    if EVIDENCE_AUTHMECH_DIR.exists():
-        for p in sorted(EVIDENCE_AUTHMECH_DIR.glob("*.pcap")):
+    if a_dir.exists():
+        for p in sorted(a_dir.glob("*.pcap")):
             stat = p.stat()
             files.append({
                 "name": p.name,
@@ -331,7 +452,13 @@ async def get_evidence():
                 "status": "RECORDED"
             })
 
-    return {"files": files, "total": len(files)}
+    return {
+        "files": files, 
+        "total": len(files),
+        "commech_dir": str(c_dir),
+        "authmech_dir": str(a_dir),
+        "base_dir": str(c_dir.parent if c_dir.name in ["ComMech", "AuthMech"] else c_dir)
+    }
 
 
 @app.get("/api/report/{report_name}")
@@ -391,7 +518,10 @@ async def open_wireshark(data: dict):
     else:
         filename = os.path.basename(pcap_path) if pcap_path else ""
         current_model = get_current_model()
+        c_dir, a_dir = get_evidence_dirs()
         candidates = [
+            c_dir / filename,
+            a_dir / filename,
             PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech" / filename,
             PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech" / filename,
             PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "ComMech" / filename,

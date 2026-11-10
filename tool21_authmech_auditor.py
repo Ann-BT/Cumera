@@ -71,11 +71,17 @@ RTSP_PORT = config.get("service_ports", {}).get("rtsp_cleartext", 554)
 RTSP_PATH = config.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
 
 # Thư mục đích lưu bằng chứng
-EVIDENCE_DIR = os.path.join(PROJECT_DIR, DUT_MODEL, "Mẫu lưu bằng chứng", "AuthMech")
-if not os.path.isdir(os.path.dirname(EVIDENCE_DIR)):
-    EVIDENCE_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "AuthMech")
-if not os.path.isdir(os.path.dirname(EVIDENCE_DIR)):
-    EVIDENCE_DIR = os.path.join(BASE_DIR, "captures", "evidence", "AuthMech")
+custom_authmech = config.get("evidence_authmech_dir") or (
+    os.path.join(config.get("evidence_base_dir", ""), "AuthMech") if config.get("evidence_base_dir") else None
+)
+if custom_authmech:
+    EVIDENCE_DIR = custom_authmech
+else:
+    EVIDENCE_DIR = os.path.join(PROJECT_DIR, DUT_MODEL, "Mẫu lưu bằng chứng", "AuthMech")
+    if not os.path.isdir(os.path.dirname(EVIDENCE_DIR)):
+        EVIDENCE_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "AuthMech")
+    if not os.path.isdir(os.path.dirname(EVIDENCE_DIR)):
+        EVIDENCE_DIR = os.path.join(BASE_DIR, "captures", "evidence", "AuthMech")
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 CAPTURES_DIR = os.path.join(BASE_DIR, "captures")
 os.makedirs(CAPTURES_DIR, exist_ok=True)

@@ -38,18 +38,36 @@ from textual.widgets import (
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(BASE_DIR)
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+_app_cfg = {}
+if os.path.exists(CONFIG_PATH):
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as _f:
+            _app_cfg = json.load(_f)
+    except Exception:
+        pass
 
-EVIDENCE_COMMECH_DIR = os.path.join(PROJECT_DIR, "AXIS Q1806-LE", "Mẫu lưu bằng chứng", "ComMech")
-if not os.path.isdir(EVIDENCE_COMMECH_DIR):
-    EVIDENCE_COMMECH_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "ComMech")
-if not os.path.isdir(EVIDENCE_COMMECH_DIR):
-    EVIDENCE_COMMECH_DIR = os.path.join(BASE_DIR, "captures", "evidence", "ComMech")
+_base_evidence = _app_cfg.get("evidence_base_dir", "").strip()
+_model_name = _app_cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
 
-EVIDENCE_AUTHMECH_DIR = os.path.join(PROJECT_DIR, "AXIS Q1806-LE", "Mẫu lưu bằng chứng", "AuthMech")
-if not os.path.isdir(EVIDENCE_AUTHMECH_DIR):
-    EVIDENCE_AUTHMECH_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "AuthMech")
-if not os.path.isdir(EVIDENCE_AUTHMECH_DIR):
-    EVIDENCE_AUTHMECH_DIR = os.path.join(BASE_DIR, "captures", "evidence", "AuthMech")
+_custom_c = _app_cfg.get("evidence_commech_dir") or (os.path.join(_base_evidence, "ComMech") if _base_evidence else None)
+if _custom_c:
+    EVIDENCE_COMMECH_DIR = _custom_c
+else:
+    EVIDENCE_COMMECH_DIR = os.path.join(PROJECT_DIR, _model_name, "Mẫu lưu bằng chứng", "ComMech")
+    if not os.path.isdir(EVIDENCE_COMMECH_DIR):
+        EVIDENCE_COMMECH_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "ComMech")
+    if not os.path.isdir(EVIDENCE_COMMECH_DIR):
+        EVIDENCE_COMMECH_DIR = os.path.join(BASE_DIR, "captures", "evidence", "ComMech")
+
+_custom_a = _app_cfg.get("evidence_authmech_dir") or (os.path.join(_base_evidence, "AuthMech") if _base_evidence else None)
+if _custom_a:
+    EVIDENCE_AUTHMECH_DIR = _custom_a
+else:
+    EVIDENCE_AUTHMECH_DIR = os.path.join(PROJECT_DIR, _model_name, "Mẫu lưu bằng chứng", "AuthMech")
+    if not os.path.isdir(EVIDENCE_AUTHMECH_DIR):
+        EVIDENCE_AUTHMECH_DIR = os.path.join(PROJECT_DIR, "Mẫu lưu bằng chứng", "AuthMech")
+    if not os.path.isdir(EVIDENCE_AUTHMECH_DIR):
+        EVIDENCE_AUTHMECH_DIR = os.path.join(BASE_DIR, "captures", "evidence", "AuthMech")
 
 CAPTURES_DIR = os.path.join(BASE_DIR, "captures")
 os.makedirs(CAPTURES_DIR, exist_ok=True)
