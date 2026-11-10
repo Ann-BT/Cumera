@@ -11,11 +11,15 @@ import time
 import asyncio
 import subprocess
 import shlex
+import shutil
+import urllib.request
+import zipfile
+import io
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -72,7 +76,7 @@ def get_evidence_dirs():
 
 EVIDENCE_DIR, EVIDENCE_AUTHMECH_DIR = get_evidence_dirs()
 
-app = FastAPI(title="Camera Security Auditor Backend", version="2.0.0")
+app = FastAPI(title="Cumera Security Auditor Backend", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,6 +93,22 @@ app.mount("/captures", StaticFiles(directory=str(CAPTURES_DIR)), name="captures"
 active_process: Optional[asyncio.subprocess.Process] = None
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    ico = BASE_DIR / "favicon.ico"
+    if ico.exists():
+        return FileResponse(str(ico), media_type="image/x-icon")
+    return Response(status_code=404)
+
+
+@app.get("/icon.png", include_in_schema=False)
+async def get_icon():
+    png = BASE_DIR / "icon.png"
+    if png.exists():
+        return FileResponse(str(png), media_type="image/png")
+    return Response(status_code=404)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
     if HTML_FILE.exists():
@@ -99,7 +119,7 @@ async def get_index():
 @app.get("/api/status")
 async def get_target_status():
     """Check DUT camera ping status and network latency."""
-    ip = "192.168.20.38"
+    ip = "192.168.1.100"
     if CONFIG_FILE.exists():
         try:
             cfg = json.loads(CONFIG_FILE.read_text())
@@ -107,8 +127,14 @@ async def get_target_status():
         except Exception:
             pass
 
+    # Lệnh ping tương thích đa nền tảng (Windows: -n 1 -w 1000, Linux/macOS: -c 1 -W 1)
+    if sys.platform == "win32":
+        cmd = ["ping", "-n", "1", "-w", "1000", ip]
+    else:
+        cmd = ["ping", "-c", "1", "-W", "1", ip]
+
     proc = await asyncio.create_subprocess_exec(
-        "ping", "-c", "1", "-W", "1", ip,
+        *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
@@ -391,16 +417,161 @@ async def open_wireshark(data: dict):
     if not target_file:
         raise HTTPException(status_code=404, detail="Chưa có tệp tin PCAP cho phương thức này. Vui lòng bấm 'Test' để ghi nhận gói tin trước!")
 
+    # Tự động phân giải đường dẫn Wireshark trên cả Linux và Windows
+    wireshark_bin = "wireshark"
+    if sys.platform == "win32":
+        for possible_path in [
+            r"C:\Program Files\Wireshark\Wireshark.exe",
+            r"C:\Program Files (x86)\Wireshark\Wireshark.exe",
+        ]:
+            if os.path.exists(possible_path):
+                wireshark_bin = possible_path
+                break
+
     try:
-        subprocess.Popen(
-            ["wireshark", target_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+        if sys.platform == "win32":
+            subprocess.Popen([wireshark_bin, str(target_file)], creationflags=subprocess.DETACHED_PROCESS)
+        else:
+            subprocess.Popen(
+                [wireshark_bin, str(target_file)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
         return {"status": "ok", "message": f"Đã khởi chạy Wireshark mở tệp: {os.path.basename(target_file)}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Không thể khởi chạy Wireshark: {str(e)}")
+
+
+REPO_NAME = "Ann-BT/Cumera"
+GITHUB_REPO_API = f"https://api.github.com/repos/{REPO_NAME}"
+
+@app.get("/api/app/version")
+async def get_version():
+    """Lấy phiên bản và thông tin Git commit hiện tại của Cumera."""
+    ver_file = BASE_DIR / "version.json"
+    ver_data = {"app_name": "Cumera", "version": "2.1.0", "repo": REPO_NAME}
+    if ver_file.exists():
+        try:
+            ver_data = json.loads(ver_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    commit_hash = "unknown"
+    git_dir = BASE_DIR / ".git"
+    if git_dir.exists():
+        try:
+            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+            if proc.returncode == 0:
+                commit_hash = proc.stdout.strip()
+        except Exception:
+            pass
+    ver_data["commit"] = commit_hash
+    ver_data["platform"] = sys.platform
+    return ver_data
+
+
+@app.get("/api/app/check_update")
+async def check_update():
+    """Kiểm tra bản cập nhật mới trên GitHub repository Ann-BT/Cumera."""
+    current_commit = "unknown"
+    git_dir = BASE_DIR / ".git"
+    if git_dir.exists():
+        try:
+            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True)
+            if proc.returncode == 0:
+                current_commit = proc.stdout.strip()
+        except Exception:
+            pass
+
+    req = urllib.request.Request(
+        f"{GITHUB_REPO_API}/commits/main",
+        headers={"User-Agent": "Cumera-App-Updater"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=6) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                latest_sha = data.get("sha", "")
+                commit_msg = data.get("commit", {}).get("message", "").split("\n")[0]
+                commit_date = data.get("commit", {}).get("author", {}).get("date", "")
+
+                has_update = False
+                if current_commit != "unknown" and latest_sha:
+                    has_update = (current_commit != latest_sha)
+
+                return {
+                    "status": "ok",
+                    "has_update": has_update,
+                    "current_commit": current_commit[:7] if current_commit != "unknown" else "v2.1.0",
+                    "latest_commit": latest_sha[:7],
+                    "commit_message": commit_msg,
+                    "commit_date": commit_date,
+                    "repo": REPO_NAME
+                }
+    except Exception as e:
+        return {"status": "error", "message": f"Không thể kiểm tra GitHub: {e}", "has_update": False}
+
+
+@app.post("/api/app/update")
+async def perform_update():
+    """Tự động kéo mã nguồn mới nhất từ GitHub và cập nhật dependencies."""
+    git_dir = BASE_DIR / ".git"
+    logs = []
+
+    if git_dir.exists() and shutil.which("git"):
+        try:
+            proc = subprocess.run(
+                ["git", "-C", str(BASE_DIR), "pull", "origin", "main"],
+                capture_output=True, text=True, check=True
+            )
+            logs.append(proc.stdout)
+        except Exception as e:
+            return {"status": "error", "message": f"Lỗi git pull: {e}"}
+    else:
+        # Tải ZIP từ GitHub và giải nén (nếu người dùng Windows không cài git)
+        zip_url = f"https://github.com/{REPO_NAME}/archive/refs/heads/main.zip"
+        try:
+            req = urllib.request.Request(zip_url, headers={"User-Agent": "Cumera-App-Updater"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                zip_bytes = resp.read()
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                for member in zf.infolist():
+                    parts = member.filename.split("/", 1)
+                    if len(parts) > 1 and parts[1]:
+                        rel_path = parts[1]
+                        # Bảo toàn config.json và thư mục captures của người dùng
+                        if rel_path == "config.json" and (BASE_DIR / "config.json").exists():
+                            continue
+                        if rel_path.startswith("captures/") and not rel_path.endswith(".gitkeep"):
+                            continue
+                        dest_path = BASE_DIR / rel_path
+                        if member.is_dir():
+                            dest_path.mkdir(parents=True, exist_ok=True)
+                        else:
+                            dest_path.parent.mkdir(parents=True, exist_ok=True)
+                            with zf.open(member) as src, open(dest_path, "wb") as dst:
+                                shutil.copyfileobj(src, dst)
+            logs.append("[OK] Đã tải và cập nhật toàn bộ tệp mới nhất từ GitHub.")
+        except Exception as e:
+            return {"status": "error", "message": f"Lỗi tải cập nhật: {e}"}
+
+    # Cập nhật các thư viện phụ thuộc nếu có thay đổi trong requirements.txt
+    try:
+        pip_cmd = [str(VENV_PYTHON), "-m", "pip", "install", "-r", str(BASE_DIR / "requirements.txt")]
+        proc = subprocess.run(pip_cmd, capture_output=True, text=True)
+        if proc.returncode == 0:
+            logs.append("[OK] Đã kiểm tra và đồng bộ thư viện requirements.txt.")
+        else:
+            logs.append(f"[!] Cảnh báo pip install: {proc.stderr[:200]}")
+    except Exception as e:
+        logs.append(f"[!] Lỗi pip: {e}")
+
+    return {
+        "status": "ok",
+        "message": "Cập nhật ứng dụng Cumera thành công! Vui lòng khởi động lại app.",
+        "logs": "\n".join(logs)
+    }
 
 
 @app.websocket("/ws/run")
@@ -452,11 +623,24 @@ async def websocket_run(websocket: WebSocket):
             # Parse and transform command
             # If command starts with python, substitute with venv python
             try:
-                parts = shlex.split(cmd_str)
+                parts = shlex.split(cmd_str, posix=(sys.platform != "win32"))
             except Exception:
                 parts = cmd_str.split(" ")
-            if parts[0] == "python" or parts[0] == "python3":
+
+            # On Windows, strip sudo if present
+            if sys.platform == "win32" and parts and parts[0] == "sudo":
+                parts = parts[1:]
+
+            if not parts:
+                continue
+
+            if parts[0] in ["python", "python3"]:
                 exec_cmd = [str(VENV_PYTHON)] + parts[1:]
+            elif parts[0] == "sudo":
+                if len(parts) > 1 and parts[1] in ["python", "python3"]:
+                    exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
+                else:
+                    exec_cmd = parts
             elif parts[0] == "ping":
                 exec_cmd = parts
             else:

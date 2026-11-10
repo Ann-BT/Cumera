@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Security Auditor</title>
+  <title>Cumera - Camera Cybersecurity Auditor</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="shortcut icon" href="/favicon.ico">
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     :root {
@@ -186,12 +188,10 @@
     <div class="flex items-center gap-3">
       <!-- Clean Brand Identity -->
       <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        </div>
+        <img src="/icon.png" alt="Cumera Logo" class="w-7 h-7 rounded-full border border-cyan-500/50 shadow-sm object-cover">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-sm tracking-tight text-white">Camera Security Auditor</span>
-          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161f30] text-[#7dd3fc] border border-[#223354]">v2.4</span>
+          <span class="font-bold text-sm tracking-tight text-white">Cumera</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161f30] text-[#7dd3fc] border border-[#223354]">v2.1</span>
         </div>
       </div>
 
@@ -226,6 +226,12 @@
       <button onclick="runCommand('python tool18_api_input_validation.py --mode rtsp', 'Fuzzing Luồng RTSP')" class="bg-[#24171d] hover:bg-[#331f28] text-[#fca5a5] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#522533] shadow-sm transition">
         <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
         <span>Fuzz RTSP</span>
+      </button>
+
+      <!-- Nút Kiểm tra & Cập nhật Cumera Trực tiếp -->
+      <button onclick="checkAppUpdate()" id="btn_check_update" class="bg-[#102422] hover:bg-[#153430] text-[#5eead4] hover:text-white px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d4d47] shadow-sm transition cursor-pointer" title="Kiểm tra và cập nhật Cumera trực tiếp từ GitHub">
+        <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span>Cập nhật</span>
       </button>
 
       <button id="btn_stop_top" onclick="stopCommand()" class="hidden bg-rose-700/80 hover:bg-rose-600 text-white px-3 py-1 rounded-md text-xs font-bold items-center gap-1.5 transition border border-rose-500 shadow-sm">
@@ -348,11 +354,8 @@
         <!-- ============================================================== -->
         <div id="tab_content_target" class="tab-pane hidden space-y-3">
           <!-- Top Setting Action Bar -->
-          <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-3 rounded">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Cấu hình Thiết bị (DUT) & Mạng</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Địa chỉ IP, tài khoản kiểm định, ánh xạ cổng dịch vụ và nhận diện subnet.</p>
-            </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Cấu hình Thiết bị (DUT) & Mạng</h2>
             <div class="flex items-center gap-2">
               <button onclick="discoverCameras()" id="btn_discover_cam" class="bg-[#1f2430] hover:bg-[#282f40] text-[#38bdf8] px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-cyan-700/50 transition">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -366,9 +369,9 @@
           </div>
 
           <!-- Discovered Cameras Grid (Auto-detected IP) -->
-          <div id="discovery_panel" class="hidden border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2">
+          <div id="discovery_panel" class="hidden border border-[#272c3a] rounded p-2.5 bg-[#14171f] space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-white uppercase tracking-wider">Thiết bị tìm thấy trên Subnet (UDP 3702 Probe)</span>
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Thiết bị tìm thấy (WS-Discovery)</span>
               <span id="discovery_count_badge" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">0 thiết bị</span>
             </div>
             <div id="discovery_list" class="space-y-1.5 pt-1">
@@ -380,17 +383,16 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             
             <!-- Target Camera Credentials -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                <span class="font-bold text-xs text-white uppercase tracking-wider">1. Tài khoản & Xác thực Camera</span>
-                <span class="text-[11px] text-[#848c9e]">HTTP / RTSP / SSH</span>
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
+              <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
+                <span class="font-bold text-xs text-white uppercase tracking-wider">1. Tài khoản Camera</span>
               </div>
 
               <div>
-                <label class="block text-xs text-[#848c9e] mb-1">Địa chỉ IP Camera (DUT):</label>
+                <label class="block text-xs text-[#848c9e] mb-1">IP Camera (DUT):</label>
                 <div class="flex items-center gap-2">
                   <input type="text" id="cfg_target_ip" value="192.168.20.38" class="flex-1 bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-                  <button onclick="pingCamera()" class="px-2.5 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] text-xs font-medium border border-[#2e3547] shrink-0">Kiểm tra Ping</button>
+                  <button onclick="pingCamera()" class="px-2.5 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] text-xs font-medium border border-[#2e3547] shrink-0">Ping</button>
                 </div>
               </div>
 
@@ -411,7 +413,7 @@
                   <input type="text" id="cfg_target_user" value="admin" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Mật khẩu:</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">Mật khẩu Web:</label>
                   <div class="relative">
                     <input type="password" id="cfg_target_pass" value="Psitest135##" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                     <button type="button" onclick="togglePassVisibility('cfg_target_pass')" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Xem</button>
@@ -434,61 +436,57 @@
               </div>
 
               <div>
-                <label class="block text-xs text-[#848c9e] mb-1">Đường dẫn luồng RTSP (URI Path):</label>
+                <label class="block text-xs text-[#848c9e] mb-1">Đường dẫn RTSP (URI Path):</label>
                 <input type="text" id="cfg_rtsp_path" value="/axis-media/media.amp" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
               </div>
             </div>
 
             <!-- Ports & Network Interfaces -->
-            <div class="border border-[#272c3a] rounded p-3.5 bg-[#14171f] space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-[#272c3a]">
-                <span class="font-bold text-xs text-white uppercase tracking-wider">2. Cổng dịch vụ & Card mạng</span>
-                <span class="text-[11px] text-[#848c9e]">Service Ports Mapping</span>
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
+              <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
+                <span class="font-bold text-xs text-white uppercase tracking-wider">2. Cổng dịch vụ</span>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Cổng HTTPS (Web / ONVIF):</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">HTTPS (Web/ONVIF):</label>
                   <input type="number" id="cfg_port_https" value="443" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Cổng RTSPS Bảo mật (TLS):</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">RTSPS TLS:</label>
                   <input type="number" id="cfg_port_rtsps" value="322" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Cổng RTSP Cleartext:</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">RTSP Cleartext:</label>
                   <input type="number" id="cfg_port_rtsp" value="554" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Cổng SSHv2 Quản trị:</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">SSHv2 CLI:</label>
                   <input type="number" id="cfg_port_ssh" value="22" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Cổng SNMPv3 UDP:</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">SNMPv3 UDP:</label>
                   <input type="number" id="cfg_port_snmp" value="161" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
                 </div>
                 <div>
-                  <label class="block text-xs text-[#848c9e] mb-1">Card mạng đo kiểm (Host):</label>
+                  <label class="block text-xs text-[#848c9e] mb-1">Card mạng (Host):</label>
                   <input type="text" id="cfg_host_iface" value="enp3s0 (192.168.20.45)" disabled class="w-full bg-[#0a0c10] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-[#848c9e] font-mono cursor-not-allowed">
                 </div>
               </div>
 
-              <div class="pt-2 border-t border-[#272c3a] space-y-2">
-                <div class="text-[11px] text-[#848c9e]">Công cụ mạng hỗ trợ:</div>
-                <div class="flex items-center gap-2">
-                  <button onclick="runCommand('python service_discovery.py ' + document.getElementById('cfg_target_ip').value, 'Quét Cổng Dịch vụ')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
-                    Quét cổng mở logic (TCP/UDP)
-                  </button>
-                  <button onclick="triggerAutoLink()" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#38bdf8] border border-[#2e3547]">
-                    Auto-Link Subnet
-                  </button>
-                </div>
+              <div class="pt-1.5 border-t border-[#272c3a] flex items-center gap-2">
+                <button onclick="runCommand('python service_discovery.py ' + document.getElementById('cfg_target_ip').value, 'Quét Cổng Dịch vụ')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
+                  Quét cổng (TCP/UDP)
+                </button>
+                <button onclick="triggerAutoLink()" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#38bdf8] border border-[#2e3547]">
+                  Auto-Link Subnet
+                </button>
               </div>
             </div>
 
@@ -500,17 +498,14 @@
         <!-- ============================================================== -->
         <div id="tab_content_authmech" class="tab-pane space-y-3 hidden">
           <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phương thức Xác thực (AuthMech)</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Đối soát ciphersuite, Digest SHA-256, SSH KEX và WS-Security UsernameToken.</p>
-            </div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phương thức Xác thực (AuthMech)</h2>
             <div class="flex items-center gap-2">
               <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 3.0', 'Chạy toàn bộ phương thức xác thực')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-semibold transition border border-indigo-500 shadow-sm">
-                Chạy tất cả (1-Click)
+                Chạy tất cả
               </button>
               <button onclick="runCommand('python tool21_authmech_auditor.py --enum all', 'Liệt kê Toàn bộ Ciphersuite (Nmap Enum)')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition border border-emerald-500 shadow-sm flex items-center gap-1.5" title="Chạy Nmap ssl-enum-ciphers & ssh2-enum-algos bóc tách toàn bộ danh mục ciphersuite để chụp ảnh">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span>Liệt kê Ciphersuite (Nmap Enum)</span>
+                <span>Liệt kê Ciphersuite (Nmap)</span>
               </button>
             </div>
           </div>
@@ -519,9 +514,9 @@
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
-                  <th class="p-2 border-r border-[#272c3a] w-64">Phương thức xác thực</th>
+                  <th class="p-2 border-r border-[#272c3a] w-64">Phương thức</th>
                   <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
-                  <th class="p-2 border-r border-[#272c3a]">Bộ lọc Wireshark & Dòng Sort (Click / Bôi đen để Copy)</th>
+                  <th class="p-2 border-r border-[#272c3a]">Bộ lọc Wireshark & Thứ tự gói</th>
                   <th class="p-2 w-36 text-center">Hành động</th>
                 </tr>
               </thead>
@@ -543,7 +538,7 @@
                       <button onclick="copyFilter('http.response.code == 401 or http.authorization', 'Filter Xác thực')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                     <div class="flex items-center justify-between gap-1">
-                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">Click cột No. (TLS Server Hello → 401 Challenge → Basic Auth → 200 OK)</code></div>
+                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">No.: Server Hello → 401 → Auth → 200</code></div>
                       <button onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                   </td>
@@ -571,7 +566,7 @@
                       <button onclick="copyFilter('tcp.port == 22 and ssh', 'Filter SSH Session')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                     <div class="flex items-center justify-between gap-1">
-                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">Click cột No. (TCP SYN → Banner → KEXINIT 20 → NEWKEYS 21 → Encrypted Auth)</code></div>
+                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">No.: Banner → KEX 20 → NEWKEYS 21 → Auth</code></div>
                       <button onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                   </td>
@@ -599,7 +594,7 @@
                       <button onclick="copyFilter('rtsp.authchallenge or rtsp.status == 401 or rtsp.authorization', 'Filter RTSP Auth')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                     <div class="flex items-center justify-between gap-1">
-                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">Click cột No. (CSeq 1: 401 Challenge → CSeq 2: Basic Auth → 200 OK SDP)</code></div>
+                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">No.: 401 Challenge → Basic Auth → 200 OK</code></div>
                       <button onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                   </td>
@@ -627,7 +622,7 @@
                       <button onclick="copyFilter('http contains &quot;UsernameToken&quot; or http contains &quot;PasswordDigest&quot;', 'Filter WS-Security')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                     <div class="flex items-center justify-between gap-1">
-                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">Click cột No. (TLS Server Hello → SOAP POST GetDeviceInformation → 200 OK)</code></div>
+                      <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">No.: Server Hello → SOAP POST → 200 OK</code></div>
                       <button onclick="copyFilter('frame.number', 'Dòng sort Wireshark')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
                     </div>
                   </td>
@@ -646,13 +641,12 @@
             <div class="flex items-center justify-between">
               <div class="text-xs font-bold text-white flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                <span>Bóc tách Toàn bộ Danh mục Ciphersuite & KEX (Nmap Scripts)</span>
+                <span>Liệt kê Ciphersuite & KEX (Nmap)</span>
               </div>
               <button onclick="runCommand('python tool21_authmech_auditor.py --enum all', 'Chạy Nmap Enum Ciphers Toàn bộ')" class="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <span>Chạy Nmap Enum Toàn bộ</span>
+                <span>Chạy Nmap Enum</span>
               </button>
             </div>
-            <p class="text-[11px] text-[#848c9e]">Gói tin Server Hello trên Wireshark chỉ phản hồi 1 Cipher Suite đã đàm phán. Để chứng minh thiết bị hỗ trợ đầy đủ danh mục Ciphersuite, kiểm định viên sử dụng các lệnh Nmap sau để chụp ảnh minh chứng:</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono">
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between">
                 <div>
@@ -684,17 +678,14 @@
         <!-- ============================================================== -->
         <div id="tab_content_commech" class="tab-pane space-y-3">
           <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dịch vụ Truyền thông (ComMech)</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Kiểm tra an toàn bảo mật kênh truyền và mã hóa TLS/SSH cho các dịch vụ mạng.</p>
-            </div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dịch vụ Truyền thông (ComMech)</h2>
             <div class="flex items-center gap-2">
               <button onclick="runCommand('python tool17_commech_auditor.py --id all --wait 3.0', 'Chạy toàn bộ phương thức truyền thông')" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1 rounded text-xs font-semibold transition border border-blue-600">
-                Chạy tất cả (1-Click)
+                Chạy tất cả
               </button>
               <button onclick="runCommand('python tool17_commech_auditor.py --enum all', 'Liệt kê Toàn bộ Ciphersuite ComMech (Nmap Enum)')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition border border-emerald-500 shadow-sm flex items-center gap-1.5" title="Chạy Nmap ssl-enum-ciphers & ssh2-enum-algos bóc tách toàn bộ danh mục ciphersuite ComMech để chụp ảnh">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span>Liệt kê Ciphersuite (Nmap Enum)</span>
+                <span>Liệt kê Ciphersuite (Nmap)</span>
               </button>
             </div>
           </div>
@@ -703,11 +694,11 @@
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
-                  <th class="p-2 border-r border-[#272c3a]">Phương thức / Tên dịch vụ</th>
+                  <th class="p-2 border-r border-[#272c3a]">Dịch vụ</th>
                   <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
                   <th class="p-2 border-r border-[#272c3a] w-24">Hướng</th>
-                  <th class="p-2 border-r border-[#272c3a]">Bảo mật / Ciphersuite</th>
-                  <th class="p-2 border-r border-[#272c3a]">Kiểm thử hạ cấp</th>
+                  <th class="p-2 border-r border-[#272c3a]">Bảo mật</th>
+                  <th class="p-2 border-r border-[#272c3a]">Hạ cấp</th>
                   <th class="p-2 w-44 text-center">Hành động</th>
                 </tr>
               </thead>
@@ -867,38 +858,34 @@
             <div class="flex items-center justify-between">
               <div class="text-xs font-bold text-white flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                <span>Bóc tách Toàn bộ Danh mục Ciphersuite & KEX (Nmap Scripts)</span>
+                <span>Liệt kê Ciphersuite & KEX (Nmap)</span>
               </div>
               <button onclick="runCommand('python tool17_commech_auditor.py --enum all', 'Chạy Nmap Enum Ciphers Toàn bộ ComMech')" class="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <span>Chạy Nmap Enum Toàn bộ ComMech</span>
+                <span>Chạy Nmap Enum</span>
               </button>
             </div>
-            <p class="text-[11px] text-[#848c9e]">Gói tin Server Hello trên Wireshark chỉ phản hồi 1 Cipher Suite đã đàm phán. Để chứng minh thiết bị hỗ trợ đầy đủ danh mục Ciphersuite, kiểm định viên sử dụng các lệnh Nmap sau để chụp ảnh minh chứng:</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono">
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">1. Web HTTPS / ONVIF (Cổng 443):</div>
+                  <div class="text-[#848c9e] text-[10px]">1. Web HTTPS / ONVIF (443):</div>
                   <div class="text-cyan-300 select-all cursor-pointer" onclick="copyFilter('nmap -Pn -p 443 --script ssl-enum-ciphers 192.168.20.38', 'Lệnh Nmap Cổng 443')">nmap -Pn -p 443 --script ssl-enum-ciphers 192.168.20.38</div>
                 </div>
                 <button onclick="copyFilter('nmap -Pn -p 443 --script ssl-enum-ciphers 192.168.20.38', 'Lệnh Nmap Cổng 443')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">2. SSH Remote CLI (Cổng 22):</div>
+                  <div class="text-[#848c9e] text-[10px]">2. SSH Remote CLI (22):</div>
                   <div class="text-emerald-300 select-all cursor-pointer" onclick="copyFilter('nmap -Pn -p 22 --script ssh2-enum-algos 192.168.20.38', 'Lệnh Nmap Cổng 22')">nmap -Pn -p 22 --script ssh2-enum-algos 192.168.20.38</div>
                 </div>
                 <button onclick="copyFilter('nmap -Pn -p 22 --script ssh2-enum-algos 192.168.20.38', 'Lệnh Nmap Cổng 22')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
               <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between">
                 <div>
-                  <div class="text-[#848c9e] text-[10px]">3. RTSPS Media Stream (Cổng 322):</div>
+                  <div class="text-[#848c9e] text-[10px]">3. RTSPS Stream (322):</div>
                   <div class="text-purple-300 select-all cursor-pointer" onclick="copyFilter('nmap -Pn -p 322 --script ssl-enum-ciphers 192.168.20.38', 'Lệnh Nmap Cổng 322')">nmap -Pn -p 322 --script ssl-enum-ciphers 192.168.20.38</div>
                 </div>
                 <button onclick="copyFilter('nmap -Pn -p 322 --script ssl-enum-ciphers 192.168.20.38', 'Lệnh Nmap Cổng 322')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
-            </div>
-            <div class="text-[10px] text-[#64748b] bg-[#14171f] p-2 rounded border border-[#272c3a]/60">
-              <strong class="text-amber-400">Ghi chú kiểm định vai trò Client:</strong> Đối với các kênh Camera đóng vai trò Client (ComMech-5 MQTT, ComMech-6 Syslog, ComMech-7 SMB, ComMech-8 SMTP, ComMech-9 SFTP, ComMech-11 O3C Cloud), danh sách Cipher Suite được camera chủ động gửi trong bản tin <code>Client Hello</code> / <code>SSH KEXINIT</code> / <code>SMB Negotiate</code> trong file PCAP tương ứng.
             </div>
           </div>
         </div>
@@ -908,13 +895,8 @@
         <!-- ============================================================== -->
         <div id="tab_content_lockout" class="tab-pane hidden space-y-3">
           <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phòng vệ Vét cạn & Khóa tài khoản (Brute-Force)</h2>
-              <p class="text-[11px] text-[#848c9e] mt-0.5">Đo kiểm rate-limit và cơ chế khóa tài khoản trên 4 interface dịch vụ.</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] text-[#848c9e]">Ngưỡng khuyến nghị: <strong class="text-rose-400 font-mono">10 fail (RTSP/SSH/ONVIF)</strong> • <strong class="text-amber-400 font-mono">6 fail (Web)</strong></span>
-            </div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Khóa tài khoản & Rate Limit (Brute-Force)</h2>
+            <span class="text-[11px] text-[#848c9e]">Ngưỡng: <strong class="text-rose-400 font-mono">10 fail (RTSP/SSH/ONVIF)</strong> • <strong class="text-amber-400 font-mono">6 fail (Web)</strong></span>
           </div>
 
           <!-- 4 Distinct Sub-Modules Grid -->
@@ -930,31 +912,30 @@
                   </div>
                   <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 443 / 80</span>
                 </div>
-                <p class="text-[11px] text-[#848c9e]">WS-Security & Digest Auth. Đo kiểm giới hạn tốc độ và khóa phiên SOAP.</p>
 
                 <!-- Parameter Form -->
                 <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần gửi SAI liên tiếp:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
                     <input id="onvif_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Chèn lượt ĐÚNG tại bước:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
                     <input id="onvif_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ gửi kết nối:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
                     <select id="onvif_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="4.0" selected>4.0 conn/s (Kiểm tra Firewall 3/s)</option>
-                      <option value="1.0">1.0 conn/s (Kiểm tra Khóa logic)</option>
-                      <option value="0.0">Tối đa (Không độ trễ)</option>
+                      <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
+                      <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                      <option value="0.0">Tối đa (Không trễ)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng dịch vụ ONVIF:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
                     <select id="onvif_port" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="443" selected>Cổng 443 (HTTPS / TLS)</option>
-                      <option value="80">Cổng 80 (HTTP / Cleartext)</option>
+                      <option value="443" selected>443 (HTTPS)</option>
+                      <option value="80">80 (HTTP)</option>
                     </select>
                   </div>
                 </div>
@@ -963,20 +944,17 @@
               <!-- Action Controls -->
               <div class="space-y-1.5 pt-1">
                 <button onclick="runCustomLockout('onvif')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy Kịch bản Tùy biến ONVIF</span>
+                  <span>Chạy tùy biến ONVIF</span>
                 </button>
                 <div class="grid grid-cols-3 gap-1.5">
-                  <button onclick="runPresetLockout('onvif', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng (Kỳ vọng bị khóa)">
-                    <div class="font-bold text-[11px] text-rose-400">Test Khóa (10)</div>
-                    <div class="text-[9px] text-[#848c9e]">10 Sai ➔ Lượt 11 Đúng</div>
+                  <button onclick="runPresetLockout('onvif', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
+                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
                   </button>
-                  <button onclick="runPresetLockout('onvif', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng (Kỳ vọng reset bộ đếm)">
-                    <div class="font-bold text-[11px] text-emerald-400">Test Reset (4)</div>
-                    <div class="text-[9px] text-[#848c9e]">4 Sai ➔ Lượt 5 Đúng</div>
+                  <button onclick="runPresetLockout('onvif', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
+                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
                   </button>
-                  <button onclick="runCommand('python tool11_onvif_lockout.py --mode burst --burst-count 8', 'ONVIF Firewall Burst')" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="Bắn 8 kết nối đồng thời trong 1 giây để kiểm tra Firewall drop">
-                    <div class="font-bold text-[11px] text-blue-400">Tường lửa Burst</div>
-                    <div class="text-[9px] text-[#848c9e]">8 kết nối trong 1s</div>
+                  <button onclick="runCommand('python tool11_onvif_lockout.py --mode burst --burst-count 8', 'ONVIF Firewall Burst')" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="Bắn 8 kết nối đồng thời">
+                    <span class="font-bold text-[11px] text-blue-400">Burst (8/s)</span>
                   </button>
                 </div>
               </div>
@@ -992,31 +970,30 @@
                   </div>
                   <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 322 / 554</span>
                 </div>
-                <p class="text-[11px] text-[#848c9e]">DESCRIBE/SETUP stream media. Đo kiểm từ chối xác thực và ngắt TCP RST.</p>
 
                 <!-- Parameter Form -->
                 <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần gửi SAI liên tiếp:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
                     <input id="rtsp_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Chèn lượt ĐÚNG tại bước:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
                     <input id="rtsp_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ gửi kết nối:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
                     <select id="rtsp_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="4.0" selected>4.0 conn/s (Kiểm tra Firewall 3/s)</option>
-                      <option value="1.0">1.0 conn/s (Kiểm tra Khóa logic)</option>
-                      <option value="0.0">Tối đa (Không độ trễ)</option>
+                      <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
+                      <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                      <option value="0.0">Tối đa (Không trễ)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng luồng RTSP:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
                     <select id="rtsp_port" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="322" selected>Cổng 322 (RTSPS - Mã hóa TLS)</option>
-                      <option value="554">Cổng 554 (RTSP - Bản rõ Cleartext)</option>
+                      <option value="322" selected>322 (RTSPS TLS)</option>
+                      <option value="554">554 (RTSP Cleartext)</option>
                     </select>
                   </div>
                 </div>
@@ -1025,16 +1002,14 @@
               <!-- Action Controls -->
               <div class="space-y-1.5 pt-1">
                 <button onclick="runCustomLockout('rtsp')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy Kịch bản Tùy biến RTSP</span>
+                  <span>Chạy tùy biến RTSP</span>
                 </button>
                 <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('rtsp', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng (Kỳ vọng bị khóa)">
-                    <div class="font-bold text-[11px] text-rose-400">Test Khóa (10)</div>
-                    <div class="text-[9px] text-[#848c9e]">10 Sai ➔ Lượt 11 Thử Đúng</div>
+                  <button onclick="runPresetLockout('rtsp', 10, 11, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
+                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
                   </button>
-                  <button onclick="runPresetLockout('rtsp', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng (Kỳ vọng reset bộ đếm)">
-                    <div class="font-bold text-[11px] text-emerald-400">Test Reset (4)</div>
-                    <div class="text-[9px] text-[#848c9e]">4 Sai ➔ Lượt 5 Thử Đúng</div>
+                  <button onclick="runPresetLockout('rtsp', 4, 5, 4.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
+                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
                   </button>
                 </div>
               </div>
@@ -1050,29 +1025,28 @@
                   </div>
                   <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 22</span>
                 </div>
-                <p class="text-[11px] text-[#848c9e]">OpenSSH & PAM. Đo kiểm thời gian lockout và phản hồi kết nối khi sai mật khẩu liên tiếp.</p>
 
                 <!-- Parameter Form -->
                 <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần gửi SAI liên tiếp:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
                     <input id="ssh_fail_count" type="number" value="10" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Chèn lượt ĐÚNG tại bước:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
                     <input id="ssh_success_at" type="number" value="11" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 5 = Trước ngưỡng (Reset); 11 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ gửi kết nối:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
                     <select id="ssh_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="3.0" selected>3.0 conn/s (Ngưỡng Firewall SSH)</option>
-                      <option value="1.0">1.0 conn/s (Kiểm tra Khóa logic)</option>
+                      <option value="3.0" selected>3.0 conn/s (Firewall SSH)</option>
+                      <option value="1.0">1.0 conn/s (Khóa logic)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng dịch vụ SSH:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
                     <div class="w-full bg-[#141822] border border-[#2e3547] rounded px-2 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
-                      <span>Cổng 22 / TCP</span>
+                      <span>22 / TCP</span>
                       <span class="text-[10px] text-emerald-400">SSHv2</span>
                     </div>
                   </div>
@@ -1082,16 +1056,14 @@
               <!-- Action Controls -->
               <div class="space-y-1.5 pt-1">
                 <button onclick="runCustomLockout('ssh')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy Kịch bản Tùy biến SSH</span>
+                  <span>Chạy tùy biến SSH</span>
                 </button>
                 <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('ssh', 10, 11, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng (Kỳ vọng bị khóa)">
-                    <div class="font-bold text-[11px] text-rose-400">Test Khóa (10)</div>
-                    <div class="text-[9px] text-[#848c9e]">10 Sai ➔ Lượt 11 Thử Đúng</div>
+                  <button onclick="runPresetLockout('ssh', 10, 11, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="10 lần sai -> lượt 11 thử đúng">
+                    <span class="font-bold text-[11px] text-rose-400">Khóa (10 fail)</span>
                   </button>
-                  <button onclick="runPresetLockout('ssh', 4, 5, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng (Kỳ vọng reset bộ đếm)">
-                    <div class="font-bold text-[11px] text-emerald-400">Test Reset (4)</div>
-                    <div class="text-[9px] text-[#848c9e]">4 Sai ➔ Lượt 5 Thử Đúng</div>
+                  <button onclick="runPresetLockout('ssh', 4, 5, 3.0)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="4 lần sai -> lượt 5 thử đúng">
+                    <span class="font-bold text-[11px] text-emerald-400">Reset (4 fail)</span>
                   </button>
                 </div>
               </div>
@@ -1107,29 +1079,28 @@
                   </div>
                   <span class="font-mono text-cyan-400 text-[11px] bg-[#1a2333] px-2 py-0.5 rounded border border-cyan-800/40">TCP 443</span>
                 </div>
-                <p class="text-[11px] text-[#848c9e]">Web GUI & VAPIX Management API. Đo kiểm HTTP 401/429 lockout và ngắt session.</p>
 
                 <!-- Parameter Form -->
                 <div class="bg-[#0f1219] p-2.5 rounded border border-[#222735] grid grid-cols-2 gap-2 text-[11px]">
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần gửi SAI liên tiếp:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Số lần sai:</label>
                     <input id="web_fail_count" type="number" value="6" min="1" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Chèn lượt ĐÚNG tại bước:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Thử đúng tại:</label>
                     <input id="web_success_at" type="number" value="7" min="0" max="100" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-emerald-400 font-mono focus:border-blue-500 outline-none" title="0 = Không thử đúng; 4 = Trước ngưỡng (Reset); 7 = Sau ngưỡng (Khóa)">
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ gửi kết nối:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Tốc độ:</label>
                     <select id="web_rate" class="w-full bg-[#1b202b] border border-[#2e3547] rounded px-2 py-1 text-white font-mono focus:border-blue-500 outline-none">
-                      <option value="2.5" selected>2.5 conn/s (Chuẩn kiểm thử Web)</option>
-                      <option value="1.0">1.0 conn/s (Kiểm tra Khóa logic)</option>
+                      <option value="2.5" selected>2.5 conn/s (Chuẩn Web)</option>
+                      <option value="1.0">1.0 conn/s (Khóa logic)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng dịch vụ Web:</label>
+                    <label class="block text-[#848c9e] font-semibold mb-1">Cổng:</label>
                     <div class="w-full bg-[#141822] border border-[#2e3547] rounded px-2 py-1 text-slate-300 font-mono text-[11px] flex items-center justify-between">
-                      <span>Cổng 443 / TCP</span>
+                      <span>443 / TCP</span>
                       <span class="text-[10px] text-cyan-400">HTTPS TLS 1.3</span>
                     </div>
                   </div>
@@ -1139,16 +1110,14 @@
               <!-- Action Controls -->
               <div class="space-y-1.5 pt-1">
                 <button onclick="runCustomLockout('web')" class="w-full py-1.5 px-3 rounded bg-[#1d4ed8] hover:bg-[#2563eb] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-blue-600">
-                  <span>Chạy Kịch bản Tùy biến Web Admin</span>
+                  <span>Chạy tùy biến Web</span>
                 </button>
                 <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runPresetLockout('web', 6, 7, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="6 lần sai -> lượt 7 thử đúng (Kỳ vọng bị khóa)">
-                    <div class="font-bold text-[11px] text-rose-400">Test Khóa (6)</div>
-                    <div class="text-[9px] text-[#848c9e]">6 Sai ➔ Lượt 7 Thử Đúng</div>
+                  <button onclick="runPresetLockout('web', 6, 7, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="6 lần sai -> lượt 7 thử đúng">
+                    <span class="font-bold text-[11px] text-rose-400">Khóa (6 fail)</span>
                   </button>
-                  <button onclick="runPresetLockout('web', 3, 4, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="3 lần sai -> lượt 4 thử đúng (Kỳ vọng reset bộ đếm)">
-                    <div class="font-bold text-[11px] text-emerald-400">Test Reset (3)</div>
-                    <div class="text-[9px] text-[#848c9e]">3 Sai ➔ Lượt 4 Thử Đúng</div>
+                  <button onclick="runPresetLockout('web', 3, 4, 2.5)" class="p-1.5 rounded bg-[#1a1f2b] hover:bg-[#222938] border border-[#2e3547] text-center" title="3 lần sai -> lượt 4 thử đúng">
+                    <span class="font-bold text-[11px] text-emerald-400">Reset (3 fail)</span>
                   </button>
                 </div>
               </div>
@@ -1162,54 +1131,40 @@
         <!-- ============================================================== -->
         <div id="tab_content_fuzzer" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#2a1417] text-rose-300 border border-rose-800/60 font-bold">INPUT VALIDATION ENGINE</span>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Dữ liệu Đầu vào & Fuzzing Giao thức</h2>
-              </div>
-              <p class="text-[11px] text-[#848c9e] mt-1">
-                Đo kiểm phản hồi và tính toàn vẹn hệ thống trước payload dị thường, SQLi, XSS, CSRF và malformed packet.
-              </p>
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#2a1417] text-rose-300 border border-rose-800/60 font-bold">FUZZING</span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Đầu vào & Fuzzing Giao thức</h2>
             </div>
             <div class="flex items-center gap-2">
               <button onclick="runCommand('python tool18_api_input_validation.py --mode all', 'Full Fuzzing Suite')" class="bg-[#881337] hover:bg-[#9f1239] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-rose-600 transition shadow-sm">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy trọn bộ Fuzzing (Scan + Fuzz)</span>
+                <span>Chạy trọn bộ Fuzzing</span>
               </button>
             </div>
           </div>
 
           <!-- Quick 1-Click Preset Bar -->
           <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded">
-            <div class="text-[11px] font-bold text-[#848c9e] uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>Kịch bản nhanh (1-Click Presets):</span>
-              <span class="text-[10px] text-[#5c6475] font-normal">Chạy lệnh & lưu gói PCAP</span>
-            </div>
+            <div class="text-[11px] font-bold text-[#848c9e] uppercase tracking-wider mb-2">Kịch bản nhanh (1-Click Presets):</div>
             <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-              <button onclick="runRtspPreset('all', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-left transition group card-interactive">
-                <div class="font-semibold text-xs text-rose-300 group-hover:text-rose-200">RTSP Stream Fuzzer</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">7 dạng payload dị thường</div>
+              <button onclick="runRtspPreset('all', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-rose-300 group-hover:text-rose-200">RTSP Fuzzer</div>
               </button>
-              <button onclick="runApiScan()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-left transition group card-interactive">
-                <div class="font-semibold text-xs text-cyan-300 group-hover:text-cyan-200">API Attack Surface</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">Rà soát endpoint & stream</div>
+              <button onclick="runApiScan()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-cyan-300 group-hover:text-cyan-200">API Scan</div>
               </button>
-              <button onclick="runCsrfAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-emerald-900/60 text-left transition group card-interactive">
-                <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF & Token Forge</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">Kiểm tra Origin & Token</div>
+              <button onclick="runCsrfAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-emerald-900/60 text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF Audit</div>
               </button>
-              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-left transition group card-interactive">
-                <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Login: SQLi & XSS</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">Form validation & lọc ký tự</div>
+              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Login SQLi & XSS</div>
               </button>
-              <button onclick="runRtspPreset('overflow', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-left transition group card-interactive">
+              <button onclick="runRtspPreset('overflow', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
                 <div class="font-semibold text-xs text-amber-300 group-hover:text-amber-200">Buffer Overflow</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">4KB Headers + Format string</div>
               </button>
-              <button onclick="runRtspPreset('raw', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-left transition group card-interactive">
-                <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Malformed Bit-Flip</div>
-                <div class="text-[10px] text-[#848c9e] mt-0.5">256 byte binary entropy</div>
+              <button onclick="runRtspPreset('raw', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Malformed Raw</div>
               </button>
             </div>
           </div>
@@ -1218,42 +1173,36 @@
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
             <!-- Card 1: RTSP / RTSPS Stream Control Fuzzer -->
-            <div class="lg:col-span-2 border border-rose-900/40 rounded p-3 bg-[#14171f] space-y-3 relative overflow-hidden card-interactive">
-              <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl pointer-events-none"></div>
-              
+            <div class="lg:col-span-2 border border-rose-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
               <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
                 <div class="flex items-center gap-2">
                   <div class="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
                   <span class="font-bold text-xs text-white">1. RTSP / RTSPS Stream Fuzzer</span>
                 </div>
-                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 322 SẴN SÀNG</span>
+                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 322</span>
               </div>
-
-              <p class="text-[11px] text-[#848c9e]">
-                Thực hiện chuỗi khởi tạo hợp lệ (<code class="text-emerald-400">OPTIONS</code>, <code class="text-emerald-400">DESCRIBE</code> xác thực), sau đó chèn lệnh điều khiển sai định dạng để đánh giá khả năng tự phục hồi.
-              </p>
 
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
                 <div>
                   <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng RTSP:</label>
                   <select id="rtsp_fuzz_port" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                    <option value="322" selected>322 (RTSPS - TLS)</option>
-                    <option value="554">554 (RTSP Cleartext)</option>
-                    <option value="9554">9554 (RTSPS TLS Alt)</option>
+                    <option value="322" selected>322 (RTSPS TLS)</option>
+                    <option value="554">554 (RTSP Clear)</option>
+                    <option value="9554">9554 (RTSPS Alt)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Dạng Payload Fuzz:</label>
+                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Dạng Payload:</label>
                   <select id="rtsp_fuzz_type" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                    <option value="all" selected>All (Trọn bộ 7 dạng)</option>
-                    <option value="methods">Lệnh sai (Methods NULL/Corrupt)</option>
-                    <option value="overflow">Tràn bộ đệm (4KB Overflow)</option>
-                    <option value="cseq">CSeq dị thường (Negative/Over)</option>
-                    <option value="session">Session ID giả mạo</option>
+                    <option value="all" selected>All (7 dạng)</option>
+                    <option value="methods">Lệnh sai (Methods NULL)</option>
+                    <option value="overflow">Tràn bộ đệm (4KB)</option>
+                    <option value="cseq">CSeq dị thường</option>
+                    <option value="session">Session ID giả</option>
                     <option value="range">Range & Timecodes sai</option>
-                    <option value="raw">Raw Bit-flip / Entropy</option>
-                    <option value="injection">CRLF Request Smuggling</option>
+                    <option value="raw">Raw Bit-flip</option>
+                    <option value="injection">CRLF Injection</option>
                   </select>
                 </div>
 
@@ -1263,27 +1212,24 @@
                 </div>
 
                 <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (gói/giây):</label>
+                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (gói/s):</label>
                   <input type="number" id="rtsp_fuzz_rate" value="4.0" step="0.5" min="0.5" max="20" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
                 </div>
               </div>
 
               <!-- Action Bar -->
               <div class="flex items-center justify-between pt-1">
-                <div class="flex items-center gap-1.5 text-[11px] text-[#848c9e]">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Tự động bắt gói tin PCAP & xuất bộ lọc Wireshark</span>
-                </div>
-                <button onclick="runRtspFuzzer()" class="bg-[#e11d48] hover:bg-[#be123c] text-white px-3.5 py-2 rounded text-xs font-bold flex items-center gap-1.5 transition border border-rose-400 shadow-md">
+                <span class="text-[11px] text-[#848c9e]">Tự động lưu PCAP và lọc Wireshark</span>
+                <button onclick="runRtspFuzzer()" class="bg-[#e11d48] hover:bg-[#be123c] text-white px-3.5 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition border border-rose-400 shadow-md">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Khởi chạy RTSP Fuzzer</span>
+                  <span>Khởi chạy Fuzzer</span>
                 </button>
               </div>
             </div>
 
             <!-- Card 2: Full API Scanner & Proprietary Fuzzer -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-3 flex flex-col justify-between card-interactive">
-              <div class="space-y-3">
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
+              <div class="space-y-2.5">
                 <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
                   <div class="flex items-center gap-2">
                     <div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
@@ -1293,21 +1239,19 @@
 
                 <!-- API Discovery Box -->
                 <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-1.5">
-                  <div class="text-[11px] font-semibold text-white">Quét Toàn diện API của Camera</div>
-                  <p class="text-[10px] text-[#848c9e]">Dò quét toàn bộ RTSP, ONVIF SOAP, Web/REST, SSH, SNMP và cổng raw stream.</p>
+                  <div class="text-[11px] font-semibold text-white">Quét Toàn diện API Camera</div>
                   <button onclick="runApiScan()" class="w-full bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-2.5 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center justify-center gap-1.5 mt-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <span>Quét Toàn bộ API Camera</span>
+                    <span>Quét Toàn bộ API</span>
                   </button>
                 </div>
 
                 <!-- Non-HTTP Proprietary Stream Fuzzer Box -->
                 <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-semibold text-white">Giao thức Phi HTTP (Socket Đóng)</span>
-                    <span class="text-[9px] text-[#848c9e] font-mono">Dahua/Hikvision</span>
+                    <span class="text-[11px] font-semibold text-white">Socket Riêng (Phi HTTP)</span>
+                    <span class="text-[9px] text-[#848c9e] font-mono">TCP RAW</span>
                   </div>
-                  <p class="text-[10px] text-[#5c6475]">Mặc định cổng luồng RTSP (322). Nhập cổng khác nếu camera có giao thức stream riêng (VD: 37777).</p>
                   <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-[9px] text-[#848c9e] uppercase mb-0.5">Cổng Socket:</label>
@@ -1320,7 +1264,7 @@
                   </div>
                   <button onclick="runCustomProtoFuzzer()" class="w-full bg-[#1f2430] hover:bg-[#282f40] text-purple-300 px-2.5 py-1 rounded text-xs font-medium border border-purple-700/50 transition flex items-center justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span>Fuzz Socket Riêng (Phi HTTP)</span>
+                    <span>Fuzz Socket Riêng</span>
                   </button>
                 </div>
               </div>
@@ -1329,110 +1273,90 @@
           </div>
 
           <!-- Card 3: CSRF & Forged Token Auditor -->
-          <div class="border border-emerald-900/40 rounded p-3 bg-[#14171f] space-y-3 relative overflow-hidden card-interactive">
+          <div class="border border-emerald-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
             <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
               <div class="flex items-center gap-2">
                 <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
-                <span class="font-bold text-xs text-white">3. Phòng vệ CSRF & Giả mạo Token Cấu hình (Web HTTPS / REST API)</span>
+                <span class="font-bold text-xs text-white">3. Phòng vệ CSRF & Giả mạo Token Cấu hình (Web / REST)</span>
               </div>
-              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 443 SẴN SÀNG</span>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 443</span>
             </div>
-
-            <p class="text-[11px] text-[#848c9e]">
-              Mô phỏng 8 vector CSRF và chèn token giả mạo (X-CSRF-Token, JWT, Form, Cookie). Camera phải từ chối (HTTP 401/403/400) và giữ nguyên cấu hình.
-            </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
               <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web HTTPS:</label>
+                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
                 <input type="number" id="csrf_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
               </div>
               <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ gửi (req/giây):</label>
+                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (req/s):</label>
                 <input type="number" id="csrf_audit_rate" value="3.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
               </div>
               <div class="flex items-end gap-2">
                 <button onclick="runCsrfAuditor()" class="flex-1 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-emerald-400 shadow-md">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span>Chạy Đo kiểm CSRF</span>
+                  <span>Chạy CSRF</span>
                 </button>
                 <button onclick="openCsrfPoc()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                  <span>Mở Trang HTML PoC</span>
+                  <span>Mở PoC</span>
                 </button>
               </div>
             </div>
           </div>
 
           <!-- Card 4: Login Form Input Validation (SQLi & XSS) -->
-          <div class="border border-blue-900/40 rounded p-3 bg-[#14171f] space-y-3 relative overflow-hidden card-interactive">
+          <div class="border border-blue-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
             <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
               <div class="flex items-center gap-2">
                 <div class="w-2.5 h-2.5 rounded-full bg-blue-400"></div>
-                <span class="font-bold text-xs text-white">4. Xác thực Form Đăng nhập: SQL Injection & XSS (Web Login / VAPIX)</span>
+                <span class="font-bold text-xs text-white">4. Xác thực Form Đăng nhập: SQL Injection & XSS (Web / VAPIX)</span>
               </div>
-              <span class="text-[10px] font-mono text-blue-400 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-800/40 font-bold">CỔNG 443 HOẠT ĐỘNG</span>
+              <span class="text-[10px] font-mono text-blue-400 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-800/40 font-bold">CỔNG 443</span>
             </div>
-
-            <p class="text-[11px] text-[#848c9e]">
-              Tiêm 6 vector SQL Injection và 6 vector XSS vào biểu mẫu xác thực. Camera phải từ chối hợp lệ (HTTP 401/403/400), không rò rỉ CSDL và không phản xạ script.
-            </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
               <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web HTTPS:</label>
+                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
                 <input type="number" id="login_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
               </div>
               <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Giãn cách gửi (giây):</label>
+                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Giãn cách (s):</label>
                 <input type="number" id="login_audit_delay" value="0.4" step="0.1" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
               </div>
               <div class="flex items-end gap-2">
                 <button onclick="runLoginAuditor()" class="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-blue-400 shadow-md">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span>Chạy Đo kiểm Login</span>
+                  <span>Chạy Login</span>
                 </button>
                 <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                  <span>Mở Trang HTML PoC</span>
+                  <span>Mở PoC</span>
                 </button>
               </div>
             </div>
           </div>
 
           <!-- Technical Reference & Wireshark Filter Panel -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded space-y-2">
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
             <div class="font-bold text-xs text-white flex items-center justify-between">
-              <span>Tiêu chí Đánh giá An toàn & Bằng chứng Đối soát Wireshark</span>
+              <span>Bộ lọc Wireshark Display Filter</span>
               <span class="text-[10px] text-emerald-400 font-mono">DUT Integrity Enforced</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#848c9e]">
-              <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-1">
-                <div class="font-semibold text-white">1. Tiêu chí Đánh giá Chuẩn 3.10.1.3:</div>
-                <ul class="list-disc list-inside space-y-0.5 text-[11px]">
-                  <li><strong class="text-white">Xử lý đúng yêu cầu:</strong> Phản hồi mã lỗi chuẩn (400 Bad Request, 454 Session Not Found, 451, 501) hoặc ngắt kết nối an toàn (FIN/RST). Không chấp nhận (200 OK) cho dữ liệu sai.</li>
-                  <li><strong class="text-white">Duy trì tính toàn vẹn hệ thống:</strong> Thiết bị không crash, không dump core, không khởi động lại, phục hồi tức thì và tiếp nhận kết nối hợp lệ bình thường ngay sau đó.</li>
-                </ul>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-rose-400">rtsp.status &gt;= 400</span>
+                <span class="text-[10px] text-[#848c9e]">Mã lỗi từ chối</span>
               </div>
-              <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-1">
-                <div class="font-semibold text-white">2. Bộ lọc Display Filter Wireshark:</div>
-                <div class="space-y-1 font-mono text-[11px]">
-                  <div class="flex items-center justify-between bg-[#14171f] px-2 py-0.5 rounded border border-[#272c3a]">
-                    <span class="text-rose-400">rtsp.status >= 400</span>
-                    <span class="text-[10px] text-[#848c9e]">Mã lỗi từ chối của camera</span>
-                  </div>
-                  <div class="flex items-center justify-between bg-[#14171f] px-2 py-0.5 rounded border border-[#272c3a]">
-                    <span class="text-amber-400">tcp.flags.reset == 1</span>
-                    <span class="text-[10px] text-[#848c9e]">Gói tin ngắt kết nối an toàn</span>
-                  </div>
-                  <div class="flex items-center justify-between bg-[#14171f] px-2 py-0.5 rounded border border-[#272c3a]">
-                    <span class="text-cyan-400">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
-                    <span class="text-[10px] text-[#848c9e]">Toàn bộ phiên đo kiểm</span>
-                  </div>
-                </div>
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-amber-400">tcp.flags.reset == 1</span>
+                <span class="text-[10px] text-[#848c9e]">Ngắt kết nối an toàn</span>
+              </div>
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-cyan-400">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
+                <span class="text-[10px] text-[#848c9e]">Phiên đo kiểm</span>
               </div>
             </div>
           </div>
+
+        </div>
 
         </div>
 
@@ -3123,6 +3047,125 @@
       loadSettingsFromConfig();
       refreshEvidenceList();
     });
+
+    // 8. APP UPDATE ENGINE (GITHUB DIRECT SYNC)
+    async function checkAppUpdate() {
+      const modal = document.getElementById('update_modal');
+      const statusMsg = document.getElementById('update_status_msg');
+      const localSha = document.getElementById('update_local_sha');
+      const remoteSha = document.getElementById('update_remote_sha');
+      const commitInfo = document.getElementById('update_commit_info');
+      const updateBtn = document.getElementById('btn_do_update');
+
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      statusMsg.innerHTML = '<span class="text-cyan-400">Đang truy vấn dữ liệu từ GitHub repository Ann-BT/Cumera...</span>';
+      updateBtn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/app/check_update`);
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+          localSha.textContent = data.current_commit;
+          remoteSha.textContent = data.latest_commit;
+          commitInfo.textContent = `"${data.commit_message}" (${(data.commit_date || '').slice(0, 10)})`;
+
+          if (data.has_update) {
+            statusMsg.innerHTML = '<span class="text-emerald-400 font-semibold">[+] Đã phát hiện bản cập nhật mới trên GitHub!</span>';
+            updateBtn.disabled = false;
+          } else {
+            statusMsg.innerHTML = '<span class="text-slate-400">[OK] Ứng dụng Cumera của bạn đang ở phiên bản mới nhất.</span>';
+            updateBtn.disabled = true;
+          }
+        } else {
+          statusMsg.innerHTML = `<span class="text-rose-400">${data.message || 'Lỗi kiểm tra cập nhật'}</span>`;
+        }
+      } catch (err) {
+        statusMsg.innerHTML = `<span class="text-rose-400">Lỗi kết nối backend: ${err.message}</span>`;
+      }
+    }
+
+    function closeUpdateModal() {
+      const modal = document.getElementById('update_modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function applyAppUpdate() {
+      const btn = document.getElementById('btn_do_update');
+      const statusMsg = document.getElementById('update_status_msg');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block animate-pulse">↻</span> Đang tải...';
+      statusMsg.innerHTML = '<span class="text-yellow-400 font-semibold">Đang tải và cập nhật mã nguồn từ GitHub...</span>';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/app/update`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+          statusMsg.innerHTML = `<span class="text-emerald-400 font-bold">${data.message}</span>`;
+          showToast(data.message);
+          const term = document.getElementById('terminal_output');
+          if (term && data.logs) {
+            term.innerHTML += `\n<span class="text-emerald-400 font-bold">[CUMERA-UPDATE]</span>\n${data.logs}\n`;
+            term.scrollTop = term.scrollHeight;
+          }
+          btn.innerHTML = 'Đã cập nhật';
+        } else {
+          statusMsg.innerHTML = `<span class="text-rose-400 font-bold">${data.message}</span>`;
+          btn.disabled = false;
+          btn.innerHTML = 'Thử lại';
+        }
+      } catch (err) {
+        statusMsg.innerHTML = `<span class="text-rose-400">Lỗi cập nhật: ${err.message}</span>`;
+        btn.disabled = false;
+        btn.innerHTML = 'Thử lại';
+      }
+    }
+  </script>
+
+  <!-- MODAL CẬP NHẬT ỨNG DỤNG CUMERA -->
+  <div id="update_modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-[#0f1420] border border-[#232f45] rounded-xl shadow-2xl w-full max-w-md p-5 text-[#cbd5e1] space-y-4">
+      <div class="flex items-center justify-between border-b border-[#1f293d] pb-3">
+        <div class="flex items-center gap-2.5">
+          <img src="/icon.png" class="w-8 h-8 rounded-full border border-teal-500/50 object-cover shadow-sm">
+          <div>
+            <h3 class="text-sm font-bold text-white tracking-tight">Cập nhật ứng dụng Cumera</h3>
+            <p class="text-[11px] text-[#64748b]">GitHub: <span class="font-mono text-cyan-400">Ann-BT/Cumera</span></p>
+          </div>
+        </div>
+        <button onclick="closeUpdateModal()" class="text-[#64748b] hover:text-white p-1 text-lg font-bold leading-none cursor-pointer">&times;</button>
+      </div>
+
+      <div id="update_modal_body" class="space-y-3 text-xs">
+        <div class="p-3 rounded-lg bg-[#0a0d14] border border-[#1b2230] space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-[#8892b0]">Commit cục bộ:</span>
+            <span id="update_local_sha" class="font-mono text-cyan-300 font-bold px-1.5 py-0.5 rounded bg-[#131b29] border border-[#233149]">...</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#8892b0]">Commit mới trên GitHub:</span>
+            <span id="update_remote_sha" class="font-mono text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-[#10221e] border border-[#1e453c]">...</span>
+          </div>
+          <div id="update_commit_info" class="pt-2 border-t border-[#1a2333] text-[11px] text-[#94a3b8] italic">
+            ...
+          </div>
+        </div>
+        <div id="update_status_msg" class="text-center text-[11px] text-[#38bdf8] py-1">
+          Đang kiểm tra dữ liệu từ máy chủ GitHub...
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#1f293d]">
+        <button onclick="closeUpdateModal()" class="px-3 py-1.5 rounded-md text-xs bg-[#171f2e] hover:bg-[#202b3d] text-[#94a3b8] border border-[#2b374d] cursor-pointer">Đóng</button>
+        <button id="btn_do_update" onclick="applyAppUpdate()" class="px-4 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span>Cập nhật ngay</span>
+        </button>
+      </div>
+    </div>
+  </div>
   </script>
 </body>
 </html>

@@ -501,92 +501,145 @@ def audit_commech_3_onvif(wait_sec: float = 3.0) -> Dict[str, Any]:
 
 
 def audit_commech_4_snmp(wait_sec: float = 3.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-4: Giao diện SNMP (UDP 161)."""
+    """Đo kiểm ComMech-4: Giao diện SNMP (UDP 161).
+    Quy trình đo chuẩn 2 giai đoạn:
+      Giai đoạn 1: Kết nối an toàn chuẩn (Bắt tay SNMPv3 authPriv SHA-256 + AES-256/128, lấy thành công sysDescr).
+      Giai đoạn 2: Thử nghiệm tấn công hạ cấp đường truyền (SNMPv3 noAuthNoPriv, SNMPv1 cleartext, SNMPv2c cleartext).
+    """
     console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-4: SNMP Interface (UDP/{DUT_IP}:161)[/bold cyan]...")
     res = {
         "id": "ComMech-4",
         "name": "SNMP Interface (UDP/161)",
         "port": 161,
-        "proto": "IP/UDP/SNMP",
+        "proto": "IP/UDP/SNMPv3",
         "direction": "DUT Server (Tool Probe)",
         "pcap": "commech-4_snmpv3.pcap"
     }
 
     pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and udp port 161", prefix="commech4_snmpv3")
+    time.sleep(0.8)
     try:
-        # Gửi SNMPv1 probe cleartext 'public'
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(1.5)
-        v1_probe = b"\x30\x26\x02\x01\x00\x04\x06public\xa0\x19\x02\x04\x12\x34\x56\x78\x02\x01\x00\x02\x01\x00\x30\x0b\x30\x09\x06\x05\x2b\x06\x01\x02\x01\x05\x00"
-        v1_rejected = False
-        try:
-            sock.sendto(v1_probe, (DUT_IP, 161))
-            data, _ = sock.recvfrom(1024)
-            v1_msg = "NGUY HIỂM: Thiết bị phản hồi SNMPv1 truyền rõ!"
-        except socket.timeout:
-            v1_rejected = True
-            v1_msg = "ĐẠT: Từ chối / Không phản hồi gói SNMP v1/v2c truyền rõ"
-        except Exception as e:
-            v1_rejected = True
-            v1_msg = f"ĐẠT: Ngắt kết nối v1 rõ ({type(e).__name__})"
-        finally:
-            sock.close()
+        from pysnmp.hlapi.asyncio import (
+            SnmpEngine, UsmUserData, UdpTransportTarget, ContextData,
+            ObjectType, ObjectIdentity, get_cmd,
+            usmHMAC192SHA256AuthProtocol, usmAesCfb256Protocol, usmAesCfb128Protocol,
+            usmNoAuthProtocol, usmNoPrivProtocol
+        )
 
-        # Kiểm thử SNMPv3 authPriv
         snmp_user = config.get("snmp_v3", {}).get("user", USER)
         snmp_auth = config.get("snmp_v3", {}).get("auth_pass", PASS)
         snmp_priv = config.get("snmp_v3", {}).get("priv_pass", PASS)
 
-        snmpv3_details = []
-        try:
-            from pysnmp.hlapi.asyncio import (
-                SnmpEngine, UsmUserData, UdpTransportTarget, ContextData,
-                ObjectType, ObjectIdentity, get_cmd,
-                usmHMAC192SHA256AuthProtocol, usmAesCfb128Protocol
-            )
+        users_to_try = []
+        for u in [snmp_user, "admin", "initial"]:
+            if u and u not in users_to_try:
+                users_to_try.append(u)
 
-            async def _run_v3_test():
-                engine1 = SnmpEngine()
-                ud_noauth = UsmUserData("public")
-                target1 = await UdpTransportTarget.create((DUT_IP, 161), timeout=1.5, retries=0)
-                err1, _, _, _ = await get_cmd(engine1, ud_noauth, target1, ContextData(), ObjectType(ObjectIdentity('1.3.6.1.2.1.1.1.0')))
+        priv_ciphers = [
+            ("AES-256", usmAesCfb256Protocol),
+            ("AES-128", usmAesCfb128Protocol)
+        ]
 
-                users_to_try = [snmp_user] if snmp_user == "initial" else [snmp_user, "initial"]
-                last_err2 = ""
-                binds_res = []
+        # -------------------------------------------------------------
+        # BƯỚC 1: KẾT NỐI AN TOÀN CHUẨN (SNMPv3 authPriv SHA-256 + AES)
+        # -------------------------------------------------------------
+        async def _run_secure_authpriv():
+            for cipher_name, priv_proto in priv_ciphers:
                 for u in users_to_try:
-                    engine2 = SnmpEngine()
-                    ud_authpriv = UsmUserData(
+                    engine = SnmpEngine()
+                    ud = UsmUserData(
                         u,
                         authKey=snmp_auth,
                         privKey=snmp_priv,
                         authProtocol=usmHMAC192SHA256AuthProtocol,
-                        privProtocol=usmAesCfb128Protocol
+                        privProtocol=priv_proto
                     )
-                    target2 = await UdpTransportTarget.create((DUT_IP, 161), timeout=1.5, retries=0)
-                    err2, stat2, _, vbs2 = await get_cmd(engine2, ud_authpriv, target2, ContextData(), ObjectType(ObjectIdentity('1.3.6.1.2.1.1.1.0')))
-                    last_err2 = str(err2)
-                    if vbs2:
-                        binds_res = [v.prettyPrint() for v in vbs2]
-                        break
-                return str(err1), last_err2, binds_res
+                    target = await UdpTransportTarget.create((DUT_IP, 161), timeout=2.0, retries=1)
+                    err, stat, idx, vbs = await get_cmd(
+                        engine, ud, target, ContextData(),
+                        ObjectType(ObjectIdentity('1.3.6.1.2.1.1.1.0'))
+                    )
+                    if err is None and stat == 0 and vbs:
+                        val = vbs[0].prettyPrint()
+                        return True, u, cipher_name, val
+            return False, "", "", "Không có phản hồi authPriv hợp lệ"
 
-            err_noauth, err_authpriv, binds = asyncio.run(_run_v3_test())
-            snmpv3_details.append(f"noAuthNoPriv: Từ chối ({err_noauth})")
-            if binds:
-                snmpv3_details.append(f"authPriv (SHA256+AES): Thành công -> {binds[0][:60]}")
-            else:
-                snmpv3_details.append(f"authPriv (SHA256+AES): USM Engine kiểm soát ({err_authpriv})")
-        except Exception as e:
-            snmpv3_details.append(f"SNMPv3 Test Info: {e}")
+        authpriv_ok, matched_user, matched_cipher, sys_descr = asyncio.run(_run_secure_authpriv())
+        time.sleep(0.5)
 
-        res["downgrade_test"] = {"pass": v1_rejected, "detail": v1_msg}
-        res["snmpv3_result"] = "; ".join(snmpv3_details)
-        res["status"] = "PASS" if v1_rejected else "WARN"
+        # -------------------------------------------------------------
+        # BƯỚC 2: THỬ NGHIỆM TẤN CÔNG HẠ CẤP ĐƯỜNG TRUYỀN (DOWNGRADE)
+        # -------------------------------------------------------------
+        # 2a. Hạ cấp SNMPv3 noAuthNoPriv (vô hiệu hóa xác thực & mã hóa)
+        async def _run_noauth_probe():
+            engine_noauth = SnmpEngine()
+            ud_noauth = UsmUserData(matched_user or snmp_user)
+            target_noauth = await UdpTransportTarget.create((DUT_IP, 161), timeout=1.5, retries=0)
+            err, stat, _, _ = await get_cmd(
+                engine_noauth, ud_noauth, target_noauth, ContextData(),
+                ObjectType(ObjectIdentity('1.3.6.1.2.1.1.1.0'))
+            )
+            is_rejected = (err is not None or str(stat) != "0")
+            err_msg = str(err) if err else str(stat)
+            return is_rejected, err_msg
+
+        noauth_rejected, noauth_msg = asyncio.run(_run_noauth_probe())
+        time.sleep(0.3)
+
+        # 2b. Hạ cấp SNMPv1 truyền rõ (Community 'public')
+        s1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s1.settimeout(1.2)
+        v1_probe = b"\x30\x26\x02\x01\x00\x04\x06public\xa0\x19\x02\x04\x12\x34\x56\x78\x02\x01\x00\x02\x01\x00\x30\x0b\x30\x09\x06\x05\x2b\x06\x01\x02\x01\x05\x00"
+        v1_rejected = False
+        try:
+            s1.sendto(v1_probe, (DUT_IP, 161))
+            _, _ = s1.recvfrom(1024)
+        except socket.timeout:
+            v1_rejected = True
+        except Exception:
+            v1_rejected = True
+        finally:
+            s1.close()
+        time.sleep(0.3)
+
+        # 2c. Hạ cấp SNMPv2c truyền rõ (Community 'public')
+        s2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s2.settimeout(1.2)
+        v2c_probe = b"\x30\x26\x02\x01\x01\x04\x06public\xa0\x19\x02\x04\x12\x34\x56\x79\x02\x01\x00\x02\x01\x00\x30\x0b\x30\x09\x06\x05\x2b\x06\x01\x02\x01\x05\x00"
+        v2c_rejected = False
+        try:
+            s2.sendto(v2c_probe, (DUT_IP, 161))
+            _, _ = s2.recvfrom(1024)
+        except socket.timeout:
+            v2c_rejected = True
+        except Exception:
+            v2c_rejected = True
+        finally:
+            s2.close()
+        time.sleep(0.3)
+
+        downgrade_ok = (v1_rejected and v2c_rejected and noauth_rejected)
+
+        if authpriv_ok:
+            conn_detail = f"Bắt tay authPriv (SHA-256 + {matched_cipher}, User: {matched_user}) thành công"
+            res["active_cipher"] = f"SHA-256 / {matched_cipher}"
+            res["sys_descr"] = sys_descr[:80]
+        else:
+            conn_detail = "Bắt tay authPriv thất bại"
+
+        if downgrade_ok:
+            downgrade_detail = f"ĐẠT: {conn_detail}; Chặn toàn bộ hạ cấp SNMPv1/v2c (Timeout) & SNMPv3 noAuth ({noauth_msg})"
+        else:
+            downgrade_detail = f"CẢNH BÁO: {conn_detail}; Không chặn được hạ cấp (v1={v1_rejected}, v2c={v2c_rejected}, noAuth={noauth_rejected})"
+
+        res["downgrade_test"] = {"pass": (authpriv_ok and downgrade_ok), "detail": downgrade_detail}
+        res["status"] = "PASS" if (authpriv_ok and downgrade_ok) else "WARN"
+
     except Exception as e:
         res["status"] = "WARN"
-        res["downgrade_test"] = {"pass": False, "detail": f"Không thể thăm dò SNMP 161: {e}"}
+        res["downgrade_test"] = {"pass": False, "detail": f"Không thể kiểm thử SNMP 161: {e}"}
     finally:
+        time.sleep(0.8)
         stop_pcap_capture(pcap_proc)
         res["pcap_file"] = pcap_path
         res["pcap_packet_count"] = get_pcap_packet_count(pcap_path)

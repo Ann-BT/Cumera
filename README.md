@@ -1,6 +1,8 @@
-# BỘ CÔNG CỤ TỰ ĐỘNG ĐO KIỂM BẢO MẬT & MẬT MÃ CAMERA IP (QCVN 11:2026/BCA)
+# CUMERA - BỘ CÔNG CỤ TỰ ĐỘNG ĐO KIỂM BẢO MẬT & MẬT MÃ CAMERA IP (QCVN 11:2026/BCA)
 
-Bộ công cụ này được thiết kế và đóng gói chuyên dụng để đo kiểm, đánh giá an toàn kỹ thuật thực nghiệm của các cơ chế mạng, giao thức xác thực, thuật toán mật mã và bảo vệ tham số an toàn trên thiết bị Camera IP (DUT) theo quy chuẩn kỹ thuật quốc gia **QCVN 11:2026/BCA** (Ban hành theo Thông tư 48/2026/TT-BCA) và tiêu chuẩn mật mã **SOGIS Version 1.3**.
+<img src="assets/icon.png" width="96" alt="Cumera Logo" align="right">
+
+**Cumera** là bộ công cụ chuyên dụng kiểm thử an toàn thực nghiệm, đánh giá các cơ chế mạng, giao thức xác thực, thuật toán mật mã và bề mặt tham số an toàn trên thiết bị Camera IP (DUT) theo quy chuẩn kỹ thuật quốc gia **QCVN 11:2026/BCA** (Thông tư 48/2026/TT-BCA) và tiêu chuẩn mật mã **SOGIS Version 1.3**.
 
 > [!NOTE]
 > **Nguyên tắc đo kiểm khách quan & Chuẩn Bằng chứng Wireshark**:
@@ -17,31 +19,45 @@ Bộ công cụ này được thiết kế và đóng gói chuyên dụng để 
 ## 1. YÊU CẦU HỆ THỐNG & CÀI ĐẶT NHANH (QUICK START)
 
 ### Yêu cầu tiên quyết:
-- **Hệ điều hành**: Linux (Ubuntu, Debian, Fedora, Arch...), macOS, hoặc Windows 10/11.
-- **Python**: Phiên bản >= 3.9 (đã bật tùy chọn thêm vào PATH).
+- **Hệ điều hành**: Windows 10/11, Linux (Ubuntu, Debian, Fedora, Arch...), hoặc macOS.
+- **Python**: Phiên bản >= 3.9 (đã bật tùy chọn thêm vào PATH khi cài đặt).
 - **Công cụ mạng bổ trợ (khuyến nghị)**:
-  - `tshark` / `Wireshark` (để tự động bắt và lưu file `.pcap`).
+  - `Wireshark` / `tshark` (để tự động bắt và lưu file `.pcap`).
   - `openssl` (để đo kiểm bắt tay TLS nâng cao).
 
-### Cài đặt trên Linux / macOS:
-1. Mở Terminal tại thư mục bộ công cụ:
+### Cài đặt & Khởi chạy trên Windows:
+1. **Cài đặt lần đầu**:
+   - Nhấp đúp chuột vào file `setup.bat`.
+   - Script sẽ tự động tạo môi trường ảo `.venv`, cài đặt đầy đủ thư viện, khởi tạo `config.json` và tạo icon Cumera trên màn hình Desktop.
+2. **Khởi chạy ứng dụng**:
+   - **Giao diện Ứng dụng Desktop (Khuyên dùng)**: Nhấp đúp vào `run_app.bat` (hoặc icon Cumera trên Desktop). Tự động mở cửa sổ độc lập (Native Window Mode qua Microsoft Edge / Google Chrome).
+   - **Giao diện Dòng lệnh CLI Menu**: Nhấp đúp vào `run_suite.bat`.
+3. **Cập nhật ứng dụng khi có tính năng mới**:
+   - Bấm trực tiếp nút **[Cập nhật]** ngay trên thanh công cụ của Web Dashboard.
+   - Hoặc nhấp đúp file `update.bat` để tự động kéo mã nguồn mới nhất từ GitHub.
+
+### Cài đặt & Khởi chạy trên Linux / macOS:
+1. **Cài đặt**:
    ```bash
    ./setup.sh
    ```
-2. Khởi chạy Menu điều khiển:
-   ```bash
-   ./run_suite.sh
-   ```
-
-### Cài đặt trên Windows:
-1. Nhấp đúp chuột vào file `setup.bat` (hoặc mở Command Prompt / PowerShell và gõ `setup.bat`).
-2. Khởi chạy Menu điều khiển:
-   - Nhấp đúp chuột vào `run_suite.bat`.
-   - Hoặc gõ lệnh: `.venv\Scripts\python.exe toolkit_menu.py`.
+2. **Khởi chạy**:
+   - **Giao diện Đồ họa Desktop**: `./run_app.sh`
+   - **Giao diện Terminal TUI**: `./run_app.sh --cli`
+   - **Giao diện Menu Dòng lệnh**: `./run_suite.sh`
+3. **Cập nhật**:
+   - Bấm nút **[Cập nhật]** trong Web Dashboard hoặc chạy `git pull origin main && .venv/bin/pip install -r requirements.txt`.
 
 ---
 
 ## 2. CẤU TRÚC BỘ CÔNG CỤ
+
+| File / Module | Chức năng kỹ thuật | Giao thức / Mục tiêu |
+| :--- | :--- | :--- |
+| **`ui_dashboard.html`** | Giao diện đồ họa Desktop kỹ thuật chuyên sâu (Single-Page App) | Bảng điều khiển Web Dashboard |
+| **`toolkit_web_server.py`** | Máy chủ Backend FastAPI + WebSocket Realtime Log Streaming & Cập nhật | Port 8765 |
+| **`run_app.bat` / `run_app.sh`** | Trình khởi chạy Native App Window không thanh URL (Edge/Chrome/Vivaldi) | Khởi chạy 1-click |
+| **`update.bat`** | Kịch bản tự động kiểm tra và tải cập nhật mới từ GitHub cho Windows | Cập nhật tự động |
 
 | File / Module | Chức năng kỹ thuật | Giao thức / Mục tiêu |
 | :--- | :--- | :--- |

@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 > nul
-title Cài đặt Môi trường - Bộ công cụ đo kiểm mật mã Camera IP (QCVN 11:2026/BCA)
+title Cài đặt Môi trường - Cumera (Camera Cybersecurity Auditor)
 echo ==========================================================
-echo   CÀI ĐẶT MÔI TRƯỜNG: BỘ ĐO KIỂM AN TOÀN CAMERA (QCVN 11)
+echo   CÀI ĐẶT MÔI TRƯỜNG: CUMERA (CAMERA SECURITY AUDITOR)
 echo ==========================================================
 cd /d "%~dp0"
 
@@ -49,10 +49,19 @@ if not exist "captures" mkdir captures
 if not exist "captures\evidence\ComMech" mkdir captures\evidence\ComMech
 if not exist "captures\evidence\AuthMech" mkdir captures\evidence\AuthMech
 
+:: Tạo phím tắt Desktop với biểu tượng Cumera (nếu có PowerShell)
+powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Cumera.lnk'); $s.TargetPath='%~dp0run_app.bat'; $s.IconLocation='%~dp0assets\cumera.ico'; $s.WorkingDirectory='%~dp0'; $s.Save()" 2>nul
+if exist "%USERPROFILE%\Desktop\Cumera.lnk" (
+    echo [*] Đã tạo biểu tượng Cumera trên Desktop của bạn!
+)
+
 echo.
-echo [OK] Hoàn tất cài đặt môi trường thành công!
-echo Bạn có thể khởi chạy bộ công cụ bằng một trong các cách sau:
-echo     1. Giao diện Đồ họa Web Dashboard:    nhấp đúp run_app.bat
-echo     2. Menu điều khiển dòng lệnh CLI:     nhấp đúp run_suite.bat
+echo ==========================================================
+echo [OK] HOÀN TẤT CÀI ĐẶT CUMERA THÀNH CÔNG!
+echo.
+echo Cách khởi chạy:
+echo     1. Giao diện Đồ họa Desktop (Khuyên dùng): Nhấp đúp run_app.bat (hoặc icon Cumera trên Desktop)
+echo     2. Menu điều khiển dòng lệnh:             Nhấp đúp run_suite.bat
+echo     3. Cập nhật app khi có bản mới:           Nhấp đúp update.bat (hoặc bấm nút Cập nhật trong App)
 echo ==========================================================
 pause
