@@ -545,7 +545,7 @@ def main():
             run_script("cam_auto_link.py", "--once")
             input("\nBấm Enter để tiếp tục...")
         elif choice.upper() == "D":
-            run_script("service_discovery.py", ip)
+            run_script("service_discovery.py", ip, "--auto")
             input("\nBấm Enter để tiếp tục...")
         elif choice.upper() == "C":
             change_target_camera()

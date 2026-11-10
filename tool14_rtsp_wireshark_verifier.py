@@ -720,8 +720,23 @@ def save_proof_reports(results_list: List[Dict[str, Any]]):
     console.print(f"[bold green][OK] Đã lưu Bằng chứng số liệu JSON:[/bold green] [bold white]{json_file}[/bold white]")
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="RTSP / RTSPS Authentication & Live Connection Verifier (Wireshark-Style Evidence)")
+    parser.add_argument("target_ip", nargs="?", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--ip", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--port", type=int, default=None, help="Cổng RTSP/RTSPS cần đo kiểm (554, 322...)")
+    parser.add_argument("--method", default=None, choices=["all", "digest_sha256", "basic", "digest_md5"], help="Phương thức xác thực")
+    parser.add_argument("--auto", action="store_true", help="Tự động đo kiểm toàn bộ cổng mở và phương thức (không dừng tương tác)")
+
+    args = parser.parse_args()
+
+    global DUT_IP
+    if args.ip or args.target_ip:
+        DUT_IP = args.ip or args.target_ip
+
     console.print("=" * 80)
-    console.print("  CÔNG CỤ KIỂM TRA KẾT NỐI & XÁC THỰC RTSP / RTSPS (CHUẨN WIRESHARK EVIDENCE)")
+    console.print(f"  CÔNG CỤ KIỂM TRA KẾT NỐI & XÁC THỰC RTSP / RTSPS (CHUẨN WIRESHARK EVIDENCE)")
+    console.print(f"  Mục tiêu: {DUT_IP}")
     console.print("=" * 80)
 
     # 1. Detect open ports
@@ -734,59 +749,80 @@ def main():
     for p, tls in open_ports:
         console.print(f"    • Cổng TCP {p:5d} : [bold green]MỞ[/bold green] ({'RTSPS mã hóa TLS 1.3' if tls else 'RTSP rõ Cleartext'})")
 
-    # Select Port
-    selected_port, is_tls = open_ports[0]
-    if len(open_ports) > 1:
-        console.print("\nChọn cổng muốn kiểm thử:")
-        for idx, (p, tls) in enumerate(open_ports, 1):
-            console.print(f"  [{idx}] Cổng {p} ({'RTSPS / TLS' if tls else 'RTSP / Cleartext'})")
-        try:
-            ch_p = input(f"Nhập lựa chọn (mặc định [1]): ").strip()
-            if ch_p.isdigit() and 1 <= int(ch_p) <= len(open_ports):
-                selected_port, is_tls = open_ports[int(ch_p)-1]
-        except EOFError:
-            pass
+    # Determine whether to run interactive prompt or automated batch
+    is_interactive = sys.stdin.isatty() and not args.auto and not args.port and not args.method
 
-    console.print(f"\n[+] Đã chọn mục tiêu: [bold white]{DUT_IP}:{selected_port}[/bold white] ({'RTSPS / TLS' if is_tls else 'RTSP / Cleartext'})")
-
-    # Select Auth Method
-    console.print("\nDanh sách phương thức xác thực đo kiểm:")
-    console.print("  [1] Digest Authentication SHA-256 (RFC 7616 - Tiêu chuẩn hiện đại)")
-    console.print("  [2] Basic Authentication (Base64 - Phương thức truyền thống)")
-    console.print("  [3] Digest Authentication MD5 (RFC 2617 - Hàm băm cũ)")
-    console.print("  [4] CHẠY TOÀN BỘ CÁC PHƯƠNG THỨC & XUẤT MA TRẬN BẰNG CHỨNG (Khuyên dùng)")
-    
-    try:
-        ch_m = input("\nNhập lựa chọn (mặc định [4]): ").strip()
-    except EOFError:
-        ch_m = "4"
-    if not ch_m: ch_m = "4"
+    ports_to_test = []
+    if args.port:
+        matched = [op for op in open_ports if op[0] == args.port]
+        if matched:
+            ports_to_test = matched
+        else:
+            is_tls = probe_rtsp_service(DUT_IP, args.port, True)
+            ports_to_test = [(args.port, is_tls)]
+    elif is_interactive:
+        selected_port, is_tls = open_ports[0]
+        if len(open_ports) > 1:
+            console.print("\nChọn cổng muốn kiểm thử:")
+            for idx, (p, tls) in enumerate(open_ports, 1):
+                console.print(f"  [{idx}] Cổng {p} ({'RTSPS / TLS' if tls else 'RTSP / Cleartext'})")
+            try:
+                ch_p = input(f"Nhập lựa chọn (mặc định [1]): ").strip()
+                if ch_p.isdigit() and 1 <= int(ch_p) <= len(open_ports):
+                    selected_port, is_tls = open_ports[int(ch_p)-1]
+            except EOFError:
+                pass
+        ports_to_test = [(selected_port, is_tls)]
+    else:
+        # Automated: test all open RTSP/RTSPS ports
+        ports_to_test = open_ports
 
     methods_to_run = []
-    if ch_m == "1":
-        methods_to_run = ["digest_sha256"]
-    elif ch_m == "2":
-        methods_to_run = ["basic"]
-    elif ch_m == "3":
-        methods_to_run = ["digest_md5"]
+    if args.method:
+        if args.method == "all":
+            methods_to_run = ["digest_sha256", "basic", "digest_md5"]
+        else:
+            methods_to_run = [args.method]
+    elif is_interactive:
+        console.print("\nDanh sách phương thức xác thực đo kiểm:")
+        console.print("  [1] Digest Authentication SHA-256 (RFC 7616 - Tiêu chuẩn hiện đại)")
+        console.print("  [2] Basic Authentication (Base64 - Phương thức truyền thống)")
+        console.print("  [3] Digest Authentication MD5 (RFC 2617 - Hàm băm cũ)")
+        console.print("  [4] CHẠY TOÀN BỘ CÁC PHƯƠNG THỨC & XUẤT MA TRẬN BẰNG CHỨNG (Khuyên dùng)")
+        try:
+            ch_m = input("\nNhập lựa chọn (mặc định [4]): ").strip()
+        except EOFError:
+            ch_m = "4"
+        if not ch_m: ch_m = "4"
+        if ch_m == "1":
+            methods_to_run = ["digest_sha256"]
+        elif ch_m == "2":
+            methods_to_run = ["basic"]
+        elif ch_m == "3":
+            methods_to_run = ["digest_md5"]
+        else:
+            methods_to_run = ["digest_sha256", "basic", "digest_md5"]
     else:
+        # Automated default: test all standard methods
         methods_to_run = ["digest_sha256", "basic", "digest_md5"]
 
     all_results = []
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    for m in methods_to_run:
-        pcap_file = os.path.join(CAPTURES_DIR, f"rtsp_{m}_port{selected_port}_{timestamp_str}.pcap")
-        console.print(f"\n[*] Đang thực thi bài đo kiểm: [bold cyan]{m.upper()}[/bold cyan] trên cổng [bold white]{selected_port}[/bold white]...")
-        res = run_rtsp_connection_session(
-            dut_ip=DUT_IP,
-            port=selected_port,
-            auth_method=m,
-            pcap_output_path=pcap_file
-        )
-        display_wireshark_proof(res)
-        all_results.append(res)
-        time.sleep(0.5)
+    for port, is_tls in ports_to_test:
+        console.print(f"\n[+] Kiểm thử trên mục tiêu: [bold white]{DUT_IP}:{port}[/bold white] ({'RTSPS / TLS' if is_tls else 'RTSP / Cleartext'})")
+        for m in methods_to_run:
+            pcap_file = os.path.join(CAPTURES_DIR, f"rtsp_{m}_port{port}_{timestamp_str}.pcap")
+            console.print(f"\n[*] Đang thực thi bài đo kiểm: [bold cyan]{m.upper()}[/bold cyan] trên cổng [bold white]{port}[/bold white]...")
+            res = run_rtsp_connection_session(
+                dut_ip=DUT_IP,
+                port=port,
+                auth_method=m,
+                pcap_output_path=pcap_file
+            )
+            display_wireshark_proof(res)
+            all_results.append(res)
+            time.sleep(0.3)
 
     save_proof_reports(all_results)
 

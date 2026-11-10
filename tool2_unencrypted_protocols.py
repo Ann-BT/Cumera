@@ -437,6 +437,11 @@ def display_auth_audit(results: Dict[str, Any]):
     )
 
 if __name__ == '__main__':
-    dut = sys.argv[1] if len(sys.argv) > 1 else DUT_IP
+    dut = DUT_IP
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--ip" and len(sys.argv) > 2:
+            dut = sys.argv[2]
+        elif not sys.argv[1].startswith("-"):
+            dut = sys.argv[1]
     data = run_full_auth_audit(dut)
     display_auth_audit(data)

@@ -639,10 +639,11 @@ def generate_technical_report(m1_res, m2_res, m3_res, m4_res, m5_res, ip):
 # ==============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Công cụ đo kiểm an toàn bề mặt hệ thống & giao diện Web/API Camera IP")
-    parser.add_argument("--ip", default=DUT_IP, help=f"Địa chỉ IP của Camera DUT (mặc định: {DUT_IP})")
+    parser.add_argument("target_ip", nargs="?", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--ip", default=None, help=f"Địa chỉ IP của Camera DUT (mặc định: {DUT_IP})")
     args = parser.parse_args()
 
-    target_ip = args.ip
+    target_ip = args.ip or args.target_ip or DUT_IP
     print_header("HỆ THỐNG ĐO KIỂM THỰC NGHIỆM AN TOÀN BỀ MẶT HỆ THỐNG & GIAO DIỆN WEB/API")
     print(f"  Thiết bị đo kiểm : {CONFIG['target_camera'].get('model')}")
     print(f"  Địa chỉ IP DUT   : {target_ip}")

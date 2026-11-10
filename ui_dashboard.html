@@ -481,7 +481,7 @@
               </div>
 
               <div class="pt-1.5 border-t border-[#272c3a] flex items-center gap-2">
-                <button onclick="runCommand('python service_discovery.py ' + document.getElementById('cfg_target_ip').value, 'Quét Cổng Dịch vụ')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
+                <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Quét Cổng Dịch vụ & Đối chiếu IXIT')" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#e1e4ea] border border-[#2e3547]">
                   Quét cổng (TCP/UDP)
                 </button>
                 <button onclick="triggerAutoLink()" class="flex-1 py-1.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-xs font-medium text-[#38bdf8] border border-[#2e3547]">
@@ -1532,9 +1532,9 @@
         <div id="tab_content_surface" class="tab-pane hidden space-y-3">
           <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
             <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API & Dịch vụ Mạng</h2>
-            <button onclick="runCommand('python service_discovery.py 192.168.20.38', 'Dò quét Cổng & Dịch vụ toàn diện')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
+            <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535 & Đối chiếu IXIT)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <span>Dò quét Cổng</span>
+              <span>Dò quét Cổng Toàn diện</span>
             </button>
           </div>
 
@@ -1544,13 +1544,13 @@
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                  <span>1. Dò quét Cổng & Dịch vụ</span>
+                  <span>1. Dò quét Cổng & Dịch vụ Mạng</span>
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
               </div>
-              <button onclick="runCommand('python service_discovery.py 192.168.20.38', 'Dò quét Cổng & Dịch vụ mạng')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+              <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Dò quét Cổng, Dịch vụ & API ngoài')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Dò quét Cổng</span>
+                <span>Chạy Dò quét Cổng & Dịch vụ</span>
               </button>
             </div>
 
@@ -1563,9 +1563,9 @@
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
               </div>
-              <button onclick="runCommand('python tool13_security_params_auditor.py', 'Đo kiểm tham số an toàn & phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+              <button onclick="runCommand('python tool13_security_params_auditor.py --ip ' + getTargetIp(), 'Đo kiểm Tham số An toàn & Phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Đo kiểm Tham số</span>
+                <span>Đo kiểm Tham số An toàn</span>
               </button>
             </div>
 
@@ -1574,11 +1574,11 @@
               <div class="flex items-center justify-between">
                 <div class="font-bold text-xs text-white flex items-center gap-1.5">
                   <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  <span>3. Đối soát Wireshark RTSPS</span>
+                  <span>3. Đối soát & Giải mã Wireshark RTSPS</span>
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool14_rtsp_verifier</span>
               </div>
-              <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py', 'Đối soát & Giải mã Wireshark RTSPS')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+              <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py --auto --ip ' + getTargetIp(), 'Đối soát Wireshark RTSPS (Toàn diện)')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Chạy Đối soát RTSPS</span>
               </button>
@@ -1593,7 +1593,7 @@
                 </div>
                 <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool2_unencrypted</span>
               </div>
-              <button onclick="runCommand('python tool2_unencrypted_protocols.py', 'Kiểm tra giao thức bản rõ & hạ cấp')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
+              <button onclick="runCommand('python tool2_unencrypted_protocols.py ' + getTargetIp(), 'Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Kiểm tra Giao thức Bản rõ</span>
               </button>
@@ -2205,6 +2205,11 @@
       term.innerHTML += ansiToHtml(text) + '\n';
       updateLineCounter();
       if (autoScroll) term.scrollTop = term.scrollHeight;
+    }
+
+    function getTargetIp() {
+      const el = document.getElementById('cfg_target_ip');
+      return (el && el.value.trim()) ? el.value.trim() : '192.168.20.38';
     }
 
     function runCommand(cmd, toolName) {

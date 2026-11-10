@@ -831,7 +831,7 @@ class ToolkitApp(App):
         elif btn_id == "btn_discovery":
             self.run_audit_command([VENV_PYTHON, "camera_manager.py"], "Dò quét Camera WS-Discovery")
         elif btn_id == "btn_scan_services":
-            self.run_audit_command([VENV_PYTHON, "service_discovery.py", ip], "Dò quét cổng dịch vụ mạng")
+            self.run_audit_command([VENV_PYTHON, "service_discovery.py", ip, "--auto"], "Dò quét cổng dịch vụ mạng")
         elif btn_id == "btn_ping_check":
             self.run_audit_command(["ping", "-c", "4", ip], f"Kiểm tra Ping đến Camera {ip}")
         elif btn_id == "btn_restart_daemon":
