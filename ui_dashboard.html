@@ -270,14 +270,14 @@
           <span class="nav-label px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800 shrink-0">4</span>
         </button>
 
-        <button onclick="switchTab('fuzzer')" id="nav_fuzzer" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium text-[#94a3b8] nav-item" title="Xác thực đầu vào (SQLi, XSS, CSRF, RTSP Fuzzer)">
+        <button onclick="switchTab('fuzzer')" id="nav_fuzzer" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium text-[#94a3b8] nav-item" title="Xác thực đầu vào Web (SQL Injection, XSS, CSRF)">
           <div class="flex items-center gap-2 overflow-hidden">
             <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
             <span class="nav-label truncate font-medium">Input Validation</span>
           </div>
         </button>
 
-        <button onclick="switchTab('surface')" id="nav_surface" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium text-[#94a3b8] nav-item" title="Dò quét cổng, bề mặt API và kiểm tra phân quyền">
+        <button onclick="switchTab('surface')" id="nav_surface" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium text-[#94a3b8] nav-item" title="Dò quét cổng, bề mặt API và fuzzing giao thức">
           <div class="flex items-center gap-2 overflow-hidden">
             <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
             <span class="nav-label truncate font-medium">API Scan</span>
@@ -1173,231 +1173,186 @@
         </div>
 
         <!-- ============================================================== -->
-        <!-- TAB: XÁC THỰC ĐẦU VÀO & FUZZING API (CLAUSE 3.10.1.3) -->
+        <!-- TAB: XÁC THỰC ĐẦU VÀO WEB (SQLi, XSS, CSRF) -->
         <!-- ============================================================== -->
         <div id="tab_content_fuzzer" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3">
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
             <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#2a1417] text-rose-300 border border-rose-800/60 font-bold">FUZZING</span>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Đầu vào & Fuzzing Giao thức</h2>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#142338] text-blue-300 border border-blue-800/60 font-bold tracking-wider">INPUT VALIDATION</span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Đầu vào Web (SQL Injection, XSS, CSRF)</h2>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="runCommand('python tool18_api_input_validation.py --mode all', 'Full Fuzzing Suite')" class="bg-[#881337] hover:bg-[#9f1239] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-rose-600 transition shadow-sm">
+              <button onclick="runFullWebInputSuite()" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-blue-500 transition shadow-sm">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy trọn bộ Fuzzing</span>
+                <span>Chạy Tất cả (SQLi + XSS + CSRF)</span>
               </button>
             </div>
           </div>
 
           <!-- Quick 1-Click Preset Bar -->
           <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded">
-            <div class="text-[11px] font-bold text-[#848c9e] uppercase tracking-wider mb-2">Kịch bản nhanh (1-Click Presets):</div>
-            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-              <button onclick="runRtspPreset('all', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-rose-300 group-hover:text-rose-200">RTSP Fuzzer</div>
+            <div class="text-[11px] font-bold text-[#848c9e] uppercase tracking-wider mb-2">Kịch bản nhanh:</div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <button onclick="runFullWebInputSuite()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Trọn bộ Web Suite</div>
               </button>
-              <button onclick="runApiScan()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-cyan-300 group-hover:text-cyan-200">API Scan</div>
+              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-sky-900/60 text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-sky-300 group-hover:text-sky-200">SQL Injection</div>
+              </button>
+              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-purple-900/60 text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Cross-Site Scripting</div>
               </button>
               <button onclick="runCsrfAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-emerald-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF Audit</div>
+                <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF &amp; Token</div>
               </button>
-              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Login SQLi & XSS</div>
-              </button>
-              <button onclick="runRtspPreset('overflow', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-amber-300 group-hover:text-amber-200">Buffer Overflow</div>
-              </button>
-              <button onclick="runRtspPreset('raw', 10, 4.0)" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Malformed Raw</div>
+              <button onclick="openCsrfPoc()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
+                <div class="font-semibold text-xs text-amber-300 group-hover:text-amber-200">Mở PoC CSRF</div>
               </button>
             </div>
           </div>
 
-          <!-- Main Interactive Controls: 3 Columns / Cards -->
+          <!-- Main Interactive Controls: 3 Cards for SQLi, XSS, and CSRF -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
-            <!-- Card 1: RTSP / RTSPS Stream Control Fuzzer -->
-            <div class="lg:col-span-2 border border-rose-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
-              <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                <div class="flex items-center gap-2">
-                  <div class="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-                  <span class="font-bold text-xs text-white">1. RTSP / RTSPS Stream Fuzzer</span>
-                </div>
-                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 322</span>
-              </div>
-
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
-                <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng RTSP:</label>
-                  <select id="rtsp_fuzz_port" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                    <option value="322" selected>322 (RTSPS TLS)</option>
-                    <option value="554">554 (RTSP Clear)</option>
-                    <option value="9554">9554 (RTSPS Alt)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Dạng Payload:</label>
-                  <select id="rtsp_fuzz_type" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                    <option value="all" selected>All (7 dạng)</option>
-                    <option value="methods">Lệnh sai (Methods NULL)</option>
-                    <option value="overflow">Tràn bộ đệm (4KB)</option>
-                    <option value="cseq">CSeq dị thường</option>
-                    <option value="session">Session ID giả</option>
-                    <option value="range">Range & Timecodes sai</option>
-                    <option value="raw">Raw Bit-flip</option>
-                    <option value="injection">CRLF Injection</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Số lần Fuzz:</label>
-                  <input type="number" id="rtsp_fuzz_iters" value="10" min="1" max="100" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                </div>
-
-                <div>
-                  <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (gói/s):</label>
-                  <input type="number" id="rtsp_fuzz_rate" value="4.0" step="0.5" min="0.5" max="20" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-rose-500 focus:outline-none">
-                </div>
-              </div>
-
-              <!-- Action Bar -->
-              <div class="flex items-center justify-between pt-1">
-                <span class="text-[11px] text-[#848c9e]">Tự động lưu PCAP và lọc Wireshark</span>
-                <button onclick="runRtspFuzzer()" class="bg-[#e11d48] hover:bg-[#be123c] text-white px-3.5 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition border border-rose-400 shadow-md">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Khởi chạy Fuzzer</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Card 2: Full API Scanner & Proprietary Fuzzer -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 flex flex-col justify-between card-interactive">
+            <!-- Card 1: SQL Injection (SQLi) -->
+            <div class="border border-sky-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
               <div class="space-y-2.5">
                 <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
                   <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
-                    <span class="font-bold text-xs text-white">2. Quét Toàn diện API & Socket Riêng</span>
+                    <div class="w-2.5 h-2.5 rounded-full bg-sky-400"></div>
+                    <span class="font-bold text-xs text-white">1. SQL Injection (SQLi)</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded border border-sky-800/40 font-bold">CỔNG 443</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 bg-[#10131a] p-2 rounded border border-[#272c3a]">
+                  <div>
+                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
+                    <input type="number" id="login_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-sky-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Giãn cách (s):</label>
+                    <input type="number" id="login_audit_delay" value="0.4" step="0.1" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-sky-500 focus:outline-none">
                   </div>
                 </div>
 
-                <!-- API Discovery Box -->
-                <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-1.5">
-                  <div class="text-[11px] font-semibold text-white">Quét Toàn diện API Camera</div>
-                  <button onclick="runApiScan()" class="w-full bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-2.5 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center justify-center gap-1.5 mt-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <span>Quét Toàn bộ API</span>
-                  </button>
+                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
+                  <div class="text-sky-300">Auth Bypass (' OR 1=1--)</div>
+                  <div class="text-[#cbd5e1]">Blind Boolean / Time-based</div>
+                  <div class="text-[#cbd5e1]">Web SPA, /axis-cgi/login.cgi, Session</div>
                 </div>
+              </div>
 
-                <!-- Non-HTTP Proprietary Stream Fuzzer Box -->
-                <div class="bg-[#10131a] p-2.5 rounded border border-[#272c3a] space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-semibold text-white">Socket Riêng (Phi HTTP)</span>
-                    <span class="text-[9px] text-[#848c9e] font-mono">TCP RAW</span>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-[9px] text-[#848c9e] uppercase mb-0.5">Cổng Socket:</label>
-                      <input type="number" id="custom_fuzz_port" value="322" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-0.5 text-xs text-white font-mono">
-                    </div>
-                    <div>
-                      <label class="block text-[9px] text-[#848c9e] uppercase mb-0.5">Số mẫu:</label>
-                      <input type="number" id="custom_fuzz_iters" value="10" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-0.5 text-xs text-white font-mono">
-                    </div>
-                  </div>
-                  <button onclick="runCustomProtoFuzzer()" class="w-full bg-[#1f2430] hover:bg-[#282f40] text-purple-300 px-2.5 py-1 rounded text-xs font-medium border border-purple-700/50 transition flex items-center justify-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span>Fuzz Socket Riêng</span>
-                  </button>
-                </div>
+              <div class="flex items-center gap-2 pt-1">
+                <button onclick="runLoginAuditor()" class="flex-1 bg-[#0284c7] hover:bg-[#0369a1] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-sky-400 shadow-md">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Chạy SQLi</span>
+                </button>
+                <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
+                  <span>PoC</span>
+                </button>
               </div>
             </div>
 
-          </div>
+            <!-- Card 2: Cross-Site Scripting (XSS) -->
+            <div class="border border-purple-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2.5 h-2.5 rounded-full bg-purple-400"></div>
+                    <span class="font-bold text-xs text-white">2. Cross-Site Scripting (XSS)</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded border border-purple-800/40 font-bold">CỔNG 443</span>
+                </div>
 
-          <!-- Card 3: CSRF & Forged Token Auditor -->
-          <div class="border border-emerald-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
-            <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-              <div class="flex items-center gap-2">
-                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
-                <span class="font-bold text-xs text-white">3. Phòng vệ CSRF & Giả mạo Token Cấu hình (Web / REST)</span>
+                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
+                  <div class="text-purple-300">&lt;script&gt;alert(1)&lt;/script&gt;</div>
+                  <div class="text-[#cbd5e1]">SVG onload / Event Handlers</div>
+                  <div class="text-[#cbd5e1]">Headers CSP, X-Content-Type, Nosniff</div>
+                </div>
+
+                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1">
+                  <div class="text-[10px] uppercase text-[#848c9e] font-bold">Cơ chế bảo vệ:</div>
+                  <div class="text-[#e2e8f0]">Khử khuẩn đầu vào (HTML/JS Sanitization)</div>
+                  <div class="text-[#e2e8f0]">Không phản xạ nguyên dạng payload trong DOM</div>
+                </div>
               </div>
-              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 443</span>
+
+              <div class="flex items-center gap-2 pt-1">
+                <button onclick="runLoginAuditor()" class="flex-1 bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-purple-400 shadow-md">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Chạy XSS</span>
+                </button>
+                <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
+                  <span>PoC</span>
+                </button>
+              </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
-              <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
-                <input type="number" id="csrf_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+            <!-- Card 3: CSRF & Token Auditor -->
+            <div class="border border-emerald-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                    <span class="font-bold text-xs text-white">3. CSRF &amp; Token Cấu hình</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 443</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 bg-[#10131a] p-2 rounded border border-[#272c3a]">
+                  <div>
+                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
+                    <input type="number" id="csrf_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (req/s):</label>
+                    <input type="number" id="csrf_audit_rate" value="3.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+                  </div>
+                </div>
+
+                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
+                  <div class="text-emerald-300">Origin / Referer Spoofing</div>
+                  <div class="text-[#cbd5e1]">Forged Anti-CSRF Token Rejection</div>
+                  <div class="text-[#cbd5e1]">VAPIX / REST Config Modification</div>
+                </div>
               </div>
-              <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (req/s):</label>
-                <input type="number" id="csrf_audit_rate" value="3.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
-              </div>
-              <div class="flex items-end gap-2">
+
+              <div class="flex items-center gap-2 pt-1">
                 <button onclick="runCsrfAuditor()" class="flex-1 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-emerald-400 shadow-md">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   <span>Chạy CSRF</span>
                 </button>
-                <button onclick="openCsrfPoc()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1">
-                  <span>Mở PoC</span>
+                <button onclick="openCsrfPoc()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
+                  <span>PoC</span>
                 </button>
               </div>
-            </div>
-          </div>
-
-          <!-- Card 4: Login Form Input Validation (SQLi & XSS) -->
-          <div class="border border-blue-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive">
-            <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-              <div class="flex items-center gap-2">
-                <div class="w-2.5 h-2.5 rounded-full bg-blue-400"></div>
-                <span class="font-bold text-xs text-white">4. Xác thực Form Đăng nhập: SQL Injection & XSS (Web / VAPIX)</span>
-              </div>
-              <span class="text-[10px] font-mono text-blue-400 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-800/40 font-bold">CỔNG 443</span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#10131a] p-2.5 rounded border border-[#272c3a]">
-              <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
-                <input type="number" id="login_audit_port" value="443" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Giãn cách (s):</label>
-                <input type="number" id="login_audit_delay" value="0.4" step="0.1" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-              </div>
-              <div class="flex items-end gap-2">
-                <button onclick="runLoginAuditor()" class="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-blue-400 shadow-md">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span>Chạy Login</span>
-                </button>
-                <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1">
-                  <span>Mở PoC</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- Technical Reference & Wireshark Filter Panel -->
           <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
             <div class="font-bold text-xs text-white flex items-center justify-between">
-              <span>Bộ lọc Wireshark Display Filter</span>
+              <span>Bộ lọc Wireshark Display Filter (Web Input Validation)</span>
               <span class="text-[10px] text-emerald-400 font-mono">DUT Integrity Enforced</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
               <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-rose-400">rtsp.status &gt;= 400</span>
-                <span class="text-[10px] text-[#848c9e]">Mã lỗi từ chối</span>
+                <span class="text-rose-400">http.response.code in {400, 401, 403}</span>
+                <span class="text-[10px] text-[#848c9e]">Mã từ chối</span>
               </div>
               <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-amber-400">tcp.flags.reset == 1</span>
-                <span class="text-[10px] text-[#848c9e]">Ngắt kết nối an toàn</span>
+                <span class="text-purple-400">http contains "SELECT" || http contains "&lt;script&gt;"</span>
+                <span class="text-[10px] text-[#848c9e]">Dò SQLi / XSS</span>
               </div>
               <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-cyan-400">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
-                <span class="text-[10px] text-[#848c9e]">Phiên đo kiểm</span>
+                <span class="text-cyan-400">http.request.method == "POST" &amp;&amp; tcp.port == 443</span>
+                <span class="text-[10px] text-[#848c9e]">Gói cấu hình</span>
               </div>
             </div>
           </div>
@@ -1576,75 +1531,196 @@
         <!-- TAB: DÒ QUÉT & BỀ MẶT TẤN CÔNG -->
         <!-- ============================================================== -->
         <div id="tab_content_surface" class="tab-pane hidden space-y-3">
-          <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded flex items-center justify-between">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API & Dịch vụ Mạng</h2>
-            <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <span>Dò quét Cổng Toàn diện</span>
-            </button>
+          <!-- Header Banner -->
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#0c2438] text-cyan-300 border border-cyan-800/60 font-bold tracking-wider">API &amp; PORTS</span>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API, Dịch vụ &amp; Fuzzing Giao thức</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="runApiScan()" class="bg-[#0e7490] hover:bg-[#0891b2] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-cyan-500 transition shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <span>Quét Toàn bộ API</span>
+              </button>
+              <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Dò quét Cổng Toàn diện</span>
+              </button>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Main Grid of Tools -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <!-- Tool 1: Service Discovery -->
             <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                  <span>1. Dò quét Cổng & Dịch vụ Mạng</span>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                    <span>1. Dò quét Cổng &amp; Dịch vụ</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
+                <div class="text-[11px] text-[#848c9e]">Dò quét cổng mở, bóc tách banner dịch vụ mạng (HTTP, RTSP, ONVIF, SSH).</div>
               </div>
               <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Dò quét Cổng, Dịch vụ & API ngoài')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Dò quét Cổng & Dịch vụ</span>
+                <span>Chạy Dò quét Cổng</span>
               </button>
             </div>
 
-            <!-- Tool 2: Security Parameters -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span>2. Tham số An toàn & Phân quyền</span>
+            <!-- Tool 2: Full API Scan -->
+            <div class="border border-cyan-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>2. Quét Toàn diện API Camera</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40 font-bold">tool18 --mode scan</span>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
+                <div class="text-[11px] text-[#848c9e]">Tự động bóc tách và phân loại toàn bộ endpoint REST / VAPIX / CGI trên camera.</div>
+              </div>
+              <button onclick="runApiScan()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-cyan-300 px-3 py-1.5 rounded text-xs font-semibold border border-cyan-800/50 transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <span>Quét Toàn bộ API</span>
+              </button>
+            </div>
+
+            <!-- Tool 3: RTSP / RTSPS Stream Fuzzer -->
+            <div class="border border-rose-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span>3. Fuzzing Luồng RTSP/RTSPS</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-rose-400 bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-800/40 font-bold">CỔNG 322</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 bg-[#10131a] p-1.5 rounded border border-[#272c3a]">
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Cổng:</label>
+                    <select id="rtsp_fuzz_port" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                      <option value="322" selected>322 (TLS)</option>
+                      <option value="554">554 (Clear)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Dạng:</label>
+                    <select id="rtsp_fuzz_type" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                      <option value="all" selected>All</option>
+                      <option value="methods">Methods</option>
+                      <option value="overflow">Overflow</option>
+                      <option value="cseq">CSeq</option>
+                      <option value="session">Session</option>
+                      <option value="raw">Raw</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Số lần:</label>
+                    <input type="number" id="rtsp_fuzz_iters" value="10" min="1" max="100" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                  </div>
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Tốc độ:</label>
+                    <input type="number" id="rtsp_fuzz_rate" value="4.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                  </div>
+                </div>
+              </div>
+              <button onclick="runRtspFuzzer()" class="w-full bg-[#be123c] hover:bg-[#9f1239] text-white px-3 py-1.5 rounded text-xs font-semibold border border-rose-500 transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Fuzzing RTSP</span>
+              </button>
+            </div>
+
+            <!-- Tool 4: Proprietary / Raw Socket Fuzzer -->
+            <div class="border border-purple-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                    <span>4. Socket Riêng (Phi HTTP)</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/40 font-bold">TCP RAW</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 bg-[#10131a] p-1.5 rounded border border-[#272c3a]">
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Cổng Socket:</label>
+                    <input type="number" id="custom_fuzz_port" value="322" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                  </div>
+                  <div>
+                    <label class="block text-[9px] text-[#848c9e] uppercase">Số mẫu:</label>
+                    <input type="number" id="custom_fuzz_iters" value="10" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
+                  </div>
+                </div>
+              </div>
+              <button onclick="runCustomProtoFuzzer()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-3 py-1.5 rounded text-xs font-semibold border border-purple-800/50 transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>Fuzz Socket Riêng</span>
+              </button>
+            </div>
+
+            <!-- Tool 5: Security Parameters -->
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span>5. Tham số An toàn &amp; Quyền</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
+                </div>
+                <div class="text-[11px] text-[#848c9e]">Kiểm tra phân quyền tham số hệ thống và bảo vệ cấu hình nhạy cảm.</div>
               </div>
               <button onclick="runCommand('python tool13_security_params_auditor.py --ip ' + getTargetIp(), 'Đo kiểm Tham số An toàn & Phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Đo kiểm Tham số An toàn</span>
+                <span>Đo kiểm Tham số</span>
               </button>
             </div>
 
-            <!-- Tool 3: RTSPS Wireshark Verifier -->
+            <!-- Tool 6: RTSPS & Cleartext Verification -->
             <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  <span>3. Đối soát & Giải mã Wireshark RTSPS</span>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span>6. Đối soát Wireshark &amp; Bản rõ</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool14 &amp; tool2</span>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool14_rtsp_verifier</span>
-              </div>
-              <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py --auto --ip ' + getTargetIp(), 'Đối soát Wireshark RTSPS (Toàn diện)')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Đối soát RTSPS</span>
-              </button>
-            </div>
-
-            <!-- Tool 4: Cleartext Protocols & Downgrade -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                  <span>4. Giao thức Bản rõ & Hạ cấp Kênh</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py --auto --ip ' + getTargetIp(), 'Đối soát Wireshark RTSPS (Toàn diện)')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-2 py-1.5 rounded text-xs font-semibold border border-purple-800/40 transition">
+                    RTSPS Wireshark
+                  </button>
+                  <button onclick="runCommand('python tool2_unencrypted_protocols.py ' + getTargetIp(), 'Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-amber-300 px-2 py-1.5 rounded text-xs font-semibold border border-amber-800/40 transition">
+                    Bản rõ / Hạ cấp
+                  </button>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool2_unencrypted</span>
               </div>
-              <button onclick="runCommand('python tool2_unencrypted_protocols.py ' + getTargetIp(), 'Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Kiểm tra Giao thức Bản rõ</span>
-              </button>
             </div>
           </div>
+
+          <!-- Wireshark Filter Panel for API Scan & Stream Fuzzing -->
+          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
+            <div class="font-bold text-xs text-white flex items-center justify-between">
+              <span>Bộ lọc Wireshark Display Filter (API &amp; Protocol Fuzzing)</span>
+              <span class="text-[10px] text-emerald-400 font-mono">DUT Integrity Enforced</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-rose-400">rtsp.status &gt;= 400</span>
+                <span class="text-[10px] text-[#848c9e]">Mã lỗi từ chối RTSP</span>
+              </div>
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-amber-400">tcp.flags.reset == 1</span>
+                <span class="text-[10px] text-[#848c9e]">Ngắt kết nối an toàn</span>
+              </div>
+              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
+                <span class="text-cyan-400">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
+                <span class="text-[10px] text-[#848c9e]">Phiên đo kiểm RTSPS</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- ============================================================== -->
@@ -2413,6 +2489,14 @@
 
     function openLoginEvidence() {
       window.open('/captures/login_audit_evidence.html', '_blank');
+    }
+
+    function runFullWebInputSuite() {
+      const port = document.getElementById('login_audit_port')?.value || '443';
+      const delay = document.getElementById('login_audit_delay')?.value || '0.4';
+      const csrfPort = document.getElementById('csrf_audit_port')?.value || '443';
+      const cmd = `python tool22_login_input_validation.py --port ${port} --delay ${delay} && python tool19_csrf_token_auditor.py --port ${csrfPort}`;
+      runCommand(cmd, `Trọn bộ Xác thực Đầu vào Web (SQLi, XSS, CSRF Cổng ${port})`);
     }
 
     // 2.3. TELEMETRY & GEOIP AUDITOR RUNNERS (CLAUSE 3.11.4 & 3.11.5)
@@ -3216,6 +3300,5 @@
       </div>
     </div>
   </div>
-  </script>
 </body>
 </html>
