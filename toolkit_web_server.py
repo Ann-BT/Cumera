@@ -119,7 +119,7 @@ def get_evidence_dirs():
 
 EVIDENCE_DIR, EVIDENCE_AUTHMECH_DIR = get_evidence_dirs()
 
-app = FastAPI(title="Cumera Security Auditor Backend", version="2.1.0")
+app = FastAPI(title="Cumera Security Auditor Backend", version="2.1.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -628,7 +628,7 @@ def _get_local_commit() -> str:
 async def get_version():
     """Lấy phiên bản và thông tin Git commit hiện tại của Cumera."""
     ver_file = BASE_DIR / "version.json"
-    ver_data = {"app_name": "Cumera", "version": "2.1.0", "repo": REPO_NAME}
+    ver_data = {"app_name": "Cumera", "version": "2.1.1", "repo": REPO_NAME}
     if ver_file.exists():
         try:
             ver_data = json.loads(ver_file.read_text(encoding="utf-8"))
