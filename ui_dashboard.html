@@ -3177,7 +3177,11 @@
           commitInfo.textContent = `"${data.commit_message}" (${(data.commit_date || '').slice(0, 10)})`;
 
           if (data.has_update) {
-            statusMsg.innerHTML = '<span class="text-emerald-400 font-semibold">[+] Đã phát hiện bản cập nhật mới trên GitHub!</span>';
+            if (data.current_commit === 'ZIP') {
+              statusMsg.innerHTML = '<span class="text-cyan-400 font-semibold">[+] Bản cài đặt ZIP — Bấm Cập nhật để đồng bộ bản mới nhất từ GitHub.</span>';
+            } else {
+              statusMsg.innerHTML = '<span class="text-emerald-400 font-semibold">[+] Đã phát hiện bản cập nhật mới trên GitHub!</span>';
+            }
             updateBtn.disabled = false;
           } else {
             statusMsg.innerHTML = '<span class="text-slate-400">[OK] Ứng dụng Cumera của bạn đang ở phiên bản mới nhất.</span>';

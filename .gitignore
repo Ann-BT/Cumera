@@ -45,6 +45,7 @@ telemetry_geoip_audit_report.md
 telemetry_geoip_audit_evidence.json
 
 # OS and Editor files
+.cumera_commit
 .DS_Store
 Thumbs.db
 *.swp

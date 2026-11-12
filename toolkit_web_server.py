@@ -18,6 +18,15 @@ import io
 from pathlib import Path
 from typing import Optional
 
+if sys.platform == "win32":
+    try:
+        if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +52,9 @@ if not VENV_PYTHON.exists():
 CAPTURES_DIR = BASE_DIR / "captures"
 CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = BASE_DIR / "config.json"
+EXAMPLE_CONFIG_FILE = BASE_DIR / "config.example.json"
+if not CONFIG_FILE.exists() and EXAMPLE_CONFIG_FILE.exists():
+    shutil.copyfile(EXAMPLE_CONFIG_FILE, CONFIG_FILE)
 HTML_FILE = BASE_DIR / "ui_dashboard.html"
 
 def get_current_model() -> str:
@@ -590,6 +602,27 @@ async def open_wireshark(data: dict):
 
 REPO_NAME = "Ann-BT/Cumera"
 GITHUB_REPO_API = f"https://api.github.com/repos/{REPO_NAME}"
+COMMIT_STAMP_FILE = BASE_DIR / ".cumera_commit"
+
+
+def _get_local_commit() -> str:
+    git_dir = BASE_DIR / ".git"
+    if git_dir.exists():
+        try:
+            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
+            if proc.returncode == 0 and proc.stdout.strip():
+                return proc.stdout.strip()
+        except Exception:
+            pass
+    if COMMIT_STAMP_FILE.exists():
+        try:
+            val = COMMIT_STAMP_FILE.read_text(encoding="utf-8").strip()
+            if val:
+                return val
+        except Exception:
+            pass
+    return "unknown"
+
 
 @app.get("/api/app/version")
 async def get_version():
@@ -602,16 +635,8 @@ async def get_version():
         except Exception:
             pass
 
-    commit_hash = "unknown"
-    git_dir = BASE_DIR / ".git"
-    if git_dir.exists():
-        try:
-            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
-            if proc.returncode == 0:
-                commit_hash = proc.stdout.strip()
-        except Exception:
-            pass
-    ver_data["commit"] = commit_hash
+    commit_hash = _get_local_commit()
+    ver_data["commit"] = commit_hash[:7] if commit_hash != "unknown" else "ZIP"
     ver_data["platform"] = sys.platform
     return ver_data
 
@@ -619,15 +644,7 @@ async def get_version():
 @app.get("/api/app/check_update")
 async def check_update():
     """Kiểm tra bản cập nhật mới trên GitHub repository Ann-BT/Cumera."""
-    current_commit = "unknown"
-    git_dir = BASE_DIR / ".git"
-    if git_dir.exists():
-        try:
-            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
-            if proc.returncode == 0:
-                current_commit = proc.stdout.strip()
-        except Exception:
-            pass
+    current_commit = _get_local_commit()
 
     req = urllib.request.Request(
         f"{GITHUB_REPO_API}/commits/main",
@@ -641,14 +658,12 @@ async def check_update():
                 commit_msg = data.get("commit", {}).get("message", "").split("\n")[0]
                 commit_date = data.get("commit", {}).get("author", {}).get("date", "")
 
-                has_update = False
-                if current_commit != "unknown" and latest_sha:
-                    has_update = (current_commit != latest_sha)
+                has_update = True if current_commit == "unknown" else (bool(latest_sha) and current_commit != latest_sha)
 
                 return {
                     "status": "ok",
                     "has_update": has_update,
-                    "current_commit": current_commit[:7] if current_commit != "unknown" else "v2.1.0",
+                    "current_commit": current_commit[:7] if current_commit != "unknown" else "ZIP",
                     "latest_commit": latest_sha[:7],
                     "commit_message": commit_msg,
                     "commit_date": commit_date,
@@ -697,6 +712,9 @@ async def perform_update():
                             dest_path.parent.mkdir(parents=True, exist_ok=True)
                             with zf.open(member) as src, open(dest_path, "wb") as dst:
                                 shutil.copyfileobj(src, dst)
+                zip_sha = (zf.comment or b"").decode("utf-8", errors="ignore").strip()
+                if len(zip_sha) == 40:
+                    COMMIT_STAMP_FILE.write_text(zip_sha, encoding="utf-8")
             logs.append("[OK] Đã tải và cập nhật toàn bộ tệp mới nhất từ GitHub.")
         except Exception as e:
             return {"status": "error", "message": f"Lỗi tải cập nhật: {e}"}
