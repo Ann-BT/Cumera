@@ -1,5 +1,5 @@
 {
-  "evidence_base_dir": "/home/merlin/PSI/AXIS Q1806-LE/Mẫu lưu bằng chứng",
+  "evidence_base_dir": "",
   "target_camera": {
     "ip": "192.168.1.100",
     "model": "Generic-Camera-Model",

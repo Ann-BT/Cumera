@@ -806,7 +806,13 @@ class ToolkitApp(App):
             self.refresh_evidence_files()
             return
         elif btn_id == "btn_open_evidence_folder":
-            subprocess.Popen(["xdg-open", EVIDENCE_COMMECH_DIR], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            os.makedirs(EVIDENCE_COMMECH_DIR, exist_ok=True)
+            if sys.platform == "win32":
+                os.startfile(EVIDENCE_COMMECH_DIR)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", EVIDENCE_COMMECH_DIR], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.Popen(["xdg-open", EVIDENCE_COMMECH_DIR], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return
         elif btn_id == "btn_view_report_authmech":
             rep_path = os.path.join(EVIDENCE_AUTHMECH_DIR, "authmech_audit_report.md")

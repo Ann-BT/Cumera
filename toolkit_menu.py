@@ -431,7 +431,7 @@ def menu_telemetry_geoip():
                 pcap_file = os.path.join(TOOLKIT_DIR, "captures", "telemetry_geoip_audit_evidence.json")
                 if os.path.exists(pcap_file):
                     try:
-                        with open(pcap_file, "r") as f:
+                        with open(pcap_file, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         pcap_file = data.get("metadata", {}).get("pcap_file", "")
                     except Exception:
@@ -445,7 +445,7 @@ def menu_telemetry_geoip():
             target_pcap = None
             if os.path.exists(pcap_evidence):
                 try:
-                    with open(pcap_evidence, "r") as f:
+                    with open(pcap_evidence, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     target_pcap = data.get("metadata", {}).get("pcap_file")
                 except Exception:
@@ -454,7 +454,13 @@ def menu_telemetry_geoip():
                 target_pcap = os.path.join(TOOLKIT_DIR, "captures", "commech1_web_https_20261109_195116.pcap")
             if target_pcap and os.path.exists(target_pcap):
                 try:
-                    subprocess.Popen(["wireshark", target_pcap], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    ws_bin = "wireshark"
+                    if sys.platform == "win32":
+                        for p in [r"C:\Program Files\Wireshark\Wireshark.exe", r"C:\Program Files (x86)\Wireshark\Wireshark.exe"]:
+                            if os.path.exists(p):
+                                ws_bin = p
+                                break
+                    subprocess.Popen([ws_bin, target_pcap], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     print(f"[OK] Đã mở Wireshark: {target_pcap}")
                 except Exception as e:
                     print(f"[-] Lỗi mở Wireshark: {e}")

@@ -120,6 +120,10 @@ app.add_middleware(
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 app.mount("/captures", StaticFiles(directory=str(CAPTURES_DIR)), name="captures")
 
+ASSETS_DIR = BASE_DIR / "assets"
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
 # Active execution tracking
 active_process: Optional[asyncio.subprocess.Process] = None
 
@@ -153,7 +157,7 @@ async def get_target_status():
     ip = "192.168.1.100"
     if CONFIG_FILE.exists():
         try:
-            cfg = json.loads(CONFIG_FILE.read_text())
+            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
             ip = cfg.get("target_camera", {}).get("ip", ip)
         except Exception:
             pass
@@ -174,12 +178,15 @@ async def get_target_status():
 
     online = (proc.returncode == 0)
     latency_ms = None
-    if online and "time=" in out:
-        try:
-            time_part = out.split("time=")[1].split(" ")[0]
-            latency_ms = float(time_part)
-        except Exception:
+    if online:
+        if "time<" in out:
             latency_ms = 0.5
+        elif "time=" in out:
+            try:
+                time_part = out.split("time=")[1].split(" ")[0].lower().replace("ms", "")
+                latency_ms = float(time_part)
+            except Exception:
+                latency_ms = 0.5
 
     return {
         "ip": ip,
@@ -194,7 +201,7 @@ async def get_config():
     """Retrieve current target configuration."""
     if CONFIG_FILE.exists():
         try:
-            return json.loads(CONFIG_FILE.read_text())
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     return {}
@@ -206,7 +213,7 @@ async def save_config(data: dict):
     try:
         current = {}
         if CONFIG_FILE.exists():
-            current = json.loads(CONFIG_FILE.read_text())
+            current = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         current.setdefault("target_camera", {})
         current.setdefault("service_ports", {})
 
@@ -251,7 +258,7 @@ async def save_config(data: dict):
         if "evidence_commech_dir" in data:
             current["evidence_commech_dir"] = str(data["evidence_commech_dir"]).strip()
 
-        CONFIG_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False))
+        CONFIG_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
         return {
             "status": "ok", 
             "message": f"Đã lưu cấu hình thiết bị: {tc.get('ip')}",
@@ -265,6 +272,9 @@ async def save_config(data: dict):
 async def discover_cameras_api():
     """Discover ONVIF cameras on the local network using WS-Discovery."""
     try:
+        sub_env = os.environ.copy()
+        sub_env["PYTHONUTF8"] = "1"
+        sub_env["PYTHONIOENCODING"] = "utf-8"
         proc = await asyncio.create_subprocess_exec(
             str(VENV_PYTHON),
             "-c",
@@ -272,7 +282,8 @@ async def discover_cameras_api():
             "from camera_manager import discover_onvif_cameras; "
             "print(json.dumps(discover_onvif_cameras(timeout=1.8)))",
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            env=sub_env
         )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore").strip()
@@ -285,7 +296,7 @@ async def discover_cameras_api():
         current_ip = "192.168.20.38"
         if CONFIG_FILE.exists():
             try:
-                cfg = json.loads(CONFIG_FILE.read_text())
+                cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
                 current_ip = cfg.get("target_camera", {}).get("ip", current_ip)
             except Exception:
                 pass
@@ -305,13 +316,17 @@ async def auto_link_api():
         script = BASE_DIR / "cam_auto_link.py"
         if not script.exists():
             script = PROJECT_DIR / "cam_auto_link.py"
+        sub_env = os.environ.copy()
+        sub_env["PYTHONUTF8"] = "1"
+        sub_env["PYTHONIOENCODING"] = "utf-8"
         proc = await asyncio.create_subprocess_exec(
             str(VENV_PYTHON),
             str(script),
             "--once",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(BASE_DIR)
+            cwd=str(BASE_DIR),
+            env=sub_env
         )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore")
@@ -591,7 +606,7 @@ async def get_version():
     git_dir = BASE_DIR / ".git"
     if git_dir.exists():
         try:
-            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
             if proc.returncode == 0:
                 commit_hash = proc.stdout.strip()
         except Exception:
@@ -608,7 +623,7 @@ async def check_update():
     git_dir = BASE_DIR / ".git"
     if git_dir.exists():
         try:
-            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True)
+            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
             if proc.returncode == 0:
                 current_commit = proc.stdout.strip()
         except Exception:
@@ -653,7 +668,7 @@ async def perform_update():
         try:
             proc = subprocess.run(
                 ["git", "-C", str(BASE_DIR), "pull", "origin", "main"],
-                capture_output=True, text=True, check=True
+                capture_output=True, text=True, encoding="utf-8", errors="ignore", check=True
             )
             logs.append(proc.stdout)
         except Exception as e:
@@ -688,8 +703,8 @@ async def perform_update():
 
     # Cập nhật các thư viện phụ thuộc nếu có thay đổi trong requirements.txt
     try:
-        pip_cmd = [str(VENV_PYTHON), "-m", "pip", "install", "-r", str(BASE_DIR / "requirements.txt")]
-        proc = subprocess.run(pip_cmd, capture_output=True, text=True)
+        pip_cmd = [str(VENV_PYTHON), "-m", "pip", "install", "--prefer-binary", "-r", str(BASE_DIR / "requirements.txt")]
+        proc = subprocess.run(pip_cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
         if proc.returncode == 0:
             logs.append("[OK] Đã kiểm tra và đồng bộ thư viện requirements.txt.")
         else:
@@ -750,59 +765,82 @@ async def websocket_run(websocket: WebSocket):
                 "timestamp": time.strftime("%H:%M:%S")
             })
 
-            # Parse and transform command
-            # If command starts with python, substitute with venv python
+            # Parse and execute sequential sub-commands separated by " && "
+            sub_cmds = [c.strip() for c in cmd_str.split(" && ") if c.strip()]
+            final_exit_code = 0
+
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8"
+
             try:
-                parts = shlex.split(cmd_str, posix=(sys.platform != "win32"))
-            except Exception:
-                parts = cmd_str.split(" ")
+                for sub_cmd in sub_cmds:
+                    try:
+                        parts = shlex.split(sub_cmd, posix=(sys.platform != "win32"))
+                    except Exception:
+                        parts = sub_cmd.split(" ")
 
-            # On Windows, strip sudo if present
-            if sys.platform == "win32" and parts and parts[0] == "sudo":
-                parts = parts[1:]
+                    if sys.platform == "win32":
+                        parts = [p[1:-1] if (len(p) >= 2 and p[0] == p[-1] and p[0] in ('"', "'")) else p for p in parts]
+                        if parts and parts[0] == "sudo":
+                            parts = parts[1:]
 
-            if not parts:
-                continue
+                    if not parts:
+                        continue
 
-            if parts[0] in ["python", "python3"]:
-                exec_cmd = [str(VENV_PYTHON)] + parts[1:]
-            elif parts[0] == "sudo":
-                if len(parts) > 1 and parts[1] in ["python", "python3"]:
-                    exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
-                else:
-                    exec_cmd = parts
-            elif parts[0] == "ping":
-                exec_cmd = parts
-            else:
-                exec_cmd = [str(VENV_PYTHON)] + parts
+                    if parts[0] in ["python", "python3"]:
+                        exec_cmd = [str(VENV_PYTHON)] + parts[1:]
+                    elif parts[0] == "sudo":
+                        if len(parts) > 1 and parts[1] in ["python", "python3"]:
+                            exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
+                        else:
+                            exec_cmd = parts
+                    elif parts[0] == "ping":
+                        if sys.platform == "win32":
+                            win_ping = ["ping"]
+                            i = 1
+                            while i < len(parts):
+                                if parts[i] == "-c" and i + 1 < len(parts):
+                                    win_ping.extend(["-n", parts[i + 1]])
+                                    i += 2
+                                elif parts[i] == "-W" and i + 1 < len(parts):
+                                    win_ping.extend(["-w", str(int(float(parts[i + 1]) * 1000))])
+                                    i += 2
+                                else:
+                                    win_ping.append(parts[i])
+                                    i += 1
+                            exec_cmd = win_ping
+                        else:
+                            exec_cmd = parts
+                    else:
+                        exec_cmd = [str(VENV_PYTHON)] + parts
 
-            # Start asynchronous subprocess
-            try:
-                env = os.environ.copy()
-                env["PYTHONUNBUFFERED"] = "1"
-                active_process = await asyncio.create_subprocess_exec(
-                    *exec_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    cwd=str(BASE_DIR),
-                    env=env
-                )
+                    active_process = await asyncio.create_subprocess_exec(
+                        *exec_cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        cwd=str(BASE_DIR),
+                        env=env
+                    )
 
-                # Stream stdout chunks line by line
-                while True:
-                    line = await active_process.stdout.readline()
-                    if not line:
+                    while True:
+                        line = await active_process.stdout.readline()
+                        if not line:
+                            break
+                        decoded = line.decode("utf-8", errors="replace")
+                        await websocket.send_json({
+                            "type": "stdout",
+                            "data": decoded
+                        })
+
+                    final_exit_code = await active_process.wait()
+                    if final_exit_code != 0:
                         break
-                    decoded = line.decode("utf-8", errors="replace")
-                    await websocket.send_json({
-                        "type": "stdout",
-                        "data": decoded
-                    })
 
-                exit_code = await active_process.wait()
                 await websocket.send_json({
                     "type": "exit",
-                    "code": exit_code,
+                    "code": final_exit_code,
                     "timestamp": time.strftime("%H:%M:%S")
                 })
 

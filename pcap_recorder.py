@@ -21,8 +21,40 @@ SSLKEYLOG_PATH = os.path.join(CAPTURES_DIR, "sslkeys.log")
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 os.environ["SSLKEYLOGFILE"] = SSLKEYLOG_PATH
 
+def _find_tshark_bin() -> str:
+    """Resolve tshark executable across Linux, macOS, and Windows."""
+    import shutil
+    found = shutil.which("tshark")
+    if found:
+        return found
+    if sys.platform == "win32":
+        for p in [
+            r"C:\Program Files\Wireshark\tshark.exe",
+            r"C:\Program Files (x86)\Wireshark\tshark.exe",
+        ]:
+            if os.path.exists(p):
+                return p
+    return "tshark"
+
+
 def detect_outbound_interface(dest_ip: str) -> str:
     """Detects the network interface used to route packets to dest_ip."""
+    if sys.platform == "win32":
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((dest_ip, 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            tshark_bin = _find_tshark_bin()
+            res = subprocess.run([tshark_bin, "-D"], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if local_ip in line:
+                        return line.split(".", 1)[0].strip()
+        except Exception:
+            pass
+        return "Ethernet"
     try:
         cmd = f"ip route get {dest_ip}"
         out = subprocess.check_output(cmd, shell=True, text=True)
@@ -68,20 +100,27 @@ def start_pcap_capture(
     
     use_sudo = hasattr(os, "geteuid") and os.geteuid() != 0
     sudo_prefix = ["sudo", "-n"] if use_sudo else []
-    tcpdump_cmd = sudo_prefix + ["tcpdump", "-i", iface, "-s", "0", "-w", pcap_file, "-Z", "root", "-U"] + filter_tokens
+    if sys.platform != "win32":
+        tcpdump_cmd = sudo_prefix + ["tcpdump", "-i", iface, "-s", "0", "-w", pcap_file, "-Z", "root", "-U"] + filter_tokens
+        try:
+            proc = subprocess.Popen(tcpdump_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            proc.pcap_file = pcap_file
+            proc.use_sudo = use_sudo
+            time.sleep(0.8)  # Chờ tcpdump khởi tạo socket và sẵn sàng lắng nghe trên interface
+            return proc, pcap_file
+        except Exception:
+            pass
+
+    tshark_bin = _find_tshark_bin()
+    tshark_cmd = sudo_prefix + [tshark_bin, "-i", iface, "-f", bpf_filter, "-w", pcap_file, "-q"]
     try:
-        proc = subprocess.Popen(tcpdump_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        proc.pcap_file = pcap_file
-        proc.use_sudo = use_sudo
-        time.sleep(0.8)  # Chờ tcpdump khởi tạo socket và sẵn sàng lắng nghe trên interface
-        return proc, pcap_file
-    except Exception:
-        tshark_cmd = sudo_prefix + ["tshark", "-i", iface, "-f", bpf_filter, "-w", pcap_file, "-q"]
         proc = subprocess.Popen(tshark_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         proc.pcap_file = pcap_file
         proc.use_sudo = use_sudo
         time.sleep(0.8)
         return proc, pcap_file
+    except Exception:
+        return None, pcap_file
 
 def stop_pcap_capture(proc: Optional[subprocess.Popen], wait_sec: float = 1.5) -> None:
     """Gracefully flushes buffers and terminates background capture process via SIGINT."""
@@ -108,7 +147,10 @@ def stop_pcap_capture(proc: Optional[subprocess.Popen], wait_sec: float = 1.5) -
                 pass
     else:
         try:
-            proc.send_signal(signal.SIGINT)
+            if sys.platform == "win32":
+                proc.terminate()
+            else:
+                proc.send_signal(signal.SIGINT)
             proc.wait(timeout=wait_sec)
         except Exception:
             try:
