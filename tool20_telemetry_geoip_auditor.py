@@ -54,13 +54,12 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import CONF_PATH, get_target_info, load_config, make_console
 
-CONF_PATH = os.path.join(BASE_DIR, "config.json")
+console = make_console()
 CAPTURES_DIR = os.path.join(BASE_DIR, "captures")
 GEOIP_CACHE_FILE = os.path.join(CAPTURES_DIR, "geoip_cache.json")
 REPORT_MD_PATH = os.path.join(BASE_DIR, "telemetry_geoip_audit_report.md")
@@ -68,17 +67,14 @@ EVIDENCE_JSON_PATH = os.path.join(CAPTURES_DIR, "telemetry_geoip_audit_evidence.
 
 os.makedirs(CAPTURES_DIR, exist_ok=True)
 
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+config = load_config()
+_target_info = get_target_info(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-DUT_MODEL = config.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-DUT_FW = config.get("target_camera", {}).get("firmware", "Unknown")
-USER = config.get("target_camera", {}).get("username", "admin")
-PASS = config.get("target_camera", {}).get("password", "")
+DUT_IP = _target_info["ip"]
+DUT_MODEL = _target_info["model"]
+DUT_FW = _target_info["firmware"]
+USER = _target_info["username"]
+PASS = _target_info["password"]
 
 # Telemetry keyword signatures to inspect in payloads (Clause 3.11.4)
 TELEMETRY_KEYWORDS = [
@@ -416,6 +412,10 @@ class FlowStats:
         self.bytes_in = 0
         self.packets_out = 0   # Camera -> Remote IP (Camera gửi)
         self.bytes_out = 0
+        self.phase1_packets_out = 0
+        self.phase1_bytes_out = 0
+        self.phase2_packets_out = 0
+        self.phase2_bytes_out = 0
         self.protocols: Set[str] = set()
         self.ports: Set[int] = set()
         self.dns_queries: Set[str] = set()
@@ -423,8 +423,10 @@ class FlowStats:
         self.telemetry_found: List[str] = []
         self.sensitive_leaks: List[str] = []
         self.payload_samples: List[str] = []
+        self.triggers: Set[str] = set()
         self.first_seen = 0.0
         self.last_seen = 0.0
+        self.first_offset_sec = 0.0
 
     @property
     def total_packets(self) -> int:
@@ -435,6 +437,8 @@ class FlowStats:
         return self.bytes_in + self.bytes_out
 
     def to_dict(self) -> Dict[str, Any]:
+        first_iso = datetime.datetime.fromtimestamp(self.first_seen).strftime("%H:%M:%S") if self.first_seen else ""
+        last_iso = datetime.datetime.fromtimestamp(self.last_seen).strftime("%H:%M:%S") if self.last_seen else ""
         return {
             "remote_ip": self.remote_ip,
             "country_code": self.geo.get("country_code", "UNKNOWN"),
@@ -450,8 +454,18 @@ class FlowStats:
             "bytes_camera_sent": self.bytes_out,
             "packets_camera_received": self.packets_in,
             "bytes_camera_received": self.bytes_in,
+            "phase1_packets_sent": self.phase1_packets_out,
+            "phase1_bytes_sent": self.phase1_bytes_out,
+            "phase2_packets_sent": self.phase2_packets_out,
+            "phase2_bytes_sent": self.phase2_bytes_out,
             "total_packets": self.total_packets,
             "total_bytes": self.total_bytes,
+            "first_seen": self.first_seen,
+            "last_seen": self.last_seen,
+            "first_seen_time": first_iso,
+            "last_seen_time": last_iso,
+            "first_offset_sec": round(self.first_offset_sec, 1),
+            "triggers": sorted(list(self.triggers)),
             "protocols": sorted(list(self.protocols)),
             "ports": sorted(list(self.ports)),
             "dns_queries": sorted(list(self.dns_queries)),
@@ -501,16 +515,47 @@ def stimulate_camera_traffic(target_ip: str) -> None:
         pass
 
 
+def _detect_primary_ip_in_pcap(packets, scapy_mod) -> Optional[str]:
+    """Tự động nhận diện địa chỉ IPv4 nội bộ (RFC 1918) phổ biến nhất trong tệp PCAP."""
+    counts: Dict[str, int] = defaultdict(int)
+    for pkt in packets:
+        if not pkt.haslayer(scapy_mod.IP):
+            continue
+        for ip_s in (pkt[scapy_mod.IP].src, pkt[scapy_mod.IP].dst):
+            try:
+                ip_obj = ipaddress.ip_address(ip_s)
+                if ip_obj.is_private and not ip_obj.is_multicast and not ip_obj.is_loopback and not ip_obj.is_link_local:
+                    counts[ip_s] += 1
+            except ValueError:
+                continue
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda kv: kv[1])[0]
+
+
+def _match_activity(pkt_time: float, activity_log: Optional[List[Dict[str, Any]]]) -> Optional[str]:
+    if not activity_log:
+        return None
+    for act in activity_log:
+        if act["start_ts"] <= pkt_time <= act["end_ts"]:
+            return act["label"]
+    return None
+
+
 def parse_pcap_file(
     pcap_path: str,
     target_ip: str,
-    target_mac: str = ""
+    target_mac: str = "",
+    phase_split_ts: Optional[float] = None,
+    allow_auto_ip: bool = False,
+    activity_log: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, FlowStats], List[Dict[str, Any]], Dict[str, Any]]:
     """
     Bóc tách và phân tích toàn bộ gói tin từ tệp PCAP:
     - Nhận diện luồng IP 2 chiều
     - Phân tích GeoIP
     - Bóc tách nội dung payload, DNS, TLS SNI, Telemetry, Privacy Leaks
+    - Hỗ trợ tách thống kê 2 giai đoạn (phase_split_ts), truy vết tác vụ kích hoạt (activity_log) và tự động dò IP
     """
     import scapy.all as scapy
     
@@ -519,9 +564,12 @@ def parse_pcap_file(
     
     flows: Dict[str, FlowStats] = {}
     dns_records: List[Dict[str, Any]] = []
+    notable_events: List[Dict[str, Any]] = []
     
-    summary = {
+    effective_ip = target_ip
+    summary: Dict[str, Any] = {
         "pcap_file": pcap_path,
+        "target_ip": effective_ip,
         "total_packets_read": 0,
         "camera_packets_sent": 0,
         "camera_packets_received": 0,
@@ -545,6 +593,27 @@ def parse_pcap_file(
         return flows, dns_records, summary
 
     summary["total_packets_read"] = len(packets)
+    base_ts = float(packets[0].time) if packets and hasattr(packets[0], "time") else None
+
+    if allow_auto_ip:
+        has_target = False
+        if effective_ip and effective_ip.lower() != "auto":
+            for pkt in packets:
+                if pkt.haslayer(scapy.IP) and (pkt[scapy.IP].src == effective_ip or pkt[scapy.IP].dst == effective_ip):
+                    has_target = True
+                    break
+        if not has_target:
+            detected_ip = _detect_primary_ip_in_pcap(packets, scapy)
+            if detected_ip:
+                console.print(
+                    f"[yellow][!] Không tìm thấy lưu lượng cho IP '{effective_ip}' trong PCAP. "
+                    f"Tự động chọn IP nội bộ phổ biến nhất: [bold cyan]{detected_ip}[/bold cyan][/yellow]"
+                )
+                effective_ip = detected_ip
+                summary["target_ip"] = effective_ip
+
+    phase1_stats = {"packets_sent": 0, "bytes_sent": 0, "overseas_packets_sent": 0, "overseas_bytes_sent": 0, "overseas_ips": set()}
+    phase2_stats = {"packets_sent": 0, "bytes_sent": 0, "overseas_packets_sent": 0, "overseas_bytes_sent": 0, "overseas_ips": set()}
 
     for pkt in packets:
         # Xử lý tầng IP
@@ -558,8 +627,8 @@ def parse_pcap_file(
         pkt_time = float(pkt.time) if hasattr(pkt, 'time') else time.time()
 
         # Xác định chiều của gói tin đối với Camera
-        is_from_camera = (src_ip == target_ip)
-        is_to_camera = (dst_ip == target_ip)
+        is_from_camera = (src_ip == effective_ip)
+        is_to_camera = (dst_ip == effective_ip)
 
         if not is_from_camera and not is_to_camera:
             # Gói tin không liên quan trực tiếp đến DUT
@@ -572,6 +641,7 @@ def parse_pcap_file(
             geo = geo_engine.lookup(remote_ip)
             flows[remote_ip] = FlowStats(remote_ip, geo)
             flows[remote_ip].first_seen = pkt_time
+            flows[remote_ip].first_offset_sec = (pkt_time - base_ts) if base_ts else 0.0
             if geo.get("is_local"):
                 summary["local_ips_contacted"] += 1
             elif geo.get("is_vietnam"):
@@ -581,6 +651,9 @@ def parse_pcap_file(
 
         flow = flows[remote_ip]
         flow.last_seen = pkt_time
+        act_label = _match_activity(pkt_time, activity_log)
+        if act_label:
+            flow.triggers.add(act_label)
 
         # Xác định giao thức và cổng
         proto_name = "IP"
@@ -643,6 +716,26 @@ def parse_pcap_file(
             summary["camera_packets_sent"] += 1
             summary["camera_bytes_sent"] += pkt_len
 
+            if phase_split_ts is not None:
+                if pkt_time < phase_split_ts:
+                    flow.phase1_packets_out += 1
+                    flow.phase1_bytes_out += pkt_len
+                    phase1_stats["packets_sent"] += 1
+                    phase1_stats["bytes_sent"] += pkt_len
+                    if flow.geo.get("is_overseas"):
+                        phase1_stats["overseas_packets_sent"] += 1
+                        phase1_stats["overseas_bytes_sent"] += pkt_len
+                        phase1_stats["overseas_ips"].add(remote_ip)
+                else:
+                    flow.phase2_packets_out += 1
+                    flow.phase2_bytes_out += pkt_len
+                    phase2_stats["packets_sent"] += 1
+                    phase2_stats["bytes_sent"] += pkt_len
+                    if flow.geo.get("is_overseas"):
+                        phase2_stats["overseas_packets_sent"] += 1
+                        phase2_stats["overseas_bytes_sent"] += pkt_len
+                        phase2_stats["overseas_ips"].add(remote_ip)
+
             # Nếu Camera gửi gói tin đi nước ngoài
             if flow.geo.get("is_overseas"):
                 summary["overseas_packets_sent"] += 1
@@ -654,11 +747,13 @@ def parse_pcap_file(
             summary["camera_bytes_received"] += pkt_len
 
         # Bóc tách nội dung gói tin (DPI Inspection)
+        pkt_telemetry = False
         if raw_payload:
             dpi_res = dpi_inspector.inspect_payload(raw_payload)
             if dpi_res.get("tls_sni"):
                 flow.tls_snis.add(dpi_res["tls_sni"])
             if dpi_res.get("telemetry_detected"):
+                pkt_telemetry = True
                 summary["telemetry_packets_detected"] += 1
                 flow.telemetry_found.extend(dpi_res["telemetry_keywords"])
             if dpi_res.get("sensitive_leaks"):
@@ -666,6 +761,42 @@ def parse_pcap_file(
                 flow.sensitive_leaks.extend(dpi_res["sensitive_leaks"])
             if dpi_res.get("printable_sample") and len(flow.payload_samples) < 3:
                 flow.payload_samples.append(dpi_res["printable_sample"])
+
+        if len(notable_events) < 100 and ((is_from_camera and flow.geo.get("is_overseas")) or pkt_telemetry):
+            notable_events.append({
+                "time_iso": datetime.datetime.fromtimestamp(pkt_time).strftime("%H:%M:%S"),
+                "offset_sec": round((pkt_time - base_ts) if base_ts else 0.0, 1),
+                "direction": "OUT" if is_from_camera else "IN",
+                "remote_ip": remote_ip,
+                "country": flow.geo.get("country_code", "??"),
+                "protocol": proto_name,
+                "dport": dport,
+                "bytes": pkt_len,
+                "trigger": act_label or (f"GĐ{2 if (phase_split_ts and pkt_time >= phase_split_ts) else 1}" if phase_split_ts else proto_name),
+                "kind": "OVERSEAS" if (is_from_camera and flow.geo.get("is_overseas")) else "TELEMETRY",
+                "wireshark_filter": f"ip.src == {effective_ip} && ip.dst == {remote_ip}" if is_from_camera else f"ip.addr == {remote_ip}",
+            })
+
+    if phase_split_ts is not None:
+        summary["phase_breakdown"] = {
+            "phase_split_ts": phase_split_ts,
+            "phase1_label": "Chức năng bình thường",
+            "phase2_label": "Mở hết chức năng",
+            "phase1": {
+                "packets_sent": phase1_stats["packets_sent"],
+                "bytes_sent": phase1_stats["bytes_sent"],
+                "overseas_packets_sent": phase1_stats["overseas_packets_sent"],
+                "overseas_bytes_sent": phase1_stats["overseas_bytes_sent"],
+                "overseas_ips": sorted(list(phase1_stats["overseas_ips"])),
+            },
+            "phase2": {
+                "packets_sent": phase2_stats["packets_sent"],
+                "bytes_sent": phase2_stats["bytes_sent"],
+                "overseas_packets_sent": phase2_stats["overseas_packets_sent"],
+                "overseas_bytes_sent": phase2_stats["overseas_bytes_sent"],
+                "overseas_ips": sorted(list(phase2_stats["overseas_ips"])),
+            },
+        }
 
     # Đánh giá Hợp quy Điều 2.11.4 & 2.11.5
     # Điều 2.11.4: Telemetry Data
@@ -682,6 +813,22 @@ def parse_pcap_file(
     else:
         summary["clause_3_11_5_verdict"] = "ĐẠT (100% dữ liệu lưu thông nội bộ hoặc máy chủ đặt tại Việt Nam)"
 
+    overseas_ips = sorted([ip for ip, fl in flows.items() if fl.geo.get("is_overseas")])
+    if overseas_ips:
+        dst_expr = " || ".join(f"ip.dst == {ip}" for ip in overseas_ips[:12])
+        overseas_ws_filter = f"ip.src == {effective_ip} && ({dst_expr})"
+    else:
+        overseas_ws_filter = (
+            f"ip.src == {effective_ip} && !(ip.dst == 10.0.0.0/8 || ip.dst == 172.16.0.0/12 "
+            "|| ip.dst == 192.168.0.0/16 || ip.dst == 224.0.0.0/4 || ip.dst == 255.255.255.255)"
+        )
+    summary["notable_events"] = notable_events
+    summary["wireshark_filters"] = {
+        "overseas_outbound": overseas_ws_filter,
+        "telemetry": f'ip.addr == {effective_ip} && frame matches "(?i)telemetry|analytics|crashlog|coredump|heartbeat"',
+        "phase2_only": f"ip.src == {effective_ip} && frame.time_epoch >= {phase_split_ts:.3f}" if phase_split_ts else "",
+    }
+
     return flows, dns_records, summary
 
 
@@ -694,12 +841,13 @@ def generate_markdown_report(
     """Tạo báo cáo đo kiểm chuyên nghiệp định dạng Markdown."""
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pcap_base = os.path.basename(summary.get("pcap_file", "live_capture.pcap"))
+    target_ip_str = summary.get("target_ip", DUT_IP)
 
     md = f"""# BÁO CÁO ĐO KIỂM GIÁM SÁT TRUYỀN TIN QUỐC TẾ & DỮ LIỆU ĐO ĐẠC TỪ XA
 **Tiêu chuẩn áp dụng**: QCVN 11:2026/BCA (Điều 2.11.4 & Điều 2.11.5 / Phương pháp đo 3.11.4 & 3.11.5)  
 **Tài liệu tham chiếu**: ETSI EN 303 645 (Clause 5.11 / IXIT 24-TelData & IXIT 28-ExtAPI)  
 **Thời gian thực hiện**: `{now_str}`  
-**Thiết bị kiểm tra (DUT)**: `{DUT_MODEL}` | **IP**: `{DUT_IP}` | **Firmware**: `{DUT_FW}`  
+**Thiết bị kiểm tra (DUT)**: `{DUT_MODEL}` | **IP**: `{target_ip_str}` | **Firmware**: `{DUT_FW}`  
 **Tệp bằng chứng PCAP**: `{pcap_base}`  
 
 ---
@@ -714,7 +862,21 @@ def generate_markdown_report(
 > **Ghi chú đánh giá**:
 > - **Điều 2.11.4**: Toàn bộ nội dung gói tin trao đổi ({summary['total_packets_read']} gói) đã được bóc tách sâu (DPI). Kết quả ghi nhận {summary['telemetry_packets_detected']} gói chứa từ khóa đo đạc kỹ thuật và {summary['sensitive_data_leaks_count']} trường hợp lộ dữ liệu cá nhân.
 > - **Điều 2.11.5**: Camera đã phát đi {summary['camera_packets_sent']} gói tin. Trong đó có **{summary['overseas_packets_sent']} gói tin truyền đi máy chủ quốc tế** ({summary['overseas_bytes_sent']} bytes). {'Thiết bị tuân thủ 100% quy định lưu trữ dữ liệu tại Việt Nam.' if summary['overseas_packets_sent'] == 0 else 'Cần thẩm tra lại cấu hình Cloud/NTP/DNS để đảm bảo định tuyến máy chủ trong nước.'}
+"""
 
+    if summary.get("phase_breakdown"):
+        pb = summary["phase_breakdown"]
+        p1, p2 = pb["phase1"], pb["phase2"]
+        md += f"""
+### So sánh 2 giai đoạn đo (5 phút bình thường + 5 phút mở hết chức năng)
+
+| Giai đoạn | Tổng gói gửi | Dung lượng gửi | Gói gửi ra nước ngoài | IP nước ngoài |
+| :--- | :---: | :---: | :---: | :--- |
+| **Giai đoạn 1 ({pb['phase1_label']})** | {p1['packets_sent']} | {p1['bytes_sent']:,} B | **{p1['overseas_packets_sent']}** | {', '.join(p1['overseas_ips']) or 'Không có'} |
+| **Giai đoạn 2 ({pb['phase2_label']})** | {p2['packets_sent']} | {p2['bytes_sent']:,} B | **{p2['overseas_packets_sent']}** | {', '.join(p2['overseas_ips']) or 'Không có'} |
+"""
+
+    md += """
 ---
 
 ## 2. BẢNG THỐNG KÊ LƯU LƯỢNG & ĐỊNH VỊ ĐỊA LÝ IP (GEOIP FLOW TABLE)
@@ -938,53 +1100,169 @@ def display_results_terminal(
     )
 
 
-def run_live_audit(duration_sec: int = 20, active_stim: bool = True, iface: Optional[str] = None) -> int:
-    """Chạy giám sát lưu lượng trực tiếp trên card mạng."""
+def _run_capture_window(duration_sec: int, label: str, active_stim: bool, target_ip: str) -> None:
+    """Chạy vòng lặp đếm thời gian theo đồng hồ thực tế và kích thích lưu lượng định kỳ."""
+    start_ts = time.time()
+    end_ts = start_ts + max(1, duration_sec)
+    last_stim = -10.0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeElapsedColumn(),
+        console=console
+    ) as progress:
+        task = progress.add_task(label, total=max(1, duration_sec))
+        completed = 0
+        while True:
+            now = time.time()
+            elapsed = now - start_ts
+            if active_stim and (elapsed - last_stim) >= 4.0:
+                stimulate_camera_traffic(target_ip)
+                last_stim = elapsed
+            new_completed = min(max(1, duration_sec), int(elapsed))
+            if new_completed > completed:
+                progress.update(task, advance=(new_completed - completed))
+                completed = new_completed
+            if now >= end_ts:
+                if completed < max(1, duration_sec):
+                    progress.update(task, advance=(max(1, duration_sec) - completed))
+                break
+            time.sleep(min(1.0, max(0.05, end_ts - time.time())))
+
+
+def _run_phase2_all_features(
+    phase2_sec: int,
+    active_stim: bool,
+    target_ip: str,
+    activity_log: List[Dict[str, Any]],
+) -> None:
+    """Tự động chạy lần lượt tất cả chức năng/cơ chế của Camera trong giai đoạn 2 và ghi timeline truy vết."""
+    end_ts = time.time() + max(1, phase2_sec)
+    tasks = [
+        ("ONVIF Discovery", ["tool7_onvif_discover.py"], 25),
+        ("AuthMech (Web/ONVIF/RTSP/SSH)", ["tool21_authmech_auditor.py", "--id", "all", "--wait", "3", "--no-pcap"], 70),
+        ("ComMech + VAPIX Trigger", ["tool17_commech_auditor.py", "--id", "all", "--auto-trigger", "--wait", "3", "--no-pcap"], 90),
+        ("SNMPv3 / SNMP", ["tool5_snmpv3_auditor.py", "--no-pcap"], 30),
+        ("Web UI / API Params", ["tool13_security_params_auditor.py", "--ip", target_ip], 45),
+    ]
+
+    for label, cmd_parts, max_sec in tasks:
+        remaining = end_ts - time.time()
+        if remaining <= 3:
+            break
+        script_path = os.path.join(BASE_DIR, cmd_parts[0])
+        if not os.path.exists(script_path):
+            continue
+        timeout_sec = max(5, int(min(max_sec, remaining)))
+        console.print(f"[cyan][*][/cyan] [GĐ2] Tự động kích hoạt: [bold]{label}[/bold] (tối đa {timeout_sec}s)...")
+        t0 = time.time()
+        try:
+            subprocess.run(
+                [sys.executable, script_path, *cmd_parts[1:]],
+                cwd=BASE_DIR,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=timeout_sec,
+            )
+        except subprocess.TimeoutExpired:
+            console.print(f"[yellow][!][/yellow] {label} đạt giới hạn {timeout_sec}s, chuyển bước tiếp theo.")
+        except Exception as e:
+            console.print(f"[yellow][!][/yellow] Bỏ qua {label}: {e}")
+        t1 = time.time()
+        activity_log.append({"phase": 2, "label": label, "start_ts": t0, "end_ts": t1})
+        console.print(f"[green][+][/green] Xong [bold]{label}[/bold] ({t1 - t0:.1f}s)")
+
+    remaining = end_ts - time.time()
+    if remaining > 2:
+        t0 = time.time()
+        _run_capture_window(int(remaining), "[yellow]GĐ2: Kích thích HTTP/HTTPS/RTSP đến hết 5p...", active_stim, target_ip)
+        activity_log.append({"phase": 2, "label": "HTTP/HTTPS/RTSP Stream", "start_ts": t0, "end_ts": time.time()})
+
+
+def run_live_audit(
+    duration_sec: int = 20,
+    active_stim: bool = True,
+    iface: Optional[str] = None,
+    mode: str = "standard",
+    phase1_sec: int = 300,
+    phase2_sec: int = 300,
+    target_ip: Optional[str] = None,
+) -> int:
+    """Chạy giám sát lưu lượng trực tiếp trên card mạng (chuẩn hoặc 2 giai đoạn 5p + 5p)."""
+    effective_ip = target_ip or DUT_IP
     console.print("\n[bold cyan]=== KHỞI CHẠY BỘ ĐO KIỂM GIÁM SÁT TRUYỀN TIN QUỐC TẾ & TELEMETRY (3.11.4 & 3.11.5) ===[/bold cyan]")
-    target_mac = get_target_mac(DUT_IP)
-    console.print(f"[*] Mục tiêu DUT IP: [bold yellow]{DUT_IP}[/bold yellow] | MAC: [bold green]{target_mac or 'Chưa xác định'}[/bold green]")
-    console.print(f"[*] Thời gian giám sát: [bold cyan]{duration_sec} giây[/bold cyan] (Chế độ kích thích chủ động: {'BẬT' if active_stim else 'TẮT'})")
+    target_mac = get_target_mac(effective_ip)
+    console.print(f"[*] Mục tiêu DUT IP: [bold yellow]{effective_ip}[/bold yellow] | MAC: [bold green]{target_mac or 'Chưa xác định'}[/bold green]")
 
-    bpf = f"host {DUT_IP}"
-    proc, pcap_path = start_pcap_capture(DUT_IP, bpf, prefix="telemetry_geoip_audit", net_iface=iface)
-    console.print(f"[*] Tiến trình bắt gói tin đang chạy... Đang ghi vào: [bold blue]{pcap_path}[/bold blue]\n")
+    if mode == "two-phase":
+        total_sec = phase1_sec + phase2_sec
+        console.print(
+            f"[*] Chế độ đo 2 GIAI ĐOẠN ({total_sec} giây = {phase1_sec}s Bình thường + {phase2_sec}s Tự chạy hết chức năng)"
+        )
+    else:
+        console.print(f"[*] Thời gian giám sát: [bold cyan]{duration_sec} giây[/bold cyan] (Kích thích chủ động: {'BẬT' if active_stim else 'TẮT'})")
 
+    bpf = f"host {effective_ip}"
+    proc, pcap_path = start_pcap_capture(effective_ip, bpf, prefix="telemetry_geoip_audit", net_iface=iface)
+    console.print(f"[*] Đang ghi PCAP vào: [bold blue]{pcap_path}[/bold blue]\n")
+
+    phase_split_ts: Optional[float] = None
+    activity_log: List[Dict[str, Any]] = []
     try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TimeElapsedColumn(),
-            console=console
-        ) as progress:
-            task = progress.add_task("[green]Đang giám sát luồng gói tin...", total=duration_sec)
-            for sec in range(duration_sec):
-                if active_stim and sec % 4 == 0:
-                    stimulate_camera_traffic(DUT_IP)
-                time.sleep(1.0)
-                progress.update(task, advance=1)
+        if mode == "two-phase":
+            console.print(Panel.fit(
+                f"[bold green]GIAI ĐOẠN 1/2 ({phase1_sec}s): CHẾ ĐỘ BÌNH THƯỜNG[/bold green]\n"
+                "Giữ camera hoạt động bình thường để đo lưu lượng nền.",
+                border_style="green"
+            ))
+            t0 = time.time()
+            _run_capture_window(phase1_sec, "[green]GĐ1: Theo dõi bình thường...", active_stim, effective_ip)
+            activity_log.append({"phase": 1, "label": "GĐ1: Hoạt động bình thường", "start_ts": t0, "end_ts": time.time()})
+
+            phase_split_ts = time.time()
+            console.print("\n")
+            console.print(Panel.fit(
+                f"[bold yellow]GIAI ĐOẠN 2/2 ({phase2_sec}s): TỰ ĐỘNG CHẠY HẾT CHỨC NĂNG CAMERA[/bold yellow]\n"
+                "Lần lượt kích hoạt: ONVIF, AuthMech, ComMech + VAPIX, SNMPv3, Web/API & RTSP.",
+                border_style="yellow"
+            ))
+            _run_phase2_all_features(phase2_sec, active_stim, effective_ip, activity_log)
+        else:
+            t0 = time.time()
+            _run_capture_window(duration_sec, "[green]Đang giám sát luồng gói tin...", active_stim, effective_ip)
+            activity_log.append({"phase": 1, "label": "Giám sát trực tiếp", "start_ts": t0, "end_ts": time.time()})
     except KeyboardInterrupt:
         console.print("\n[yellow][!] Đã nhận tín hiệu dừng từ bàn phím (Ctrl+C).[/yellow]")
 
     console.print("\n[*] Đang dừng tiến trình bắt gói tin và hoàn tất tệp PCAP...")
     stop_pcap_capture(proc)
 
-    console.print("[*] Đang bóc tách gói tin và phân tích vị trí địa lý (GeoIP Engine & DPI)...")
-    flows, dns_records, summary = parse_pcap_file(pcap_path, DUT_IP, target_mac=target_mac)
+    console.print("[*] Đang bóc tách gói tin, truy vết nguyên nhân và định vị GeoIP...")
+    flows, dns_records, summary = parse_pcap_file(
+        pcap_path,
+        effective_ip,
+        target_mac=target_mac,
+        phase_split_ts=phase_split_ts,
+        activity_log=activity_log,
+    )
 
     # Xuất JSON Evidence
     json_data = {
         "metadata": {
             "test_title": "QCVN 11 Clause 3.11.4 & 3.11.5 Telemetry and International Transfer Audit",
+            "mode": mode,
             "timestamp": datetime.datetime.now().isoformat(),
             "target_camera": {
-                "ip": DUT_IP,
+                "ip": summary.get("target_ip", effective_ip),
                 "model": DUT_MODEL,
                 "mac": target_mac,
                 "firmware": DUT_FW
             },
             "pcap_file": pcap_path
         },
+        "activity_log": activity_log,
         "summary": summary,
         "dns_queries": dns_records,
         "flows": [f.to_dict() for f in flows.values()]
@@ -995,7 +1273,7 @@ def run_live_audit(duration_sec: int = 20, active_stim: bool = True, iface: Opti
     # Xuất Markdown Report
     generate_markdown_report(flows, dns_records, summary, REPORT_MD_PATH)
 
-    # Nếu có thư mục lưu bằng chứng của mẫu thử, sao chép báo cáo vào đó
+    # Nếu có thư mục lưu bằng chứng của mẫu thử, sao chép báo cáo & PCAP vào đó
     project_dir = os.path.dirname(BASE_DIR)
     evidence_dir = os.path.join(project_dir, DUT_MODEL, "Mẫu lưu bằng chứng", "3.11_Bao_ve_du_lieu")
     if not os.path.isdir(os.path.dirname(evidence_dir)):
@@ -1003,31 +1281,74 @@ def run_live_audit(duration_sec: int = 20, active_stim: bool = True, iface: Opti
     try:
         os.makedirs(evidence_dir, exist_ok=True)
         generate_markdown_report(flows, dns_records, summary, os.path.join(evidence_dir, "telemetry_geoip_audit_report.md"))
+        if os.path.exists(pcap_path):
+            import shutil
+            shutil.copy2(pcap_path, os.path.join(evidence_dir, os.path.basename(pcap_path)))
     except Exception:
         pass
 
     # Hiển thị trên màn hình dòng lệnh
     display_results_terminal(flows, dns_records, summary, pcap_path)
+    if summary.get("phase_breakdown"):
+        pb = summary["phase_breakdown"]
+        p1, p2 = pb["phase1"], pb["phase2"]
+        console.print(Panel.fit(
+            f"[bold cyan]SO SÁNH 2 GIAI ĐOẠN[/bold cyan]\n"
+            f"- GĐ1 ({pb['phase1_label']}): {p1['packets_sent']} gói gửi | Nước ngoài: [bold {'red' if p1['overseas_packets_sent'] else 'green'}]{p1['overseas_packets_sent']} gói ({len(p1['overseas_ips'])} IP)[/]\n"
+            f"- GĐ2 ({pb['phase2_label']}): {p2['packets_sent']} gói gửi | Nước ngoài: [bold {'red' if p2['overseas_packets_sent'] else 'green'}]{p2['overseas_packets_sent']} gói ({len(p2['overseas_ips'])} IP)[/]",
+            border_style="cyan"
+        ))
+    notable = summary.get("notable_events") or []
+    if notable:
+        ev_tbl = Table(title="TRUY VẾT SỰ KIỆN NƯỚC NGOÀI / TELEMETRY (THỜI ĐIỂM & NGUYÊN NHÂN)", show_lines=False)
+        ev_tbl.add_column("Lúc", style="cyan", no_wrap=True)
+        ev_tbl.add_column("Offset", style="dim", no_wrap=True)
+        ev_tbl.add_column("Loại", style="bold")
+        ev_tbl.add_column("IP Đích", style="yellow")
+        ev_tbl.add_column("Nguyên nhân / Tác vụ", style="magenta")
+        ev_tbl.add_column("Wireshark Filter", style="green")
+        for ev in notable[:15]:
+            ev_tbl.add_row(
+                ev["time_iso"],
+                f"+{ev['offset_sec']}s",
+                f"{ev['kind']} ({ev['country']})",
+                f"{ev['remote_ip']}:{ev['dport']}",
+                ev["trigger"],
+                ev["wireshark_filter"],
+            )
+        console.print(ev_tbl)
+    console.print(f"[bold green][+] Đã lưu PCAP 10p tại:[/bold green] {pcap_path}")
     console.print(f"\n[bold green][+] Đã lưu báo cáo kỹ thuật tại:[/bold green] {REPORT_MD_PATH}")
     console.print(f"[bold green][+] Đã lưu bằng chứng JSON tại:[/bold green] {EVIDENCE_JSON_PATH}\n")
     return 0
 
 
-def run_offline_audit(pcap_path: str) -> int:
-    """Phân tích một tệp PCAP đã có sẵn."""
+def run_offline_audit(pcap_path: str, target_ip: Optional[str] = None) -> int:
+    """Phân tích một tệp PCAP đã có sẵn (hỗ trợ tự nhận diện IP camera nếu khác config)."""
     if not os.path.exists(pcap_path):
         console.print(f"[bold red][-] Không tìm thấy tệp PCAP tại: {pcap_path}[/bold red]")
         return 1
 
+    effective_ip = target_ip or DUT_IP
     console.print(f"\n[bold cyan]=== PHÂN TÍCH TỆP BẰNG CHỨNG PCAP: {os.path.basename(pcap_path)} ===[/bold cyan]")
-    target_mac = get_target_mac(DUT_IP)
-    flows, dns_records, summary = parse_pcap_file(pcap_path, DUT_IP, target_mac=target_mac)
+    target_mac = get_target_mac(effective_ip)
+    flows, dns_records, summary = parse_pcap_file(
+        pcap_path,
+        effective_ip,
+        target_mac=target_mac,
+        allow_auto_ip=True,
+    )
 
     json_data = {
         "metadata": {
             "test_title": "QCVN 11 Clause 3.11.4 & 3.11.5 Offline PCAP Audit",
+            "mode": "offline_pcap",
             "timestamp": datetime.datetime.now().isoformat(),
-            "target_camera": {"ip": DUT_IP, "model": DUT_MODEL, "mac": target_mac},
+            "target_camera": {
+                "ip": summary.get("target_ip", effective_ip),
+                "model": DUT_MODEL,
+                "mac": target_mac,
+            },
             "pcap_file": pcap_path
         },
         "summary": summary,
@@ -1049,16 +1370,28 @@ def main():
     )
     parser.add_argument("--live", action="store_true", help="Khởi chạy bắt gói tin trực tiếp thời gian thực")
     parser.add_argument("--duration", type=int, default=20, help="Thời gian bắt gói tin (giây, mặc định 20)")
+    parser.add_argument("--mode", choices=["standard", "two-phase"], default="standard", help="Chế độ đo: standard (liên tục) hoặc two-phase (5p bình thường + 5p mở hết chức năng)")
+    parser.add_argument("--phase1", type=int, default=300, help="Thời gian giai đoạn 1 bình thường (giây, mặc định 300)")
+    parser.add_argument("--phase2", type=int, default=300, help="Thời gian giai đoạn 2 mở hết chức năng (giây, mặc định 300)")
     parser.add_argument("--pcap", type=str, default=None, help="Đường dẫn tệp PCAP cần phân tích ngoại tuyến")
+    parser.add_argument("--target-ip", type=str, default=None, help="IP Camera mục tiêu (hoặc 'auto' khi đọc PCAP)")
     parser.add_argument("--iface", type=str, default=None, help="Giao diện mạng (mặc định tự động nhận diện)")
     parser.add_argument("--no-stim", action="store_true", help="Không kích thích luồng mạng chủ động")
 
     args = parser.parse_args()
 
     if args.pcap:
-        return run_offline_audit(args.pcap)
+        return run_offline_audit(args.pcap, target_ip=args.target_ip)
     else:
-        return run_live_audit(duration_sec=args.duration, active_stim=not args.no_stim, iface=args.iface)
+        return run_live_audit(
+            duration_sec=args.duration,
+            active_stim=not args.no_stim,
+            iface=args.iface,
+            mode=args.mode,
+            phase1_sec=args.phase1,
+            phase2_sec=args.phase2,
+            target_ip=args.target_ip,
+        )
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +35,18 @@ import uvicorn
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from toolkit_config import (
+    detect_host_network,
+    get_service_ports,
+    get_target_info,
+    load_config as tc_load_config,
+    normalize_service_ports,
+    probe_common_camera_ports,
+    save_config as tc_save_config,
+)
 
 # Tự động nhận diện môi trường ảo .venv (ưu tiên trong thư mục hiện tại, rồi thư mục cha)
 VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python"
@@ -61,10 +73,10 @@ def get_current_model() -> str:
     if CONFIG_FILE.exists():
         try:
             cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            return cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
+            return cfg.get("target_camera", {}).get("model", "Generic IP Camera")
         except Exception:
             pass
-    return "AXIS Q1806-LE"
+    return "Generic IP Camera"
 
 def get_evidence_dirs():
     cfg = {}
@@ -119,7 +131,7 @@ def get_evidence_dirs():
 
 EVIDENCE_DIR, EVIDENCE_AUTHMECH_DIR = get_evidence_dirs()
 
-app = FastAPI(title="Cumera Security Auditor Backend", version="2.1.1")
+app = FastAPI(title="Cumera Security Auditor Backend", version="2.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -165,14 +177,11 @@ async def get_index():
 
 @app.get("/api/status")
 async def get_target_status():
-    """Check DUT camera ping status and network latency."""
-    ip = "192.168.1.100"
-    if CONFIG_FILE.exists():
-        try:
-            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            ip = cfg.get("target_camera", {}).get("ip", ip)
-        except Exception:
-            pass
+    """Check DUT camera ping status, model, firmware, latency, and active host network interface."""
+    cfg = tc_load_config(str(CONFIG_FILE))
+    target = get_target_info(cfg)
+    ip = target["ip"]
+    host_iface, host_ip = detect_host_network(ip, cfg)
 
     # Lệnh ping tương thích đa nền tảng (Windows: -n 1 -w 1000, Linux/macOS: -c 1 -W 1)
     if sys.platform == "win32":
@@ -202,6 +211,10 @@ async def get_target_status():
 
     return {
         "ip": ip,
+        "model": target["model"],
+        "firmware": target["firmware"],
+        "host_iface": host_iface,
+        "host_ip": host_ip,
         "online": online,
         "latency_ms": latency_ms,
         "checked_at": time.time()
@@ -210,22 +223,52 @@ async def get_target_status():
 
 @app.get("/api/config")
 async def get_config():
-    """Retrieve current target configuration."""
-    if CONFIG_FILE.exists():
-        try:
-            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    return {}
+    """Retrieve current target configuration with normalized service ports and live host network info."""
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        if not cfg and CONFIG_FILE.exists():
+            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        cfg["service_ports"] = normalize_service_ports(cfg.get("service_ports"))
+        target_ip = get_target_info(cfg)["ip"]
+        host_iface, host_ip = detect_host_network(target_ip, cfg)
+        cfg["host_info"] = {"interface": host_iface, "ip": host_ip}
+        return cfg
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+_CONFIG_PORT_FIELD_MAP = {
+    "http_port": ("http",),
+    "https_port": ("https",),
+    "onvif_http_port": ("onvif_http",),
+    "onvif_https_port": ("onvif_https",),
+    "ws_discovery_port": ("onvif_ws_discovery_udp",),
+    "rtsp_port": ("rtsp", "rtsp_cleartext"),
+    "rtsps_port": ("rtsps", "rtsps_tls"),
+    "ssh_port": ("ssh",),
+    "snmp_port": ("snmp", "snmp_udp"),
+    "proprietary_port": ("proprietary_tcp",),
+    "mqtt_tls_port": ("mqtt_tls",),
+    "mqtt_wss_port": ("mqtt_wss",),
+    "mqtt_clear_port": ("mqtt_clear",),
+    "syslog_tls_port": ("syslog_tls",),
+    "syslog_clear_port": ("syslog_clear",),
+    "smb_port": ("smb",),
+    "smtp_starttls_port": ("smtp_starttls",),
+    "smtps_port": ("smtps",),
+    "smtp_clear_port": ("smtp_clear",),
+    "sftp_port": ("sftp_port",),
+    "ftp_port": ("ftp_clear",),
+    "alarm_http_port": ("alarm_receiver_http",),
+    "alarm_https_port": ("alarm_receiver_https",),
+}
 
 
 @app.post("/api/config")
 async def save_config(data: dict):
-    """Save updated target configuration."""
+    """Save updated target configuration, all service ports, and auto-resolved host network."""
     try:
-        current = {}
-        if CONFIG_FILE.exists():
-            current = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        current = tc_load_config(str(CONFIG_FILE))
         current.setdefault("target_camera", {})
         current.setdefault("service_ports", {})
 
@@ -236,7 +279,8 @@ async def save_config(data: dict):
             tc["username"] = str(data["username"]).strip()
         if "password" in data and data["password"]:
             tc["password"] = str(data["password"]).strip()
-            tc["ssh_password"] = str(data["password"]).strip()
+            if "ssh_password" not in data:
+                tc["ssh_password"] = str(data["password"]).strip()
         if "ssh_username" in data and data["ssh_username"]:
             tc["ssh_username"] = str(data["ssh_username"]).strip()
         if "ssh_password" in data and data["ssh_password"]:
@@ -247,21 +291,30 @@ async def save_config(data: dict):
             tc["firmware"] = str(data["firmware"]).strip()
 
         sp = current["service_ports"]
-        if "https_port" in data:
-            sp["https"] = int(data["https_port"])
-        if "rtsps_port" in data:
-            sp["rtsps"] = int(data["rtsps_port"])
-            sp["rtsps_tls"] = int(data["rtsps_port"])
-        if "rtsp_port" in data:
-            sp["rtsp"] = int(data["rtsp_port"])
-            sp["rtsp_cleartext"] = int(data["rtsp_port"])
-        if "ssh_port" in data:
-            sp["ssh"] = int(data["ssh_port"])
-        if "snmp_port" in data:
-            sp["snmp"] = int(data["snmp_port"])
-            sp["snmp_udp"] = int(data["snmp_port"])
+        if isinstance(data.get("service_ports"), dict):
+            sp.update(data["service_ports"])
+
+        for req_key, port_keys in _CONFIG_PORT_FIELD_MAP.items():
+            if req_key in data and data[req_key] not in (None, ""):
+                val = int(data[req_key])
+                for pk in port_keys:
+                    sp[pk] = val
+
         if "rtsp_path" in data and data["rtsp_path"]:
             sp["rtsp_path"] = str(data["rtsp_path"]).strip()
+        if "onvif_path" in data and data["onvif_path"]:
+            sp["onvif_path"] = str(data["onvif_path"]).strip()
+
+        if any(k in data for k in ("snmp_user", "snmp_auth_pass", "snmp_priv_pass")):
+            current.setdefault("snmp_v3", {})
+            current.setdefault("snmp_credentials", {})
+            for dst in (current["snmp_v3"], current["snmp_credentials"]):
+                if "snmp_user" in data and data["snmp_user"]:
+                    dst["user"] = str(data["snmp_user"]).strip()
+                if "snmp_auth_pass" in data and data["snmp_auth_pass"]:
+                    dst["auth_pass"] = str(data["snmp_auth_pass"]).strip()
+                if "snmp_priv_pass" in data and data["snmp_priv_pass"]:
+                    dst["priv_pass"] = str(data["snmp_priv_pass"]).strip()
 
         if "evidence_base_dir" in data:
             current["evidence_base_dir"] = str(data["evidence_base_dir"]).strip()
@@ -270,11 +323,18 @@ async def save_config(data: dict):
         if "evidence_commech_dir" in data:
             current["evidence_commech_dir"] = str(data["evidence_commech_dir"]).strip()
 
-        CONFIG_FILE.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+        # Re-resolve dynamic host network interface/IP toward target camera
+        target_ip = tc.get("ip") or get_target_info(current)["ip"]
+        host_iface, host_ip = detect_host_network(target_ip, current)
+        current["test_host"] = {"ip": host_ip, "interface": host_iface}
+
+        saved = tc_save_config(current, str(CONFIG_FILE))
+        saved_with_host = dict(saved)
+        saved_with_host["host_info"] = {"interface": host_iface, "ip": host_ip}
         return {
-            "status": "ok", 
-            "message": f"Đã lưu cấu hình thiết bị: {tc.get('ip')}",
-            "config": current
+            "status": "ok",
+            "message": f"Đã lưu cấu hình thiết bị: {tc.get('ip')} | Host: {host_iface} ({host_ip})",
+            "config": saved_with_host,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -299,26 +359,27 @@ async def discover_cameras_api():
         )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore").strip()
-        if out:
-            cameras = json.loads(out)
-        else:
-            cameras = []
+        cameras = json.loads(out) if out else []
 
-        # Read current target to mark selected
-        current_ip = "192.168.20.38"
-        if CONFIG_FILE.exists():
-            try:
-                cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-                current_ip = cfg.get("target_camera", {}).get("ip", current_ip)
-            except Exception:
-                pass
-
+        current_ip = get_target_info(tc_load_config(str(CONFIG_FILE)))["ip"]
         for c in cameras:
             c["selected"] = (c.get("ip") == current_ip)
 
         return {"status": "ok", "cameras": cameras, "current_target": current_ip}
     except Exception as e:
         return {"status": "error", "message": str(e), "cameras": []}
+
+
+@app.post("/api/target/probe_ports")
+async def probe_ports_api(data: dict = None):
+    """Probe open TCP/UDP camera ports, vendor hints, ONVIF path, and RTSP path for any DUT IP."""
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        ip = str((data or {}).get("ip") or get_target_info(cfg)["ip"]).strip()
+        result = await asyncio.to_thread(probe_common_camera_ports, ip)
+        return {"status": "ok", **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/target/auto_link")
@@ -499,6 +560,7 @@ async def get_report(report_name: str):
         "master": BASE_DIR / "camera_security_audit_report.md",
         "params": BASE_DIR / "security_params_audit_report.md",
         "telemetry_geoip": BASE_DIR / "telemetry_geoip_audit_report.md",
+        "firmware_signing": BASE_DIR / "firmware_signing_audit_report.md",
     }
     target = reports_map.get(report_name)
     if not target or not target.exists():
@@ -522,6 +584,61 @@ async def get_telemetry_geoip_evidence():
         return {"status": "ok", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi đọc dữ liệu: {e}")
+
+
+@app.get("/api/firmware_signing/result")
+async def get_firmware_signing_result():
+    """Retrieve the latest Firmware Signing & Public Key audit result JSON."""
+    res_path = BASE_DIR / "firmware_signing_audit_result.json"
+    if not res_path.exists():
+        return {"status": "none", "message": "Chưa có dữ liệu phân tích firmware."}
+    try:
+        data = json.loads(res_path.read_text(encoding="utf-8"))
+        return {"status": "ok", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc dữ liệu firmware: {e}")
+
+
+@app.get("/api/firmware_signing/download_tampered")
+async def download_tampered_firmware(path: str):
+    """Download a generated 1-byte tampered firmware .bin file."""
+    target = Path(path).resolve()
+    workspace_root = BASE_DIR.parent.resolve()
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Không tìm thấy file tampered firmware.")
+    if "_TAMPERED_1BYTE" not in target.name or not target.name.endswith(".bin"):
+        raise HTTPException(status_code=400, detail="Chỉ cho phép tải file *_TAMPERED_1BYTE.bin.")
+    if workspace_root not in target.parents:
+        raise HTTPException(status_code=403, detail="Đường dẫn nằm ngoài workspace.")
+    return FileResponse(path=str(target), filename=target.name, media_type="application/octet-stream")
+
+
+@app.post("/api/telemetry_geoip/upload_pcap")
+async def upload_telemetry_geoip_pcap(request: Request, filename: str = "uploaded.pcap"):
+    """Upload a PCAP/PCAPNG file to captures/uploads for offline GeoIP & Telemetry inspection."""
+    raw_name = os.path.basename(filename or "uploaded.pcap").strip()
+    safe_name = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in raw_name)
+    if not safe_name.lower().endswith((".pcap", ".pcapng", ".cap")):
+        raise HTTPException(status_code=400, detail="Chỉ hỗ trợ tệp .pcap, .pcapng hoặc .cap")
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Tệp PCAP rỗng.")
+    if len(body) > 250 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Tệp PCAP vượt quá giới hạn 250MB.")
+
+    uploads_dir = CAPTURES_DIR / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    ts_prefix = time.strftime("%Y%m%d_%H%M%S")
+    dest_path = uploads_dir / f"{ts_prefix}_{safe_name}"
+    dest_path.write_bytes(body)
+
+    return {
+        "status": "ok",
+        "filename": dest_path.name,
+        "pcap_path": str(dest_path),
+        "size_bytes": len(body),
+    }
 
 
 def get_current_model() -> str:
@@ -628,7 +745,7 @@ def _get_local_commit() -> str:
 async def get_version():
     """Lấy phiên bản và thông tin Git commit hiện tại của Cumera."""
     ver_file = BASE_DIR / "version.json"
-    ver_data = {"app_name": "Cumera", "version": "2.1.1", "repo": REPO_NAME}
+    ver_data = {"app_name": "Cumera", "version": "2.2.0", "repo": REPO_NAME}
     if ver_file.exists():
         try:
             ver_data = json.loads(ver_file.read_text(encoding="utf-8"))
@@ -737,144 +854,291 @@ async def perform_update():
     }
 
 
+# ==============================================================================
+# MULTI-CHANNEL TERMINAL RUNNER (DUAL TERMINAL & RELIABLE SUDO STOP ENGINE)
+# ==============================================================================
+
+class TerminalChannel:
+    def __init__(self, channel_id: str):
+        self.channel_id = channel_id
+        self.process: Optional[asyncio.subprocess.Process] = None
+        self.task: Optional[asyncio.Task] = None
+        self.tool_name: str = ""
+        self.cmd_str: str = ""
+
+channels: Dict[str, TerminalChannel] = {
+    "term1": TerminalChannel("term1"),
+    "term2": TerminalChannel("term2"),
+}
+
+async def kill_process_tree(proc: Optional[asyncio.subprocess.Process], channel_id: str = "term1"):
+    """Dừng tiến trình và toàn bộ tiến trình con (hỗ trợ cả tiến trình sudo/root)."""
+    if not proc or proc.returncode is not None:
+        return
+    pid = proc.pid
+
+    # 1. Gửi SIGINT (Ctrl+C) tới Process Group và PID để kích hoạt dọn dẹp socket/PCAP
+    try:
+        if sys.platform != "win32":
+            subprocess.run(["sudo", "-n", "kill", "-INT", f"-{pid}"], capture_output=True)
+            subprocess.run(["sudo", "-n", "kill", "-INT", str(pid)], capture_output=True)
+    except Exception:
+        pass
+    try:
+        proc.send_signal(signal.SIGINT)
+    except Exception:
+        pass
+
+    # Chờ tối đa 1.2s cho tiến trình dọn dẹp sạch
+    for _ in range(12):
+        if proc.returncode is not None:
+            return
+        await asyncio.sleep(0.1)
+
+    # 2. Nếu vẫn chưa dừng, gửi SIGTERM
+    try:
+        if sys.platform != "win32":
+            subprocess.run(["sudo", "-n", "kill", "-TERM", f"-{pid}"], capture_output=True)
+            subprocess.run(["sudo", "-n", "kill", "-TERM", str(pid)], capture_output=True)
+    except Exception:
+        pass
+    try:
+        proc.terminate()
+    except Exception:
+        pass
+
+    for _ in range(8):
+        if proc.returncode is not None:
+            return
+        await asyncio.sleep(0.1)
+
+    # 3. Cưỡng bức dừng với SIGKILL và pkill toàn bộ tiến trình con
+    try:
+        if sys.platform != "win32":
+            subprocess.run(["sudo", "-n", "kill", "-KILL", f"-{pid}"], capture_output=True)
+            subprocess.run(["sudo", "-n", "kill", "-KILL", str(pid)], capture_output=True)
+            subprocess.run(["sudo", "-n", "pkill", "-KILL", "-P", str(pid)], capture_output=True)
+    except Exception:
+        pass
+    try:
+        proc.kill()
+    except Exception:
+        pass
+
+
+@app.post("/api/process/stop")
+async def api_stop_process(channel: str = Query("all")):
+    """REST endpoint dừng ngay lập tức tiến trình trên kênh chỉ định (term1, term2, hoặc all)."""
+    stopped = []
+    for cid, ch in channels.items():
+        if channel in ["all", cid] and ch.process and ch.process.returncode is None:
+            await kill_process_tree(ch.process, cid)
+            if ch.task and not ch.task.done():
+                ch.task.cancel()
+            stopped.append(cid)
+    return {"status": "ok", "stopped_channels": stopped}
+
+
 @app.websocket("/ws/run")
 async def websocket_run(websocket: WebSocket):
-    """WebSocket stream for real-time tool execution logs."""
+    """
+    WebSocket stream đa luồng hỗ trợ Dual Terminal (term1 & term2)
+    Không bị block khi lệnh đang chạy, nhận lệnh 'stop' tức thì.
+    """
     global active_process
     await websocket.accept()
+
+    send_queue: asyncio.Queue = asyncio.Queue()
+
+    async def sender_worker():
+        while True:
+            try:
+                out_msg = await send_queue.get()
+                await websocket.send_json(out_msg)
+                send_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                break
+
+    sender_task = asyncio.create_task(sender_worker())
+
+    async def run_command_pipeline(ch_id: str, cmd_str: str, tool_name: str, cols_val: Any):
+        global active_process
+        ch = channels[ch_id]
+        final_exit_code = 0
+        sub_cmds = [c.strip() for c in cmd_str.split(" && ") if c.strip()]
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
+        try:
+            term_cols = max(95, min(220, int(cols_val or 145)))
+        except Exception:
+            term_cols = 145
+        env["COLUMNS"] = str(term_cols)
+        env["LINES"] = "50"
+        if env.get("TERM", "") in ("", "dumb"):
+            env["TERM"] = "xterm-256color"
+
+        try:
+            for sub_cmd in sub_cmds:
+                try:
+                    parts = shlex.split(sub_cmd, posix=(sys.platform != "win32"))
+                except Exception:
+                    parts = sub_cmd.split(" ")
+
+                if sys.platform == "win32":
+                    parts = [p[1:-1] if (len(p) >= 2 and p[0] == p[-1] and p[0] in ('"', "'")) else p for p in parts]
+                    if parts and parts[0] == "sudo":
+                        parts = parts[1:]
+
+                if not parts:
+                    continue
+
+                if parts[0] in ["python", "python3"]:
+                    exec_cmd = [str(VENV_PYTHON)] + parts[1:]
+                elif parts[0] == "sudo":
+                    if len(parts) > 1 and parts[1] in ["python", "python3"]:
+                        exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
+                    else:
+                        exec_cmd = parts
+                elif parts[0] == "ping":
+                    if sys.platform == "win32":
+                        win_ping = ["ping"]
+                        i = 1
+                        while i < len(parts):
+                            if parts[i] == "-c" and i + 1 < len(parts):
+                                win_ping.extend(["-n", parts[i + 1]])
+                                i += 2
+                            elif parts[i] == "-W" and i + 1 < len(parts):
+                                win_ping.extend(["-w", str(int(float(parts[i + 1]) * 1000))])
+                                i += 2
+                            else:
+                                win_ping.append(parts[i])
+                                i += 1
+                        exec_cmd = win_ping
+                    else:
+                        exec_cmd = parts
+                else:
+                    exec_cmd = [str(VENV_PYTHON)] + parts
+
+                proc_kwargs = {
+                    "stdout": asyncio.subprocess.PIPE,
+                    "stderr": asyncio.subprocess.STDOUT,
+                    "cwd": str(BASE_DIR),
+                    "env": env,
+                }
+                if sys.platform != "win32":
+                    proc_kwargs["preexec_fn"] = os.setsid
+
+                proc = await asyncio.create_subprocess_exec(*exec_cmd, **proc_kwargs)
+                ch.process = proc
+                if ch_id == "term1":
+                    active_process = proc
+
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    decoded = line.decode("utf-8", errors="replace")
+                    await send_queue.put({
+                        "type": "stdout",
+                        "terminal_id": ch_id,
+                        "data": decoded
+                    })
+
+                final_exit_code = await proc.wait()
+                if final_exit_code != 0:
+                    break
+
+            await send_queue.put({
+                "type": "exit",
+                "terminal_id": ch_id,
+                "code": final_exit_code,
+                "timestamp": time.strftime("%H:%M:%S")
+            })
+
+        except asyncio.CancelledError:
+            await send_queue.put({
+                "type": "exit",
+                "terminal_id": ch_id,
+                "code": -15,
+                "timestamp": time.strftime("%H:%M:%S")
+            })
+        except Exception as e:
+            await send_queue.put({
+                "type": "error",
+                "terminal_id": ch_id,
+                "message": f"Lỗi thực thi trên {ch_id}: {str(e)}"
+            })
+        finally:
+            ch.process = None
+            if ch_id == "term1":
+                active_process = None
 
     try:
         while True:
             raw = await websocket.receive_text()
             msg = json.loads(raw)
             action = msg.get("action")
+            ch_id = msg.get("terminal_id") or msg.get("terminal") or "term1"
+            if ch_id not in channels:
+                ch_id = "term1"
 
             if action == "stop":
-                if active_process and active_process.returncode is None:
-                    try:
-                        active_process.terminate()
-                        await websocket.send_json({
+                target = msg.get("terminal_id") or msg.get("terminal") or "all"
+                for cid, ch in channels.items():
+                    if target in ["all", cid] and ch.process and ch.process.returncode is None:
+                        await kill_process_tree(ch.process, cid)
+                        if ch.task and not ch.task.done():
+                            ch.task.cancel()
+                        await send_queue.put({
                             "type": "log",
-                            "data": "\n\033[1;31m[!] ĐÃ NHẬN TÍN HIỆU DỪNG TỪ NGƯỜI DÙNG (SIGTERM)\033[0m\n"
+                            "terminal_id": cid,
+                            "data": f"\n\033[1;31m[!] ĐÃ DỪNG TIẾN TRÌNH TRÊN [{cid.upper()}] (SIGINT/SIGTERM)\033[0m\n"
                         })
-                    except Exception as e:
-                        pass
                 continue
 
             cmd_str = msg.get("cmd")
             tool_name = msg.get("tool_name", "Security Task")
 
             if not cmd_str:
-                await websocket.send_json({"type": "error", "message": "Command is required."})
+                await send_queue.put({"type": "error", "terminal_id": ch_id, "message": "Command is required."})
                 continue
 
-            # Ensure previous process is terminated
-            if active_process and active_process.returncode is None:
-                try:
-                    active_process.terminate()
-                    await active_process.wait()
-                except Exception:
-                    pass
+            # Dừng lệnh cũ trên kênh này nếu đang chạy
+            ch = channels[ch_id]
+            if ch.process and ch.process.returncode is None:
+                await kill_process_tree(ch.process, ch_id)
+            if ch.task and not ch.task.done():
+                ch.task.cancel()
 
-            await websocket.send_json({
+            ch.cmd_str = cmd_str
+            ch.tool_name = tool_name
+
+            await send_queue.put({
                 "type": "start",
+                "terminal_id": ch_id,
                 "tool_name": tool_name,
                 "cmd": cmd_str,
                 "timestamp": time.strftime("%H:%M:%S")
             })
 
-            # Parse and execute sequential sub-commands separated by " && "
-            sub_cmds = [c.strip() for c in cmd_str.split(" && ") if c.strip()]
-            final_exit_code = 0
-
-            env = os.environ.copy()
-            env["PYTHONUNBUFFERED"] = "1"
-            env["PYTHONUTF8"] = "1"
-            env["PYTHONIOENCODING"] = "utf-8"
-
-            try:
-                for sub_cmd in sub_cmds:
-                    try:
-                        parts = shlex.split(sub_cmd, posix=(sys.platform != "win32"))
-                    except Exception:
-                        parts = sub_cmd.split(" ")
-
-                    if sys.platform == "win32":
-                        parts = [p[1:-1] if (len(p) >= 2 and p[0] == p[-1] and p[0] in ('"', "'")) else p for p in parts]
-                        if parts and parts[0] == "sudo":
-                            parts = parts[1:]
-
-                    if not parts:
-                        continue
-
-                    if parts[0] in ["python", "python3"]:
-                        exec_cmd = [str(VENV_PYTHON)] + parts[1:]
-                    elif parts[0] == "sudo":
-                        if len(parts) > 1 and parts[1] in ["python", "python3"]:
-                            exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
-                        else:
-                            exec_cmd = parts
-                    elif parts[0] == "ping":
-                        if sys.platform == "win32":
-                            win_ping = ["ping"]
-                            i = 1
-                            while i < len(parts):
-                                if parts[i] == "-c" and i + 1 < len(parts):
-                                    win_ping.extend(["-n", parts[i + 1]])
-                                    i += 2
-                                elif parts[i] == "-W" and i + 1 < len(parts):
-                                    win_ping.extend(["-w", str(int(float(parts[i + 1]) * 1000))])
-                                    i += 2
-                                else:
-                                    win_ping.append(parts[i])
-                                    i += 1
-                            exec_cmd = win_ping
-                        else:
-                            exec_cmd = parts
-                    else:
-                        exec_cmd = [str(VENV_PYTHON)] + parts
-
-                    active_process = await asyncio.create_subprocess_exec(
-                        *exec_cmd,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT,
-                        cwd=str(BASE_DIR),
-                        env=env
-                    )
-
-                    while True:
-                        line = await active_process.stdout.readline()
-                        if not line:
-                            break
-                        decoded = line.decode("utf-8", errors="replace")
-                        await websocket.send_json({
-                            "type": "stdout",
-                            "data": decoded
-                        })
-
-                    final_exit_code = await active_process.wait()
-                    if final_exit_code != 0:
-                        break
-
-                await websocket.send_json({
-                    "type": "exit",
-                    "code": final_exit_code,
-                    "timestamp": time.strftime("%H:%M:%S")
-                })
-
-            except Exception as e:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Lỗi khởi chạy tiến trình: {str(e)}"
-                })
+            ch.task = asyncio.create_task(
+                run_command_pipeline(ch_id, cmd_str, tool_name, msg.get("cols"))
+            )
 
     except WebSocketDisconnect:
         pass
     except Exception as e:
         try:
-            await websocket.send_json({"type": "error", "message": str(e)})
+            await send_queue.put({"type": "error", "terminal_id": "term1", "message": str(e)})
         except Exception:
             pass
+    finally:
+        sender_task.cancel()
 
 
 if __name__ == "__main__":

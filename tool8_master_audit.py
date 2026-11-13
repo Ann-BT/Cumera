@@ -23,31 +23,26 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel, get_sslkeylog_path
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, load_config, make_console
 
-console = Console()
+console = make_console()
 
 TOOLKIT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONF_PATH = os.path.join(TOOLKIT_DIR, "config.json")
-CONFIG = {}
-if os.path.exists(CONF_PATH):
-    try:
-        with open(CONF_PATH, encoding="utf-8") as f:
-            CONFIG = json.load(f)
-    except Exception:
-        pass
+CONFIG = load_config()
+_target_info = get_target_info(CONFIG)
+_sp = get_service_ports(CONFIG)
 
-DUT_IP = CONFIG.get("target_camera", {}).get("ip", "192.168.101.208")
+DUT_IP = _target_info["ip"]
 
 from service_discovery import scan_camera_services
 from tool1_tls_scanner import audit_tls_endpoint
 from tool2_unencrypted_protocols import run_full_auth_audit
-from tool5_snmpv3_auditor import run_snmp_audit
+from tool5_snmpv3_auditor import run_snmp_audit, summarize_snmp_audit
 
-RTSP_PORT = CONFIG.get("service_ports", {}).get("rtsp_cleartext", 554)
-RTSPS_PORT = CONFIG.get("service_ports", {}).get("rtsps_tls", 322)
-RTSP_PATH = CONFIG.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
-if not RTSP_PATH.startswith("/"):
-    RTSP_PATH = "/" + RTSP_PATH
+RTSP_PORT = int(_sp["rtsp"])
+RTSPS_PORT = int(_sp["rtsps"])
+SNMP_PORT = int(_sp["snmp"])
+RTSP_PATH = _sp["rtsp_path"]
 
 def measure_rtsp_latency(ip: str, port: int, attempts: int = 5, use_tls: bool = False) -> Dict[str, Any]:
     """Measures response latencies for successive RTSP/RTSPS authentication attempts."""
@@ -87,7 +82,7 @@ def run_master_audit(dut_ip: str) -> Dict[str, Any]:
     """Executes live master audit across all vectors with full PCAP recording."""
     pcap_proc, master_pcap = start_pcap_capture(
         dut_ip,
-        f"tcp port 80 or tcp port 443 or tcp port 554 or tcp port {RTSPS_PORT} or udp port 161 or udp port 3702",
+        f"tcp port 80 or tcp port 443 or tcp port 554 or tcp port {RTSPS_PORT} or udp port {SNMP_PORT} or udp port 3702",
         prefix="master_security_audit"
     )
     master_report = {
@@ -129,9 +124,9 @@ def run_master_audit(dut_ip: str) -> Dict[str, Any]:
             progress.remove_task(t3)
 
             # Phase 4: SNMPv3 Audit
-            if 161 in svc_data.get("udp_open", []):
+            if SNMP_PORT in svc_data.get("udp_open", []):
                 t4 = progress.add_task("[cyan]Giai đoạn 4: Đo kiểm ma trận bảo mật SNMP-V3...", total=None)
-                snmp_res = asyncio.run(run_snmp_audit(dut_ip, 161, capture_pcap=True))
+                snmp_res = asyncio.run(run_snmp_audit(dut_ip, SNMP_PORT, capture_pcap=True))
                 if isinstance(snmp_res, tuple):
                     master_report["snmp_audit"] = snmp_res[0]
                     master_report["snmp_pcap"] = snmp_res[1]
@@ -210,11 +205,16 @@ def display_master_summary(report: Dict[str, Any]):
     # 4. SNMPv3
     snmp = report.get("snmp_audit")
     if snmp:
-        accepted = [x["name"] for x in snmp if x.get("accepted")]
-        snmp_enc = "Mã hóa AES (SNMPv3)" if any("AES" in a for a in accepted) else "Không mã hóa"
-        snmp_auth = "SHA-256" if any("SHA-256" in a for a in accepted) else "Khác"
-        eva = "[bold green][PASS] ĐẠT CHUẨN authPriv[/bold green]" if any("AES" in a and "SHA-256" in a for a in accepted) else "[yellow]Cần cấu hình[/yellow]"
-        t_sum.add_row("Quản trị mạng SNMP", "UDP 161", snmp_enc, f"User: admin\nAuth: {snmp_auth}", eva)
+        s_sum = summarize_snmp_audit(snmp)
+        snmp_enc = ", ".join(s_sum["accepted_priv_algos"]) if s_sum["accepted_priv_algos"] else "Không mã hóa"
+        snmp_auth = ", ".join(s_sum["accepted_auth_algos"]) if s_sum["accepted_auth_algos"] else "Không khớp / Từ chối"
+        if s_sum["has_strong_sogis"] and not s_sum["has_weak_crypto"] and not s_sum["has_cleartext"]:
+            eva = "[bold green][PASS] ĐẠT CHUẨN authPriv[/bold green]"
+        elif s_sum["accepted_authpriv"]:
+            eva = "[bold yellow][WARN] Hỗ trợ thuật toán yếu / kênh rõ[/bold yellow]"
+        else:
+            eva = "[yellow]Cần cấu hình / Kiểm tra Pass[/yellow]"
+        t_sum.add_row("Quản trị mạng SNMP", f"UDP {SNMP_PORT}", snmp_enc, f"User: {s_sum['matched_user']}\nAuth: {snmp_auth}", eva)
 
     # 5. ONVIF
     if 3702 in report["services"].get("udp_open", []):
@@ -314,12 +314,16 @@ def save_audit_reports(report: Dict[str, Any]):
                     for ch in rs["raw_challenge"]:
                         f.write(f"  - `WWW-Authenticate: {ch}`\n")
 
-        f.write(f"\n## 4. Giao thức Quản trị SNMP-V3 (Cổng UDP 161)\n\n")
+        f.write(f"\n## 4. Giao thức Quản trị SNMP-V3 (Cổng UDP {SNMP_PORT})\n\n")
         if report.get("snmp_audit"):
+            s_sum = summarize_snmp_audit(report["snmp_audit"])
+            usable_str = ", ".join(f"`{c}`" for c in s_sum["usable_ciphers"]) if s_sum["usable_ciphers"] else "*Không có tổ hợp nào thành công*"
+            f.write(f"- **Mã hóa thực tế sử dụng được**: {usable_str}\n")
+            f.write(f"- **Tài khoản kiểm tra**: `{s_sum['matched_user']}` | **Tổng số tổ hợp thử**: `{s_sum['total_tested']}`\n\n")
             f.write(f"| Cấu hình thử nghiệm | Mức bảo mật | Phân loại | Kết quả phản hồi |\n")
             f.write(f"| :--- | :--- | :--- | :--- |\n")
             for item in report["snmp_audit"]:
-                f.write(f"| {item['name']} | {item['level']} | {item['sec_type']} | {'[PASS] CHẤP NHẬN' if item['accepted'] else '[BLOCKED] TỪ CHỐI'} |\n")
+                f.write(f"| {item['name']} | {item['level']} | {item['sec_type']} | {'[CHẤP NHẬN]' if item['accepted'] else '[TỪ CHỐI]'} ({item.get('status_code', '')}) |\n")
 
         # 5. Latency Profile
         lat = report.get("latency_profile", {})

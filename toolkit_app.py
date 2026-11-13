@@ -405,7 +405,7 @@ class ToolkitApp(App):
 
         with Container(id="top_ribbon"):
             with Horizontal():
-                yield Static("DUT: 192.168.20.38 (AXIS Q1806-LE) | Auth: admin | RTSPS: 322", id="ribbon_dut_info")
+                yield Static("DUT: -- | Đang đồng bộ...", id="ribbon_dut_info")
                 yield Static("Receiver Daemon: [ONLINE]", id="ribbon_daemon_info")
 
         with TabbedContent(id="main_tabs"):
@@ -414,7 +414,7 @@ class ToolkitApp(App):
                 with VerticalScroll():
                     with Container(classes="card-highlight") as c1:
                         c1.border_title = " [THÔNG TIN THIẾT BỊ MỤC TIÊU - DUT] "
-                        c1.border_subtitle = " AXIS Q1806-LE / Subnet 20 "
+                        c1.border_subtitle = " Target Camera / Dynamic Subnet "
                         yield Static(id="target_summary_text", classes="desc-text")
                         with Grid(classes="grid-4"):
                             yield Button("Auto-Link Đa Subnet", id="btn_autolink", classes="btn-success")
@@ -425,7 +425,7 @@ class ToolkitApp(App):
                     with Container(classes="card") as c2:
                         c2.border_title = " [CẬP NHẬT CẤU HÌNH CAMERA MỤC TIÊU] "
                         with Grid(classes="grid-4"):
-                            yield Input(placeholder="Địa chỉ IP (192.168.20.38)", id="input_cam_ip")
+                            yield Input(placeholder="Địa chỉ IP (192.168.1.100)", id="input_cam_ip")
                             yield Input(placeholder="Tài khoản (admin)", id="input_cam_user")
                             yield Input(placeholder="Mật khẩu", password=True, id="input_cam_pass")
                             yield Button("Lưu cấu hình", id="btn_save_config", classes="btn-primary")
@@ -521,6 +521,19 @@ class ToolkitApp(App):
                         with Grid(classes="grid-2"):
                             yield Button("Tool 15: Khóa SSH (Cổng 22 - 10 lần/30s)", id="btn_ssh_lockout")
                             yield Button("Tool 16: Khóa Web HTTPS (Cổng 443 - 6 lần/30s)", id="btn_web_lockout")
+
+                    with Container(classes="card-warning") as c_mass:
+                        c_mass.border_title = " [TOOL 23: KHÁNG KẾT NỐI HÀNG LOẠT ĐỒNG THỜI — 3.8.3.3] "
+                        c_mass.border_subtitle = " TLS / SSH2 / RTSP / RTSPS / ONVIF / SNMPv3 — credentials hợp lệ "
+                        yield Static(
+                            "Gửi hàng loạt kết nối đồng thời với credentials đúng để kiểm tra khả năng DUT chịu tải (mass reconnection resilience). "
+                            "DUT phải vẫn hoạt động bình thường sau khi test.",
+                            classes="desc-text",
+                        )
+                        with Grid(classes="grid-3"):
+                            yield Button("50 conn × 5 waves (Mặc định)", id="btn_mass_reconnect_default", classes="btn-warning")
+                            yield Button("100 conn × 10 waves (Tải cao)", id="btn_mass_reconnect_high", classes="btn-danger")
+                            yield Button("TLS + SSH chỉ — 50 × 5", id="btn_mass_reconnect_tlsssh")
 
             # TAB 4: ĐIỀU KHOẢN 2.4 & MASTER AUDIT
             with TabPane("4. Bề mặt & Tổng hợp (2.4)", id="tab_surface"):
@@ -789,7 +802,7 @@ class ToolkitApp(App):
         """Xử lý sự kiện bấm nút cho toàn bộ các công cụ."""
         btn_id = event.button.id
         cfg = load_config()
-        ip = cfg.get("target_camera", {}).get("ip", "192.168.20.38")
+        ip = cfg.get("target_camera", {}).get("ip", "192.168.1.100")
         rtsps_p = str(cfg.get("service_ports", {}).get("rtsps_tls", 322))
 
         # Điều khiển chung
@@ -920,6 +933,29 @@ class ToolkitApp(App):
             self.run_audit_command([VENV_PYTHON, "tool15_ssh_lockout.py"], "Khóa SSH (Cổng 22)")
         elif btn_id == "btn_web_lockout":
             self.run_audit_command([VENV_PYTHON, "tool16_web_lockout.py"], "Khóa Web HTTPS (Cổng 443)")
+
+        # 3.8.3.3 Mass Reconnection Resilience
+        elif btn_id == "btn_mass_reconnect_default":
+            self.run_audit_command(
+                [VENV_PYTHON, "tool23_mass_reconnect_stress.py",
+                 "--concurrency", "50", "--waves", "5",
+                 "--proto", "tls,ssh,rtsp,rtsps,onvif,snmp", "--no-pcap"],
+                "3.8.3.3 Mass Reconnect — 50 conn × 5 waves (all protocols)",
+            )
+        elif btn_id == "btn_mass_reconnect_high":
+            self.run_audit_command(
+                [VENV_PYTHON, "tool23_mass_reconnect_stress.py",
+                 "--concurrency", "100", "--waves", "10",
+                 "--proto", "tls,ssh,rtsp,rtsps,onvif,snmp", "--wave-delay", "1", "--no-pcap"],
+                "3.8.3.3 Mass Reconnect — 100 conn × 10 waves (tải cao)",
+            )
+        elif btn_id == "btn_mass_reconnect_tlsssh":
+            self.run_audit_command(
+                [VENV_PYTHON, "tool23_mass_reconnect_stress.py",
+                 "--concurrency", "50", "--waves", "5",
+                 "--proto", "tls,ssh", "--no-pcap"],
+                "3.8.3.3 Mass Reconnect — TLS + SSH2 only",
+            )
 
         # Nhóm 2.4 & Tổng hợp
         elif btn_id == "btn_master_audit":

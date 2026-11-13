@@ -32,7 +32,7 @@ def configure_target_and_baseline():
     console.print(Panel("[bold cyan]THIẾT LẬP THÔNG TIN MỤC TIÊU & DANH SÁCH THAM CHIẾU (BASELINE)[/bold cyan]"))
 
     # 1. Target camera
-    target["ip"] = Prompt.ask("1. IP Camera", default=target.get("ip", "192.168.101.208"))
+    target["ip"] = Prompt.ask("1. IP Camera", default=target.get("ip", "192.168.1.100"))
     target["username"] = Prompt.ask("2. Tài khoản", default=target.get("username", "admin"))
     target["password"] = Prompt.ask("3. Mật khẩu", default=target.get("password", "Psitest135#"))
 

@@ -150,7 +150,11 @@ def get_declared_ixit_ports(cfg: Optional[Dict[str, Any]] = None) -> Set[int]:
 
     # 2. Extract from camera inbound service_ports (exclude host receiver ports)
     srv_ports = cfg.get("service_ports", {})
-    inbound_keys = ["http", "https", "rtsp", "rtsps", "rtsp_cleartext", "rtsps_tls", "ssh", "snmp", "snmp_udp", "onvif_ws_discovery_udp"]
+    inbound_keys = [
+        "http", "https", "onvif_http", "onvif_https", "rtsp", "rtsps",
+        "rtsp_cleartext", "rtsps_tls", "ssh", "snmp", "snmp_udp",
+        "onvif_ws_discovery_udp", "proprietary_tcp"
+    ]
     for k in inbound_keys:
         val = srv_ports.get(k)
         if isinstance(val, int):
@@ -961,7 +965,7 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config()
-    dut_ip = args.ip or args.target_ip or cfg.get("target_camera", {}).get("ip", "192.168.20.38")
+    dut_ip = args.ip or args.target_ip or cfg.get("target_camera", {}).get("ip", "192.168.1.100")
 
     # If user explicitly requested interactive mode in terminal:
     if args.interactive and sys.stdin.isatty():

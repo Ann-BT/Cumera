@@ -7,17 +7,14 @@ import re
 from rich.console import Console
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONF_PATH, encoding="utf-8") as f:
-    config = json.load(f)
-
-DUT_IP = config["target_camera"]["ip"]
-WS_PORT = config["service_ports"]["onvif_ws_discovery_udp"]
+console = make_console()
+config = load_config()
+DUT_IP = get_target_info(config)["ip"]
+WS_PORT = int(get_service_ports(config)["onvif_ws_discovery_udp"])
 
 ws_discovery_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope"

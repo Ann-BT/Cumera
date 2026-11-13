@@ -40,14 +40,13 @@ console = Console()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
 from receiver_daemon import get_active_host_ips
+from toolkit_config import CONF_PATH, detect_host_network, get_service_ports, get_target_info, load_config
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONF_PATH, encoding="utf-8") as f:
-    config = json.load(f)
-
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.101.208")
-HOST_IP = config.get("test_host", {}).get("ip", "192.168.101.250")
-SFTP_PORTS = config.get("service_ports", {}).get("sftp_receiver", [21, 22])
+config = load_config()
+DUT_IP = get_target_info(config)["ip"]
+_, HOST_IP = detect_host_network(DUT_IP, config)
+_sp = get_service_ports(config)
+SFTP_PORTS = _sp.get("sftp_receiver", [_sp["ftp_clear"], _sp["sftp_port"]])
 GLOBAL_PCAP_FILE = ""
 
 # Khởi tạo hoặc nạp Host Key cố định (RSA & ECDSA)

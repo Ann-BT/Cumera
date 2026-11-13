@@ -45,23 +45,22 @@ from rich.panel import Panel
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-HTTP_PORT = config.get("service_ports", {}).get("http", 80)
-HTTPS_PORT = config.get("service_ports", {}).get("https", 443)
-USER = config.get("target_camera", {}).get("username", "admin")
-CORRECT_PASS = config.get("target_camera", {}).get("password", "")
+DUT_IP = _target_info["ip"]
+HTTP_PORT = int(SERVICE_PORTS["onvif_http"])
+HTTPS_PORT = int(SERVICE_PORTS["onvif_https"])
+ONVIF_PATH = SERVICE_PORTS["onvif_path"]
+USER = _target_info["username"]
+CORRECT_PASS = _target_info["password"]
 
 # Đọc ngưỡng khóa từ IXIT / baseline config (Mặc định: AXIS là 10 lần, TP-Link VIGI là 20 lần)
 LOCKOUT_THRESHOLD = (
@@ -120,13 +119,13 @@ class PreciseRateLimiter:
 
 def detect_onvif_endpoint(custom_port: Optional[int] = None) -> Tuple[str, bool, int]:
     """
-    Xác định endpoint ONVIF khả dụng trên DUT (ưu tiên cổng chỉ định -> HTTP 80 -> HTTPS 443).
+    Xác định endpoint ONVIF khả dụng trên DUT (tự dò HTTP/HTTPS cho mọi cổng tùy chỉnh).
     Returns: (url, is_https, port)
     """
     ports_to_check = []
     if custom_port:
-        ports_to_check.append((custom_port, custom_port == 443 or custom_port > 1000))
-    ports_to_check.extend([(HTTP_PORT, False), (HTTPS_PORT, True)])
+        ports_to_check.append((custom_port, is_tls_port(DUT_IP, custom_port)))
+    ports_to_check.extend([(HTTPS_PORT, True), (HTTP_PORT, False)])
 
     for port, is_ssl in ports_to_check:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -134,13 +133,13 @@ def detect_onvif_endpoint(custom_port: Optional[int] = None) -> Tuple[str, bool,
         try:
             if s.connect_ex((DUT_IP, port)) == 0:
                 scheme = "https" if is_ssl else "http"
-                return f"{scheme}://{DUT_IP}:{port}/onvif/device_service", is_ssl, port
+                return f"{scheme}://{DUT_IP}:{port}{ONVIF_PATH}", is_ssl, port
         except Exception:
             pass
         finally:
             s.close()
 
-    return f"https://{DUT_IP}:{HTTPS_PORT}/onvif/device_service", True, HTTPS_PORT
+    return f"https://{DUT_IP}:{HTTPS_PORT}{ONVIF_PATH}", True, HTTPS_PORT
 
 
 def build_ws_security_header(username: str, password: str, mode: str = "sha1") -> str:

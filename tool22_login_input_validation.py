@@ -43,26 +43,22 @@ from rich.panel import Panel
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
-# Tích hợp bộ ghi PCAP Wireshark
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-# Nạp cấu hình camera mục tiêu
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-DUT_MODEL = config.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-HTTPS_PORT = config.get("service_ports", {}).get("https", 443)
-HTTP_PORT = config.get("service_ports", {}).get("http", 80)
-USER = config.get("target_camera", {}).get("username", "admin")
-PASS = config.get("target_camera", {}).get("password", "")
+DUT_IP = _target_info["ip"]
+DUT_MODEL = _target_info["model"]
+HTTPS_PORT = int(SERVICE_PORTS["https"])
+HTTP_PORT = int(SERVICE_PORTS["http"])
+ONVIF_PATH = SERVICE_PORTS["onvif_path"]
+USER = _target_info["username"]
+PASS = _target_info["password"]
 
 GLOBAL_PCAP_FILE = ""
 
@@ -85,34 +81,37 @@ def check_icmp_integrity(ip: str) -> Tuple[bool, float]:
         return False, -1.0
 
 
-def scan_login_surfaces(ip: str, port: int) -> List[Dict[str, Any]]:
+def scan_login_surfaces(ip: str, port: int, scheme: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Dò quét thông minh và bóc tách các hộp thoại đăng nhập (HTTP Auth Dialogs / Web Forms).
-    Tự động nhận diện realm, phương thức xác thực và các trường nhập liệu tương ứng.
+    Dò quét thông minh các điểm đăng nhập Web/API trên đa dạng hãng Camera (Axis, Hikvision, Dahua, Uniview, Generic).
     """
+    proto = scheme or ("https" if is_tls_port(ip, port) else "http")
     endpoints = [
-        {"id": "SURF-01", "name": "Giao diện Web SPA Portal", "path": "/camera/index.html", "method": "GET", "expected_type": "Web SPA Login Portal"},
-        {"id": "SURF-02", "name": "Cổng xác thực HTTP Auth Gateway", "path": "/axis-cgi/login.cgi", "method": "GET/POST", "expected_type": "HTTP Basic/Digest Auth Gateway"},
-        {"id": "SURF-03", "name": "Điểm kiểm soát cấu hình tham số", "path": "/axis-cgi/param.cgi", "method": "GET", "expected_type": "Config Management Challenge"},
-        {"id": "SURF-04", "name": "Cổng quản lý phân quyền người dùng", "path": "/axis-cgi/usergroup.cgi", "method": "GET", "expected_type": "Usergroup Challenge"},
-        {"id": "SURF-05", "name": "API Quản lý phiên đăng nhập", "path": "/axis-cgi/session.cgi", "method": "GET", "expected_type": "Session API"},
-        {"id": "SURF-06", "name": "Dịch vụ ONVIF SOAP", "path": "/onvif/device_service", "method": "POST", "expected_type": "WS-Security SOAP"}
+        {"id": "SURF-01", "name": "Trang chủ Web Portal", "path": "/", "method": "GET", "expected_type": "Web UI Entry"},
+        {"id": "SURF-02", "name": "Giao diện Web SPA (Axis)", "path": "/camera/index.html", "method": "GET", "expected_type": "Web SPA Login Portal"},
+        {"id": "SURF-03", "name": "Cổng HTTP Auth (Axis CGI)", "path": "/axis-cgi/login.cgi", "method": "GET/POST", "expected_type": "HTTP Basic/Digest Auth Gateway"},
+        {"id": "SURF-04", "name": "Cổng Tham số (Axis CGI)", "path": "/axis-cgi/param.cgi", "method": "GET", "expected_type": "Config Management Challenge"},
+        {"id": "SURF-05", "name": "ISAPI Security (Hikvision)", "path": "/ISAPI/Security/userCheck", "method": "GET", "expected_type": "HTTP Auth Challenge"},
+        {"id": "SURF-06", "name": "RPC/CGI Auth (Dahua)", "path": "/cgi-bin/magicBox.cgi?action=getSystemInfo", "method": "GET", "expected_type": "HTTP Digest Challenge"},
+        {"id": "SURF-07", "name": "LAPI Security (Uniview)", "path": "/LAPI/V1.0/System/DeviceBasicInfo", "method": "GET", "expected_type": "REST Auth Gateway"},
+        {"id": "SURF-08", "name": "Dịch vụ ONVIF SOAP", "path": ONVIF_PATH, "method": "POST", "expected_type": "WS-Security SOAP"},
     ]
 
     discovered = []
     for item in endpoints:
-        url = f"https://{ip}:{port}{item['path']}"
+        url = f"{proto}://{ip}:{port}{item['path']}"
         try:
             r = requests.get(url, verify=False, timeout=2.5)
             status = r.status_code
+            if status == 404:
+                continue
             auth_header = r.headers.get("WWW-Authenticate") or r.headers.get("www-authenticate") or ""
-            
-            # Bóc tách Realm và cơ chế xác thực
+
             realm_match = re.search(r'realm="([^"]+)"', auth_header, re.I)
             realm = realm_match.group(1) if realm_match else ("Chung hệ thống" if status in [200, 401] else "None")
-            
-            auth_type = "Basic" if "basic" in auth_header.lower() else ("Digest" if "digest" in auth_header.lower() else ("SPA Gateway" if status == 200 and "/camera/" in item["path"] else "None"))
-            has_dialog = bool(auth_header) or ("/camera/" in item["path"])
+
+            auth_type = "Basic" if "basic" in auth_header.lower() else ("Digest" if "digest" in auth_header.lower() else ("SPA Gateway" if status == 200 else "HTTP Auth"))
+            has_dialog = bool(auth_header) or status in (200, 401, 403)
 
             discovered.append({
                 **item,
@@ -125,16 +124,7 @@ def scan_login_surfaces(ip: str, port: int) -> List[Dict[str, Any]]:
                 "accessible": status in [200, 401, 403, 405]
             })
         except Exception:
-            discovered.append({
-                **item,
-                "status": 0,
-                "has_dialog": False,
-                "auth_type": "Error",
-                "realm": "None",
-                "dialog_label": "N/A",
-                "input_fields": [],
-                "accessible": False
-            })
+            continue
     return discovered
 
 
@@ -149,7 +139,8 @@ def create_login_audit_evidence_html(
     surfaces: Optional[List[Dict[str, Any]]] = None
 ) -> str:
     """Xuất file HTML kiểm định form đăng nhập & hộp thoại xác thực (SQLi & XSS) chuẩn console tối giản."""
-    target_url = f"https://{target_ip}:{port}/camera/index.html"
+    scheme = "https" if is_tls_port(target_ip, port) else "http"
+    target_url = f"{scheme}://{target_ip}:{port}/"
     sqli_json = json.dumps(results_sqli, ensure_ascii=False)
     xss_json = json.dumps(results_xss, ensure_ascii=False)
     headers_json = json.dumps(sec_headers, ensure_ascii=False)
@@ -556,9 +547,10 @@ def run_login_input_validation_audit(
     3. Thực nghiệm 6 vector XSS.
     4. Kiểm tra tính toàn vẹn hệ thống & xuất PCAP, HTML, JSON.
     """
+    scheme = "https" if is_tls_port(target_ip, port) else "http"
     console.print(Panel(
         f"[bold white]ĐO KIỂM XÁC THỰC ĐẦU VÀO GIAO DIỆN ĐĂNG NHẬP (SQLI & XSS - CLAUSE 3.10.1.3)[/bold white]\n"
-        f"• Mục tiêu DUT       : [cyan]https://{target_ip}:{port}/camera/index.html[/cyan] ({DUT_MODEL})\n"
+        f"• Mục tiêu DUT       : [cyan]{scheme}://{target_ip}:{port}/[/cyan] ({DUT_MODEL})\n"
         f"• Tiêu chuẩn áp dụng : [bold yellow]QCVN 11:2026/BCA (Điều 2.10.1 & 3.10.1.3) & TS 103 701 C.29[/bold yellow]\n"
         f"• Quy tắc ĐẠT (PASS) : DUT PHẢI TỪ CHỐI (HTTP 401/403/400), không rò rỉ CSDL, không phản xạ script.\n"
         f"• Thời gian khởi chạy: [bold white]{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/bold white]",
@@ -574,7 +566,8 @@ def run_login_input_validation_audit(
         return {"status": "ERROR", "message": "DUT unreachable"}
 
     console.print(f"  • Phản hồi ICMP Ping : [bold green]OK ({ping_lat:.2f} ms)[/bold green]")
-    surfaces = scan_login_surfaces(target_ip, port)
+    surfaces = scan_login_surfaces(target_ip, port, scheme=scheme)
+    primary_auth_path = next((s["path"] for s in surfaces if s.get("status") == 401), surfaces[0]["path"] if surfaces else "/")
 
     table_surfaces = Table(
         title="Danh Sách Hộp Thoại Đăng Nhập & Bề Mặt Nhập Liệu Phát Hiện",
@@ -608,7 +601,7 @@ def run_login_input_validation_audit(
     # Lấy security headers từ root
     sec_headers = {}
     try:
-        r_root = requests.get(f"https://{target_ip}:{port}/", verify=False, timeout=3.0)
+        r_root = requests.get(f"{scheme}://{target_ip}:{port}/", verify=False, timeout=3.0)
         sec_headers = dict(r_root.headers)
     except Exception:
         pass
@@ -637,7 +630,7 @@ def run_login_input_validation_audit(
 
     for vec in sqli_vectors:
         t0 = time.time()
-        url = f"https://{target_ip}:{port}/camera/index.html"
+        url = f"{scheme}://{target_ip}:{port}{primary_auth_path}"
         try:
             r = requests.get(url, auth=HTTPBasicAuth(vec["payload"], "TestPassword123!"), verify=False, timeout=3.0)
             elapsed_ms = (time.time() - t0) * 1000
@@ -707,7 +700,8 @@ def run_login_input_validation_audit(
 
     for vec in xss_vectors:
         t0 = time.time()
-        url = f"https://{target_ip}:{port}/camera/index.html?user={requests.utils.quote(vec['payload'])}"
+        sep = "&" if "?" in primary_auth_path else "?"
+        url = f"{scheme}://{target_ip}:{port}{primary_auth_path}{sep}user={requests.utils.quote(vec['payload'])}"
         try:
             r = requests.get(url, verify=False, timeout=3.0)
             elapsed_ms = (time.time() - t0) * 1000
@@ -819,7 +813,7 @@ def run_login_input_validation_audit(
         console,
         GLOBAL_PCAP_FILE,
         filters,
-        is_tls=(port == 443),
+        is_tls=(scheme == "https"),
         sort_tip="Lọc 'http.response.code == 401 || http.response.code == 403' trong Wireshark để đối soát chứng chỉ phản hồi lỗi của DUT.",
         title="BẰNG CHỨNG GÓI TIN ĐO KIỂM LOGIN INPUT VALIDATION (CLAUSE 3.10.1.3)"
     )

@@ -127,11 +127,6 @@ def get_server_ssl_context():
                 san_entries.append(x509.IPAddress(ipaddress.ip_address(ip_str)))
             except Exception:
                 pass
-        for well_known_ip in ["192.168.101.250", "192.168.0.250", "192.168.1.250"]:
-            try:
-                san_entries.append(x509.IPAddress(ipaddress.ip_address(well_known_ip)))
-            except Exception:
-                pass
     except Exception:
         pass
 

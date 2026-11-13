@@ -33,28 +33,28 @@ from rich.table import Table
 from rich.panel import Panel
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-DUT_MODEL = config.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-RTSP_PORT = config.get("service_ports", {}).get("rtsp_cleartext", 554)
-RTSPS_PORT = config.get("service_ports", {}).get("rtsps_tls", 322)
-RTSP_PATH = config.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
-if not RTSP_PATH.startswith("/"):
-    RTSP_PATH = "/" + RTSP_PATH
+DUT_IP = _target_info["ip"]
+DUT_MODEL = _target_info["model"]
+HTTP_PORT = int(SERVICE_PORTS["http"])
+HTTPS_PORT = int(SERVICE_PORTS["https"])
+RTSP_PORT = int(SERVICE_PORTS["rtsp"])
+RTSPS_PORT = int(SERVICE_PORTS["rtsps"])
+RTSP_PATH = SERVICE_PORTS["rtsp_path"]
+SSH_PORT = int(SERVICE_PORTS["ssh"])
+SNMP_PORT = int(SERVICE_PORTS["snmp"])
+PROPRIETARY_PORT = int(SERVICE_PORTS["proprietary_tcp"])
 
-USER = config.get("target_camera", {}).get("username", "admin")
-PASS = config.get("target_camera", {}).get("password", "")
+USER = _target_info["username"]
+PASS = _target_info["password"]
 
 GLOBAL_PCAP_FILE = ""
 
@@ -84,19 +84,18 @@ def detect_rtsp_target(requested_port: Optional[int] = None) -> Tuple[int, bool]
         s.settimeout(0.5)
         if s.connect_ex((DUT_IP, requested_port)) == 0:
             s.close()
-            is_tls = (requested_port in [RTSPS_PORT, 322, 9554] or requested_port != 554)
-            return requested_port, is_tls
+            return requested_port, is_tls_port(DUT_IP, requested_port)
         s.close()
 
     # Dò tìm cổng RTSP/RTSPS đang mở thực tế
-    for port, use_tls in [(RTSPS_PORT, True), (322, True), (RTSP_PORT, False), (554, False), (9554, True)]:
+    for port in (RTSPS_PORT, RTSP_PORT, 322, 9554, 554, 8554):
         s = socket.socket()
         s.settimeout(0.5)
         res = s.connect_ex((DUT_IP, port))
         s.close()
         if res == 0:
-            return port, use_tls
-    return RTSPS_PORT, True
+            return port, is_tls_port(DUT_IP, port)
+    return RTSPS_PORT, is_tls_port(DUT_IP, RTSPS_PORT)
 
 
 def create_tls_context() -> ssl.SSLContext:
@@ -168,17 +167,25 @@ def scan_full_camera_apis() -> Dict[str, Any]:
         border_style="cyan"
     ))
 
-    scan_targets = [
-        {"port": 554, "proto": "RTSP", "name": "RTSP Cleartext Video Stream Control", "type": "Stream Control"},
-        {"port": 322, "proto": "RTSPS", "name": "RTSPS TLS Video Stream Control", "type": "Stream Control"},
+    raw_targets = [
+        {"port": RTSP_PORT, "proto": "RTSP", "name": "RTSP Cleartext Video Stream Control", "type": "Stream Control"},
+        {"port": RTSPS_PORT, "proto": "RTSPS", "name": "RTSPS TLS Video Stream Control", "type": "Stream Control"},
+        {"port": 8554, "proto": "RTSP", "name": "RTSP Alternative Port", "type": "Stream Control"},
         {"port": 9554, "proto": "RTSPS", "name": "RTSPS TLS Alternative Stream", "type": "Stream Control"},
-        {"port": 80, "proto": "HTTP", "name": "Web UI & Cleartext REST/ONVIF API", "type": "HTTP Web/API"},
-        {"port": 443, "proto": "HTTPS", "name": "Secure Web UI & HTTPS ONVIF/VAPIX API", "type": "HTTPS Web/API"},
-        {"port": 22, "proto": "SSH", "name": "SSH Management Shell", "type": "Admin CLI"},
-        {"port": 161, "proto": "SNMP", "name": "SNMPv3 Management Port", "type": "UDP Management"},
+        {"port": HTTP_PORT, "proto": "HTTP", "name": "Web UI & Cleartext REST/ONVIF API", "type": "HTTP Web/API"},
+        {"port": HTTPS_PORT, "proto": "HTTPS", "name": "Secure Web UI & HTTPS ONVIF/REST API", "type": "HTTPS Web/API"},
+        {"port": SSH_PORT, "proto": "SSH", "name": "SSH Management Shell", "type": "Admin CLI"},
+        {"port": SNMP_PORT, "proto": "SNMP", "name": "SNMPv3 Management Port", "type": "UDP Management"},
+        {"port": PROPRIETARY_PORT, "proto": "TCP", "name": "Configured Proprietary / SDK Socket", "type": "Proprietary Stream"},
         {"port": 37777, "proto": "TCP", "name": "Proprietary Stream / SDK Port (Dahua/Generic)", "type": "Proprietary Stream"},
-        {"port": 8000, "proto": "TCP", "name": "Proprietary Stream / SDK Port (Hikvision/Generic)", "type": "Proprietary Stream"}
+        {"port": 8000, "proto": "TCP", "name": "Proprietary Stream / SDK Port (Hikvision/Generic)", "type": "Proprietary Stream"},
     ]
+    seen_ports = set()
+    scan_targets = []
+    for t in raw_targets:
+        if t["port"] not in seen_ports:
+            seen_ports.add(t["port"])
+            scan_targets.append(t)
 
     results = []
     table = Table(title="Danh mục API & Cổng Dịch vụ Phát hiện trên DUT", show_header=True, header_style="bold cyan")
@@ -624,7 +631,7 @@ def main():
                 )
         elif args.mode == "csrf":
             from tool19_csrf_token_auditor import run_csrf_token_audit
-            run_csrf_token_audit(target_ip=DUT_IP, port=443, rate_cps=args.rate)
+            run_csrf_token_audit(target_ip=DUT_IP, port=args.port or HTTPS_PORT, rate_cps=args.rate)
         elif args.mode == "all":
             console.print("\n[bold cyan]>>> BƯỚC 1: QUÉT TOÀN BỘ BỀ MẶT API CỦA CAMERA <<<[/bold cyan]")
             scan_full_camera_apis()
@@ -637,7 +644,7 @@ def main():
             time.sleep(2)
             console.print("\n[bold cyan]>>> BƯỚC 3: ĐO KIỂM PHÒNG VỆ CSRF & XÁC THỰC TOKEN CẤU HÌNH (CLAUSE 3.10.1.3) <<<[/bold cyan]")
             from tool19_csrf_token_auditor import run_csrf_token_audit
-            run_csrf_token_audit(target_ip=DUT_IP, port=443, rate_cps=args.rate)
+            run_csrf_token_audit(target_ip=DUT_IP, port=HTTPS_PORT, rate_cps=args.rate)
         else: # rtsp mode
             port, use_tls = detect_rtsp_target(args.port)
             run_rtsp_stateful_fuzzer(

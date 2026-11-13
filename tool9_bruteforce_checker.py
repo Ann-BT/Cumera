@@ -8,34 +8,32 @@ import os
 from rich.console import Console
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONF_PATH, encoding="utf-8") as f:
-    config = json.load(f)
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+_sp = get_service_ports(config)
 
-DUT_IP = config["target_camera"]["ip"]
-RTSP_PORT = config["service_ports"]["rtsp_cleartext"]
-RTSPS_PORT = config["service_ports"]["rtsps_tls"]
-RTSP_PATH = config.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
-if not RTSP_PATH.startswith("/"):
-    RTSP_PATH = "/" + RTSP_PATH
-USER = config["target_camera"]["username"]
-CORRECT_PASS = config["target_camera"]["password"]
+DUT_IP = _target_info["ip"]
+RTSP_PORT = int(_sp["rtsp"])
+RTSPS_PORT = int(_sp["rtsps"])
+RTSP_PATH = _sp["rtsp_path"]
+USER = _target_info["username"]
+CORRECT_PASS = _target_info["password"]
 GLOBAL_PCAP_FILE = ""
 
 def get_active_rtsp():
-    for port, use_tls in [(RTSPS_PORT, True), (RTSP_PORT, False), (322, True), (9554, True), (554, False)]:
+    for port in (RTSPS_PORT, RTSP_PORT, 322, 9554, 554):
         s = socket.socket()
         s.settimeout(1.0)
         res = s.connect_ex((DUT_IP, port))
         s.close()
         if res == 0:
-            return port, use_tls
-    return RTSPS_PORT, True
+            return port, is_tls_port(DUT_IP, port)
+    return RTSPS_PORT, is_tls_port(DUT_IP, RTSPS_PORT)
 
 ACTIVE_PORT, USE_TLS = get_active_rtsp()
 

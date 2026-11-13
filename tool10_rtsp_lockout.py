@@ -24,43 +24,38 @@ from rich.table import Table
 from rich.panel import Panel
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-RTSP_PORT = config.get("service_ports", {}).get("rtsp_cleartext", 554)
-RTSPS_PORT = config.get("service_ports", {}).get("rtsps_tls", 322)
-RTSP_PATH = config.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
-if not RTSP_PATH.startswith("/"):
-    RTSP_PATH = "/" + RTSP_PATH
-CORRECT_PASS = config.get("target_camera", {}).get("password", "")
-USER = config.get("target_camera", {}).get("username", "admin")
+DUT_IP = _target_info["ip"]
+RTSP_PORT = int(SERVICE_PORTS["rtsp"])
+RTSPS_PORT = int(SERVICE_PORTS["rtsps"])
+RTSP_PATH = SERVICE_PORTS["rtsp_path"]
+CORRECT_PASS = _target_info["password"]
+USER = _target_info["username"]
 GLOBAL_PCAP_FILE = ""
 
 
 def detect_rtsp_port(requested_port: Optional[int] = None) -> Tuple[int, bool]:
-    """Phát hiện hoặc kiểm tra cổng RTSP khả dụng (322 TLS hoặc 554 Cleartext)."""
+    """Phát hiện hoặc kiểm tra cổng RTSP/RTSPS khả dụng thực tế (hỗ trợ cổng bất kỳ)."""
     if requested_port is not None:
-        is_tls = (requested_port in [RTSPS_PORT, 322, 9554] or requested_port != 554)
+        is_tls = (requested_port == RTSPS_PORT) or is_tls_port(DUT_IP, requested_port)
         return requested_port, is_tls
 
-    for port, use_tls in [(RTSPS_PORT, True), (RTSP_PORT, False), (322, True), (9554, True), (554, False)]:
+    for port, use_tls in [(RTSPS_PORT, True), (RTSP_PORT, False), (322, True), (9554, True), (554, False), (8554, False)]:
         s = socket.socket()
         s.settimeout(1.0)
         res = s.connect_ex((DUT_IP, port))
         s.close()
         if res == 0:
-            return port, use_tls
-    return RTSPS_PORT, (RTSPS_PORT != 554)
+            return port, (is_tls_port(DUT_IP, port) if port in (RTSPS_PORT, RTSP_PORT) else use_tls)
+    return RTSPS_PORT, is_tls_port(DUT_IP, RTSPS_PORT)
 
 
 class PreciseRateLimiter:

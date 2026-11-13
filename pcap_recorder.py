@@ -101,13 +101,15 @@ def start_pcap_capture(
     use_sudo = hasattr(os, "geteuid") and os.geteuid() != 0
     sudo_prefix = ["sudo", "-n"] if use_sudo else []
     if sys.platform != "win32":
-        tcpdump_cmd = sudo_prefix + ["tcpdump", "-i", iface, "-s", "0", "-w", pcap_file, "-Z", "root", "-U"] + filter_tokens
+        # --immediate-mode: xả gói tin ngay khỏi TPACKET_V3 ring buffer, tránh mất gói tạo PCAP 0 pkt
+        tcpdump_cmd = sudo_prefix + ["tcpdump", "-i", iface, "-s", "0", "-w", pcap_file, "-Z", "root", "-U", "--immediate-mode"] + filter_tokens
         try:
             proc = subprocess.Popen(tcpdump_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             proc.pcap_file = pcap_file
             proc.use_sudo = use_sudo
             time.sleep(0.8)  # Chờ tcpdump khởi tạo socket và sẵn sàng lắng nghe trên interface
-            return proc, pcap_file
+            if proc.poll() is None:
+                return proc, pcap_file
         except Exception:
             pass
 

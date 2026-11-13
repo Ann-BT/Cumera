@@ -26,26 +26,51 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-HTTPS_PORT = config.get("service_ports", {}).get("https", 443)
-USER = config.get("target_camera", {}).get("username", "admin")
-CORRECT_PASS = config.get("target_camera", {}).get("password", "")
+DUT_IP = _target_info["ip"]
+HTTPS_PORT = int(SERVICE_PORTS["https"])
+HTTP_PORT = int(SERVICE_PORTS["http"])
+USER = _target_info["username"]
+CORRECT_PASS = _target_info["password"]
 
 GLOBAL_PCAP_FILE = ""
+_WEB_TARGET_CACHE = {}
+
+
+def _resolve_web_auth_target(port: int) -> Tuple[str, str]:
+    """Auto-detect scheme (https/http) and protected auth endpoint across camera brands."""
+    if port in _WEB_TARGET_CACHE:
+        return _WEB_TARGET_CACHE[port]
+    scheme = "https" if is_tls_port(DUT_IP, port) else "http"
+    candidates = [
+        "/axis-cgi/param.cgi?action=list&group=root.Brand",
+        "/ISAPI/System/deviceInfo",
+        "/cgi-bin/magicBox.cgi?action=getSystemInfo",
+        "/LAPI/V1.0/System/DeviceBasicInfo",
+        "/api/system/information",
+        "/",
+    ]
+    chosen_path = candidates[-1]
+    for path in candidates:
+        url = f"{scheme}://{DUT_IP}:{port}{path}"
+        try:
+            r = requests.get(url, verify=False, timeout=2.0, headers={"Connection": "close"})
+            if r.status_code in (200, 401):
+                chosen_path = path
+                if r.status_code == 401:
+                    break
+        except Exception:
+            continue
+    _WEB_TARGET_CACHE[port] = (scheme, f"{scheme}://{DUT_IP}:{port}{chosen_path}")
+    return _WEB_TARGET_CACHE[port]
 
 
 class PreciseRateLimiter:
@@ -73,10 +98,10 @@ class PreciseRateLimiter:
 
 def attempt_web_login(username: str, password: str, port: int = 443, timeout: float = 3.0) -> Tuple[bool, str, float]:
     """
-    Thực hiện 1 lần xác thực qua Web HTTPS (VAPIX/Parameter API).
+    Thực hiện 1 lần xác thực qua Web HTTPS/HTTP (đa hãng Camera).
     Returns: (is_success, status_str, latency_ms)
     """
-    auth_url = f"https://{DUT_IP}:{port}/axis-cgi/param.cgi?action=list&group=root.Brand"
+    _, auth_url = _resolve_web_auth_target(port)
     t_start = time.time()
     try:
         res = requests.get(
@@ -87,7 +112,7 @@ def attempt_web_login(username: str, password: str, port: int = 443, timeout: fl
             headers={"Connection": "close"}
         )
         elapsed = (time.time() - t_start) * 1000
-        if res.status_code == 200 and "root.Brand" in res.text:
+        if res.status_code == 200:
             return True, f"HTTP {res.status_code} OK (Đăng nhập thành công)", elapsed
         elif res.status_code == 401:
             # Fallback HTTP Digest
@@ -100,7 +125,7 @@ def attempt_web_login(username: str, password: str, port: int = 443, timeout: fl
                 headers={"Connection": "close"}
             )
             elapsed_d = (time.time() - t_d_start) * 1000
-            if res_d.status_code == 200 and "root.Brand" in res_d.text:
+            if res_d.status_code == 200:
                 return True, f"HTTP {res_d.status_code} OK (Digest thành công)", elapsed_d
             return False, f"HTTP {res_d.status_code} Unauthorized", elapsed_d
         elif res.status_code in (403, 429):

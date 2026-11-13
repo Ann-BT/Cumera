@@ -43,28 +43,47 @@ from rich.text import Text
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
-# Tích hợp bộ ghi PCAP Wireshark
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
 
-# Nạp cấu hình camera mục tiêu
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-DUT_MODEL = config.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-HTTPS_PORT = config.get("service_ports", {}).get("https", 443)
-HTTP_PORT = config.get("service_ports", {}).get("http", 80)
-USER = config.get("target_camera", {}).get("username", "admin")
-PASS = config.get("target_camera", {}).get("password", "")
+DUT_IP = _target_info["ip"]
+DUT_MODEL = _target_info["model"]
+HTTPS_PORT = int(SERVICE_PORTS["https"])
+HTTP_PORT = int(SERVICE_PORTS["http"])
+USER = _target_info["username"]
+PASS = _target_info["password"]
 
 GLOBAL_PCAP_FILE = ""
+
+
+def _resolve_csrf_target(ip: str, port: int, custom_endpoint: Optional[str] = None) -> Tuple[str, str, str]:
+    """Resolve scheme (http/https), responsive config endpoint, and baseline query URL."""
+    scheme = "https" if is_tls_port(ip, port) else "http"
+    if custom_endpoint:
+        ep = custom_endpoint if custom_endpoint.startswith("/") else "/" + custom_endpoint
+        return scheme, ep, f"{scheme}://{ip}:{port}{ep}"
+    candidates = [
+        ("/axis-cgi/param.cgi", "/axis-cgi/param.cgi?action=list&group=root.Brand"),
+        ("/ISAPI/Security/adminAccesses", "/ISAPI/System/deviceInfo"),
+        ("/cgi-bin/configManager.cgi", "/cgi-bin/magicBox.cgi?action=getSystemInfo"),
+        ("/LAPI/V1.0/System/DeviceBasicInfo", "/LAPI/V1.0/System/DeviceBasicInfo"),
+        ("/api/system/information", "/api/system/information"),
+        ("/", "/"),
+    ]
+    for cfg_ep, base_ep in candidates:
+        try:
+            r = requests.get(f"{scheme}://{ip}:{port}{base_ep}", verify=False, timeout=2.0)
+            if r.status_code in (200, 401, 403):
+                return scheme, cfg_ep, f"{scheme}://{ip}:{port}{base_ep}"
+        except Exception:
+            continue
+    return scheme, "/", f"{scheme}://{ip}:{port}/"
 
 
 def check_icmp_integrity(ip: str) -> Tuple[bool, float]:
@@ -105,19 +124,22 @@ def generate_forged_tokens() -> Dict[str, str]:
     }
 
 
-def query_baseline_param(ip: str, port: int, timeout: float = 3.0) -> Tuple[bool, str]:
+def query_baseline_param(ip: str, port: int, timeout: float = 3.0, baseline_url: Optional[str] = None) -> Tuple[bool, str]:
     """
     Truy vấn thông số ban đầu hợp lệ có xác thực để so sánh trước và sau kiểm thử.
     """
-    url = f"https://{ip}:{port}/axis-cgi/param.cgi?action=list&group=root.Brand"
+    if not baseline_url:
+        _, _, baseline_url = _resolve_csrf_target(ip, port)
     try:
-        r = requests.get(url, auth=HTTPBasicAuth(USER, PASS), verify=False, timeout=timeout)
-        if r.status_code == 200 and "root.Brand" in r.text:
-            return True, r.text.strip().splitlines()[0]
+        r = requests.get(baseline_url, auth=HTTPBasicAuth(USER, PASS), verify=False, timeout=timeout)
+        if r.status_code == 200:
+            lines = r.text.strip().splitlines()
+            return True, lines[0][:80] if lines else "HTTP 200 OK"
         if r.status_code == 401:
-            r = requests.get(url, auth=HTTPDigestAuth(USER, PASS), verify=False, timeout=timeout)
-            if r.status_code == 200 and "root.Brand" in r.text:
-                return True, r.text.strip().splitlines()[0]
+            r = requests.get(baseline_url, auth=HTTPDigestAuth(USER, PASS), verify=False, timeout=timeout)
+            if r.status_code == 200:
+                lines = r.text.strip().splitlines()
+                return True, lines[0][:80] if lines else "HTTP 200 OK"
         return False, f"HTTP {r.status_code}"
     except Exception as e:
         return False, str(e)
@@ -357,9 +379,12 @@ def run_csrf_token_audit(
     3. Đánh giá tiêu chí bắt buộc: DUT PHẢI TỪ CHỐI các yêu cầu thay đổi cấu hình.
     4. Kiểm tra tính toàn vẹn hệ thống và đối soát cấu hình sau thử nghiệm.
     """
+    scheme, endpoint, baseline_url = _resolve_csrf_target(target_ip, port, custom_endpoint)
+    target_url = f"{scheme}://{target_ip}:{port}{endpoint}"
+
     console.print(Panel(
         f"[bold white]ĐO KIỂM PHÒNG VỆ CSRF & XÁC THỰC TOKEN[/bold white]\n"
-        f"• Mục tiêu DUT       : [cyan]https://{target_ip}:{port}/[/cyan] ({DUT_MODEL})\n"
+        f"• Mục tiêu DUT       : [cyan]{target_url}[/cyan] ({DUT_MODEL})\n"
         f"• Phương pháp        : [bold yellow]Kiểm thử tính toàn vẹn phiên, token và kiểm soát nguồn gốc CSRF[/bold yellow]\n"
         f"• Tiêu chí an toàn   : [bold green]DUT từ chối (REJECT)[/bold green] mọi yêu cầu thay đổi cấu hình có token giả mạo.\n"
         f"• Thời gian khởi chạy: [bold white]{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/bold white]",
@@ -369,12 +394,6 @@ def run_csrf_token_audit(
 
     tokens = generate_forged_tokens()
 
-    # Xác định endpoint cấu hình mục tiêu
-    # Với camera AXIS VAPIX: /axis-cgi/param.cgi
-    # Hỗ trợ tùy biến qua custom_endpoint
-    endpoint = custom_endpoint or "/axis-cgi/param.cgi"
-    target_url = f"https://{target_ip}:{port}{endpoint}"
-
     # 1. Kiểm tra trạng thái Baseline ban đầu
     console.print("\n[*] [bold cyan]Giai đoạn 1: Kiểm tra trạng thái cơ sở (Baseline & System Integrity)...[/bold cyan]")
     ping_ok_initial, ping_lat = check_icmp_integrity(target_ip)
@@ -382,7 +401,7 @@ def run_csrf_token_audit(
         console.print(f"[bold red][!] DUT tại {target_ip} không phản hồi ICMP Ping. Kiểm tra lại kết nối mạng.[/bold red]")
         return {"status": "ERROR", "message": "DUT unreachable"}
 
-    base_ok, base_info = query_baseline_param(target_ip, port)
+    base_ok, base_info = query_baseline_param(target_ip, port, baseline_url=baseline_url)
     console.print(f"  • Phản hồi ICMP Ping : [bold green]OK ({ping_lat:.2f} ms)[/bold green]")
     console.print(f"  • Truy vấn thông số  : [bold green]{base_info if base_ok else 'Không xác thực được tài khoản (vẫn tiến hành đo kiểm từ chối token)'}[/bold green]")
 
@@ -693,7 +712,7 @@ def run_csrf_token_audit(
         console,
         GLOBAL_PCAP_FILE,
         filters,
-        is_tls=(port == 443),
+        is_tls=(scheme == "https"),
         sort_tip="Lọc 'http.response.code == 401 || http.response.code == 403' trong Wireshark để đối soát mã từ chối của DUT.",
         title="BẰNG CHỨNG GÓI TIN ĐO KIỂM CSRF & TOKEN VALIDATION"
     )

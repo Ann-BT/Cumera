@@ -6,18 +6,18 @@
     "firmware": "1.0.0",
     "username": "admin",
     "password": "Password123#",
-    "ssh_username": "root",
+    "ssh_username": "admin",
     "ssh_password": "Password123#"
   },
   "test_host": {
-    "ip": "192.168.1.200"
+    "ip": "127.0.0.1",
+    "interface": "auto"
   },
   "ixit_declared_ports": [
     22,
     80,
     161,
     322,
-    332,
     443,
     554,
     3702
@@ -25,23 +25,38 @@
   "service_ports": {
     "http": 80,
     "https": 443,
+    "onvif_http": 80,
+    "onvif_https": 443,
+    "onvif_path": "/onvif/device_service",
+    "onvif_ws_discovery_udp": 3702,
     "rtsp": 554,
-    "rtsps": 322,
     "rtsp_cleartext": 554,
+    "rtsps": 322,
     "rtsps_tls": 322,
-    "rtsp_path": "/axis-media/media.amp",
+    "rtsp_path": "/stream1",
     "ssh": 22,
     "snmp": 161,
     "snmp_udp": 161,
-    "onvif_ws_discovery_udp": 3702,
-    "sftp_receiver": [
-      21,
-      22
-    ],
+    "proprietary_tcp": 8000,
+    "mqtt_tls": 8883,
+    "mqtt_wss": 443,
+    "mqtt_clear": 1883,
+    "syslog_tls": 6514,
+    "syslog_clear": 514,
+    "smb": 445,
+    "smtp_starttls": 587,
+    "smtps": 465,
+    "smtp_clear": 25,
     "smtp_receiver": [
       25,
       465,
       587
+    ],
+    "sftp_port": 22,
+    "ftp_clear": 21,
+    "sftp_receiver": [
+      21,
+      22
     ],
     "alarm_receiver_http": 8088,
     "alarm_receiver_https": 8443

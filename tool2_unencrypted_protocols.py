@@ -26,28 +26,21 @@ from rich.panel import Panel
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel, enable_ssl_keylog
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, load_config, make_console
 
-console = Console()
+console = make_console()
+CONFIG = load_config()
+_target_info = get_target_info(CONFIG)
+_sp = get_service_ports(CONFIG)
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-CONFIG = {}
-if os.path.exists(CONF_PATH):
-    try:
-        with open(CONF_PATH, encoding="utf-8") as f:
-            CONFIG = json.load(f)
-    except Exception:
-        pass
-
-DUT_IP = CONFIG.get("target_camera", {}).get("ip", "192.168.101.208")
-USER = CONFIG.get("target_camera", {}).get("username", "admin")
-PASS = CONFIG.get("target_camera", {}).get("password", "Psitest135#")
-HTTP_PORT = CONFIG.get("service_ports", {}).get("http", 80)
-HTTPS_PORT = CONFIG.get("service_ports", {}).get("https", 443)
-RTSP_PORT = CONFIG.get("service_ports", {}).get("rtsp_cleartext", 554)
-RTSPS_PORT = CONFIG.get("service_ports", {}).get("rtsps_tls", 322)
-RTSP_PATH = CONFIG.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
-if not RTSP_PATH.startswith("/"):
-    RTSP_PATH = "/" + RTSP_PATH
+DUT_IP = _target_info["ip"]
+USER = _target_info["username"]
+PASS = _target_info["password"]
+HTTP_PORT = int(_sp["http"])
+HTTPS_PORT = int(_sp["https"])
+RTSP_PORT = int(_sp["rtsp"])
+RTSPS_PORT = int(_sp["rtsps"])
+RTSP_PATH = _sp["rtsp_path"]
 
 def audit_http_port(ip: str, port: int) -> Dict[str, Any]:
     """Audits HTTP port for redirects, cleartext exposure, and auth challenges."""

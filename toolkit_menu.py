@@ -135,7 +135,7 @@ def menu_cryptography_and_auth():
             t.add_row("1", "Phân tích mã hóa đường truyền (TLS & SOGIS ACM)", f"Quét phiên bản TLS 1.0 - 1.3, phân loại SOGIS R/L/NR/F & trích xuất X.509 cert trên cổng 443 / {rtsps_p}")
             t.add_row("2", "Phân tích mã hóa giá trị xác thực (HTTP / RTSP / RTSPS)", f"Bóc tách WWW-Authenticate: Digest SHA-256 vs Basic Auth trên cổng rõ 554 & TLS {rtsps_p}")
             t.add_row("3", "Bóc tách kết nối Client (SFTP / SMTP / Webhook)", "Server thu nhận bóc tách SSH KEXINIT, TLS Client Hello & headers cảnh báo")
-            t.add_row("4", "Đo kiểm ma trận mật mã SNMP-V3", "Thử nghiệm 8 tổ hợp authPriv/authNoPriv, chống hạ cấp & chặn DES/MD5")
+            t.add_row("4", "Đo kiểm ma trận mật mã SNMP-V3", "Thử toàn bộ SHA-512/384/256/224/1/MD5 x AES-256/192/128/3DES/DES, authNoPriv & v1/v2c")
             t.add_row("5", "BÁO CÁO TỔNG HỢP TOÀN BỘ (Master Audit)", "Tự động chạy toàn bộ các bài test, xuất báo cáo Markdown & JSON")
             t.add_row("6", "Đo kiểm chuyên sâu bắt tay xác thực RTSP / RTSPS (Tool 12)", "Gửi request, bóc tách Digest SHA-256 & gói tin SDP 200 OK trên luồng video")
             t.add_row("7", "Kiểm tra kết nối & Bắt gói tin Wireshark (Tool 14)", "Bắt gói tin pcap, trích xuất dissection Wireshark & luồng RTP video thực tế")
@@ -257,13 +257,15 @@ def menu_cryptography_and_auth():
                 console.print("  [bold yellow]1[/bold yellow]. [bold green]Chạy toàn bộ 4 AuthMech & bắt gói tin PCAP[/bold green]")
                 console.print("  [bold yellow]2[/bold yellow]. [bold cyan]Bóc tách TOÀN BỘ Ciphersuite & KEX (Nmap Enum)[/bold cyan]")
                 console.print("  [bold yellow]3[/bold yellow]. [bold white]Đo kiểm chỉ định 1 AuthMech (1, 2, 3 hoặc 4)[/bold white]")
+                console.print("  [bold yellow]4[/bold yellow]. [bold magenta]Kích thích AuthMech KHÔNG lưu PCAP (dùng cho TelData)[/bold magenta]")
                 console.print("  [bold yellow]0[/bold yellow]. [dim]Quay lại[/dim]")
-                sub8 = Prompt.ask("Chọn chế độ", choices=["1", "2", "3", "0"], default="1").strip()
+                sub8 = Prompt.ask("Chọn chế độ", choices=["1", "2", "3", "4", "0"], default="1").strip()
             else:
                 print("\n=== ĐO KIỂM 4 CƠ CHẾ XÁC THỰC AUTHMECH ===")
                 print("  [1] Chạy toàn bộ 4 AuthMech & bắt gói tin PCAP")
                 print("  [2] Bóc tách TOÀN BỘ Ciphersuite & KEX (Nmap Enum)")
                 print("  [3] Đo kiểm chỉ định 1 AuthMech (1, 2, 3 hoặc 4)")
+                print("  [4] Kích thích AuthMech KHÔNG lưu PCAP (dùng cho TelData)")
                 print("  [0] Quay lại")
                 sub8 = input("Chọn chế độ [1]: ").strip() or "1"
 
@@ -274,9 +276,24 @@ def menu_cryptography_and_auth():
             elif sub8 == "3":
                 sub_id = input("Nhập ID cần kiểm (1, 2, 3, 4): ").strip() or "1"
                 run_script("tool21_authmech_auditor.py", "--id", sub_id)
+            elif sub8 == "4":
+                run_script("tool21_authmech_auditor.py", "--id", "all", "--wait", "1.5", "--no-pcap")
             input("\nBấm Enter để tiếp tục...")
         elif choice == "9":
-            run_script("tool17_commech_auditor.py")
+            print("\n  [1] Đo kiểm đầy đủ 11 phương thức (Ghi PCAP bằng chứng)")
+            print("  [2] Kích hoạt toàn bộ không lưu PCAP (--no-pcap)")
+            print("  [3] Bật toàn bộ 5 Server ComMech chạy liên tục (--server-mode)")
+            print("  [4] Chạy riêng 1 Server ComMech liên tục (--id X --forever)")
+            sub_comm = input("Chọn chế độ ComMech [1]: ").strip() or "1"
+            if sub_comm == "2":
+                run_script("tool17_commech_auditor.py", "--id", "all", "--auto-trigger", "--wait", "1.5", "--no-pcap")
+            elif sub_comm == "3":
+                run_script("tool17_commech_auditor.py", "--server-mode")
+            elif sub_comm == "4":
+                srv_id = input("Nhập ID server (5: MQTT, 6: Syslog, 7: SMB, 8: SMTP, 9: SFTP) [5]: ").strip() or "5"
+                run_script("tool17_commech_auditor.py", "--id", srv_id, "--forever")
+            else:
+                run_script("tool17_commech_auditor.py")
             input("\nBấm Enter để tiếp tục...")
 
 def menu_bruteforce_defense():
@@ -303,6 +320,7 @@ def menu_bruteforce_defense():
             t.add_row("3", "Kiểm chứng Khóa dịch vụ ONVIF & Reset bộ đếm", "Gửi các gói tin WS-Security sai, kiểm tra hành vi ngắt kết nối")
             t.add_row("4", "Kiểm chứng Khóa dịch vụ SSH & Reset bộ đếm (Cổng 22)", "10 lần sai trong 30s -> Khóa 5 phút, firewall rate limit & reset bộ đếm")
             t.add_row("5", "Kiểm chứng Khóa giao diện Web & Reset bộ đếm (Cổng 443)", "6 lần sai trong 30s -> Khóa 5 phút, firewall rate limit & reset bộ đếm")
+            t.add_row("6", "[bold]Kết nối hàng loạt đồng thời 3.8.3.3 (Mass Reconnect Stress)[/bold]", "TLS/SSH/RTSP/ONVIF/SNMPv3 — credentials hợp lệ, kiểm tra khả năng DUT chịu tải đồng thời")
             t.add_row("0", "[bold red]Quay lại Menu chính[/bold red]", "")
             console.print(t)
             choice = Prompt.ask("\nNhập lựa chọn", default="1").strip()
@@ -315,6 +333,7 @@ def menu_bruteforce_defense():
             print("  [3] Kiểm chứng Khóa dịch vụ ONVIF & Reset bộ đếm")
             print("  [4] Kiểm chứng Khóa dịch vụ SSH & Reset bộ đếm (Cổng 22)")
             print("  [5] Kiểm chứng Khóa giao diện Web & Reset bộ đếm (Cổng 443)")
+            print("  [6] Kết nối hàng loạt đồng thời 3.8.3.3 (Mass Reconnect Stress)")
             print("  [0] Quay lại Menu chính")
             choice = input("Nhập lựa chọn: ").strip()
 
@@ -339,11 +358,17 @@ def menu_bruteforce_defense():
         elif choice == "5":
             run_script("tool16_web_lockout.py")
             input("\nBấm Enter để tiếp tục...")
+        elif choice == "6":
+            conc = input("\nSố kết nối đồng thời mỗi wave [50]: ").strip() or "50"
+            waves = input("Số waves [5]: ").strip() or "5"
+            protos = input("Protocols [tls,ssh,rtsp,rtsps,onvif,snmp]: ").strip() or "tls,ssh,rtsp,rtsps,onvif,snmp"
+            run_script("tool23_mass_reconnect_stress.py", "--concurrency", conc, "--waves", waves, "--proto", protos)
+            input("\nBấm Enter để tiếp tục...")
 
 def menu_security_parameters():
     """Đo kiểm an toàn bề mặt hệ thống, Path Traversal, Command Injection & Access Control."""
     cfg = load_config()
-    ip = cfg.get("target_camera", {}).get("ip", "192.168.101.208")
+    ip = cfg.get("target_camera", {}).get("ip", "192.168.1.100")
     run_script("tool13_security_params_auditor.py")
     input("\nBấm Enter để tiếp tục...")
 

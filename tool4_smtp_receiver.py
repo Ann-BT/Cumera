@@ -44,14 +44,13 @@ console = Console()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel, enable_ssl_keylog
 from receiver_daemon import get_active_host_ips
+from toolkit_config import CONF_PATH, detect_host_network, get_service_ports, get_target_info, load_config
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONF_PATH, encoding="utf-8") as f:
-    config = json.load(f)
-
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.101.208")
-HOST_IP = config.get("test_host", {}).get("ip", "192.168.101.250")
-SMTP_PORTS = config.get("service_ports", {}).get("smtp_receiver", [25, 465, 587])
+config = load_config()
+DUT_IP = get_target_info(config)["ip"]
+_, HOST_IP = detect_host_network(DUT_IP, config)
+_sp = get_service_ports(config)
+SMTP_PORTS = _sp.get("smtp_receiver", [_sp["smtp_clear"], _sp["smtps"], _sp["smtp_starttls"]])
 GLOBAL_PCAP_FILE = ""
 
 def ensure_firewall_allowed(ports):
@@ -81,9 +80,9 @@ try:
             san_entries.append(x509.IPAddress(ipaddress.ip_address(ip_str)))
         except Exception:
             pass
-    for well_known_ip in [HOST_IP, "192.168.101.250", "192.168.0.250", "192.168.1.250"]:
+    for extra_ip in [HOST_IP]:
         try:
-            ipa = x509.IPAddress(ipaddress.ip_address(well_known_ip))
+            ipa = x509.IPAddress(ipaddress.ip_address(extra_ip))
             if ipa not in san_entries:
                 san_entries.append(ipa)
         except Exception:

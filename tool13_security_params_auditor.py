@@ -44,29 +44,17 @@ except ImportError:
 
 # Đường dẫn tệp cấu hình
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONF_PATH = os.path.join(SCRIPT_DIR, "config.json")
-if not os.path.exists(CONF_PATH):
-    CONF_PATH = os.path.join(os.path.dirname(SCRIPT_DIR), "config.json")
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, load_config
 
-CONFIG = {
-    "target_camera": {
-        "ip": "192.168.101.208",
-        "username": "admin",
-        "password": "Psitest135#",
-        "model": "TP-Link InSight S445 / S345",
-        "firmware": "1.20"
-    }
-}
-if os.path.exists(CONF_PATH):
-    try:
-        with open(CONF_PATH, "r", encoding="utf-8") as f:
-            CONFIG = json.load(f)
-    except Exception:
-        pass
-
-DUT_IP = CONFIG["target_camera"].get("ip", "192.168.101.208")
-DUT_PASS = CONFIG["target_camera"].get("password", "Psitest135#")
-DUT_USER = CONFIG["target_camera"].get("username", "admin")
+CONFIG = load_config()
+_target_info = get_target_info(CONFIG)
+_sp = get_service_ports(CONFIG)
+DUT_IP = _target_info["ip"]
+DUT_PASS = _target_info["password"]
+DUT_USER = _target_info["username"]
+SSH_DECLARED_PORT = int(_sp["ssh"])
 
 # Context SSL bỏ qua xác thực chứng thư self-signed của camera
 SSL_CTX = ssl.create_default_context()
@@ -119,7 +107,9 @@ def audit_os_attack_surface(ip):
         raw_out = f"$ {cmd_str}\n  Kết quả: {status_msg} (Phản hồi: {elapsed} ms)"
         raw_outputs.append(raw_out)
 
-        ssh_declared = (port == 22 and (CONFIG.get("service_ports", {}).get("ssh") == 22 or "axis" in str(CONFIG.get("target_camera", {}).get("model", "")).lower()))
+        ssh_declared = (port == SSH_DECLARED_PORT and port in CONFIG.get("ixit_declared_ports", [SSH_DECLARED_PORT])) or (
+            port == 22 and "axis" in str(CONFIG.get("target_camera", {}).get("model", "")).lower()
+        )
         if is_open:
             if ssh_declared:
                 print(f"    [+] Cổng TCP {port:5d} ({desc[:35]:35s}): MỞ [GIAO DIỆN KHAI BÁO IXIT (ComMech-2 / UserIntf-ssh)]")

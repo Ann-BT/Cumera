@@ -25,22 +25,19 @@ from rich.table import Table
 from rich.panel import Panel
 
 sys.stdout.reconfigure(encoding='utf-8')
-console = Console()
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
+from toolkit_config import detect_host_network, get_service_ports, get_target_info, load_config, make_console
 
-CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-try:
-    with open(CONF_PATH, encoding="utf-8") as f:
-        config = json.load(f)
-except Exception:
-    config = {}
+console = make_console()
+config = load_config()
+_target_info = get_target_info(config)
+SERVICE_PORTS = get_service_ports(config)
 
-DUT_IP = config.get("target_camera", {}).get("ip", "192.168.20.38")
-SSH_PORT = config.get("service_ports", {}).get("ssh", 22)
-SSH_USER = config.get("target_camera", {}).get("ssh_username", config.get("target_camera", {}).get("username", "admin"))
-CORRECT_PASS = config.get("target_camera", {}).get("ssh_password", config.get("target_camera", {}).get("password", ""))
+DUT_IP = _target_info["ip"]
+SSH_PORT = int(SERVICE_PORTS["ssh"])
+SSH_USER = _target_info["ssh_username"]
+CORRECT_PASS = _target_info["ssh_password"]
 
 GLOBAL_PCAP_FILE = ""
 
@@ -69,18 +66,18 @@ class PreciseRateLimiter:
 
 
 def connect_ssh_socket(ip: str, port: int, timeout: float = 3.0) -> socket.socket:
-    """Kết nối SSH TCP socket với fallback giao diện mạng máy kiểm thử."""
+    """Kết nối SSH TCP socket với fallback IP giao diện mạng tới DUT."""
     try:
-        s = socket.create_connection((ip, port), timeout=timeout)
-        return s
+        return socket.create_connection((ip, port), timeout=timeout)
     except Exception:
         pass
 
-    for fallback_ip in ["192.168.20.45", "192.168.20.225", "192.168.20.39", "192.168.101.250"]:
+    _, host_ip = detect_host_network(ip, config)
+    if host_ip and host_ip != "127.0.0.1":
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(timeout)
-            s.bind((fallback_ip, 0))
+            s.bind((host_ip, 0))
             s.connect((ip, port))
             return s
         except Exception:

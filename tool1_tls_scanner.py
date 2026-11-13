@@ -382,18 +382,12 @@ def display_tls_audit(results: Dict[str, Any]):
     )
 
 if __name__ == '__main__':
-    CONF_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-    dut_ip = "192.168.101.208"
-    port = 443
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from toolkit_config import get_service_ports, get_target_info, load_config
 
-    if os.path.exists(CONF_PATH):
-        try:
-            with open(CONF_PATH, "r", encoding="utf-8") as f:
-                c = json.load(f)
-                dut_ip = c.get("target_camera", {}).get("ip", dut_ip)
-                port = c.get("service_ports", {}).get("https", port)
-        except Exception:
-            pass
+    _cfg = load_config()
+    dut_ip = get_target_info(_cfg)["ip"]
+    port = int(get_service_ports(_cfg)["https"])
 
     if len(sys.argv) > 1:
         dut_ip = sys.argv[1]

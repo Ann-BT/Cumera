@@ -31,22 +31,20 @@ console = Console()
 TOOLKIT_DIR = os.path.dirname(os.path.abspath(__file__))
 CAPTURES_DIR = os.path.join(TOOLKIT_DIR, "captures")
 os.makedirs(CAPTURES_DIR, exist_ok=True)
+if TOOLKIT_DIR not in sys.path:
+    sys.path.insert(0, TOOLKIT_DIR)
+from toolkit_config import CONF_PATH, get_service_ports, get_target_info, load_config
 
-CONF_PATH = os.path.join(TOOLKIT_DIR, "config.json")
-CONFIG = {}
-if os.path.exists(CONF_PATH):
-    try:
-        with open(CONF_PATH, encoding="utf-8") as f:
-            CONFIG = json.load(f)
-    except Exception:
-        pass
+CONFIG = load_config()
+_target_info = get_target_info(CONFIG)
+_sp = get_service_ports(CONFIG)
 
-DUT_IP = CONFIG.get("target_camera", {}).get("ip", "192.168.101.208")
-USER = CONFIG.get("target_camera", {}).get("username", "admin")
-PASS = CONFIG.get("target_camera", {}).get("password", "Psitest135#")
-RTSP_PORT = CONFIG.get("service_ports", {}).get("rtsp_cleartext", 554)
-RTSPS_PORT = CONFIG.get("service_ports", {}).get("rtsps_tls", 322)
-RTSP_PATH = CONFIG.get("service_ports", {}).get("rtsp_path", "/axis-media/media.amp" if RTSPS_PORT == 322 else "/stream1")
+DUT_IP = _target_info["ip"]
+USER = _target_info["username"]
+PASS = _target_info["password"]
+RTSP_PORT = int(_sp["rtsp"])
+RTSPS_PORT = int(_sp["rtsps"])
+RTSP_PATH = _sp["rtsp_path"]
 
 def detect_outbound_interface(dest_ip: str) -> str:
     """Finds the network interface routed to dest_ip."""

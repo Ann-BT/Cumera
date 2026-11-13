@@ -20,6 +20,8 @@ captures/*.log
 captures/*.json
 captures/*.html
 captures/sslkeys.log
+captures/evidence/
+captures/uploads/
 !captures/.gitkeep
 
 # Mock server certificates and keys
@@ -31,18 +33,12 @@ syslog_ca.key
 syslog_ca.crt
 
 # Local test reports from camera runs
-security_params_audit_result.json
-security_params_audit_report.md
-camera_security_audit_evidence.json
-camera_security_audit_report.md
-authmech_audit_report.json
-authmech_audit_report.md
-authmech_ciphers_nmap_enum.*
-commech_audit_report.json
-commech_audit_report.md
-commech_ciphers_nmap_enum.*
-telemetry_geoip_audit_report.md
-telemetry_geoip_audit_evidence.json
+*_audit_result.json
+*_audit_report.md
+*_audit_report.json
+*_evidence.json
+*_ciphers_nmap_enum.*
+mass_reconnect_report_*.json
 
 # OS and Editor files
 .cumera_commit
@@ -50,6 +46,7 @@ telemetry_geoip_audit_evidence.json
 Thumbs.db
 *.swp
 *~
+*.bak*
 .vscode/
 .idea/
 *.log
