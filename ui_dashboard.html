@@ -363,7 +363,6 @@
             <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
             <span class="nav-label truncate font-medium">AuthMech</span>
           </div>
-          <span class="nav-label px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#141824] text-[#818cf8] border border-[#20273a] shrink-0">4</span>
         </button>
 
         <!-- COMMECH -->
@@ -372,7 +371,6 @@
             <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             <span class="nav-label truncate font-medium">ComMech</span>
           </div>
-          <span class="nav-label px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#121929] text-[#60a5fa] border border-[#1e2a42] shrink-0">11</span>
         </button>
 
         <div class="my-1 border-t border-[#18202e]/60"></div>
@@ -383,7 +381,6 @@
             <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span class="nav-label truncate font-medium">Brute-Force</span>
           </div>
-          <span class="nav-label px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#1c1811] text-[#fbbf24] border border-[#302717] shrink-0">4</span>
         </button>
 
         <!-- INPUT VALIDATION -->
@@ -822,10 +819,21 @@
           <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
             <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phương thức Xác thực (AuthMech)</h2>
             <div class="flex items-center gap-2">
-              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 3.0', 'Chạy toàn bộ phương thức xác thực')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-semibold transition border border-indigo-500 shadow-sm">
+              <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
+                <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Xác thực:</span>
+                <select id="authmech_global_auth" class="bg-transparent text-xs text-indigo-300 font-mono outline-none cursor-pointer">
+                  <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                  <option value="digest-md5">Digest MD5</option>
+                  <option value="digest-sha256">Digest SHA-256</option>
+                  <option value="basic">Basic Auth</option>
+                  <option value="wsse_sha1">WS-Security SHA-1</option>
+                  <option value="wsse_sha256">WS-Security SHA-256</option>
+                </select>
+              </div>
+              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 3.0 --auth ' + (document.getElementById('authmech_global_auth')?.value || 'auto'), 'Chạy toàn bộ phương thức xác thực')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-semibold transition border border-indigo-500 shadow-sm">
                 Chạy tất cả
               </button>
-              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 1.5 --no-pcap', 'Kích hoạt AuthMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Chạy toàn bộ các cơ chế xác thực để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
+              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 1.5 --no-pcap --auth ' + (document.getElementById('authmech_global_auth')?.value || 'auto'), 'Kích hoạt AuthMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Chạy toàn bộ các cơ chế xác thực để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
                 <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 <span>Chạy (No PCAP)</span>
               </button>
@@ -840,8 +848,9 @@
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
-                  <th class="p-2 border-r border-[#272c3a] w-64">Phương thức</th>
+                  <th class="p-2 border-r border-[#272c3a] w-56">Phương thức</th>
                   <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
+                  <th class="p-2 border-r border-[#272c3a] w-48">Cơ chế xác thực</th>
                   <th class="p-2 border-r border-[#272c3a]">Bộ lọc Wireshark & Thứ tự gói</th>
                   <th class="p-2 w-36 text-center">Hành động</th>
                 </tr>
@@ -876,14 +885,25 @@
           <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
             <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dịch vụ Truyền thông (ComMech)</h2>
             <div class="flex items-center gap-2">
-              <button onclick="runCommand('python tool17_commech_auditor.py --id all --wait 3.0', 'Chạy toàn bộ phương thức truyền thông')" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1 rounded text-xs font-semibold transition border border-blue-600">
+              <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
+                <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Xác thực:</span>
+                <select id="commech_global_auth" class="bg-transparent text-xs text-blue-300 font-mono outline-none cursor-pointer">
+                  <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                  <option value="digest-md5">Digest MD5</option>
+                  <option value="digest-sha256">Digest SHA-256</option>
+                  <option value="basic">Basic Auth</option>
+                  <option value="wsse_sha1">WS-Security SHA-1</option>
+                  <option value="wsse_sha256">WS-Security SHA-256</option>
+                </select>
+              </div>
+              <button onclick="runCommand('python tool17_commech_auditor.py --id all --wait 3.0 --auth ' + (document.getElementById('commech_global_auth')?.value || 'auto'), 'Chạy toàn bộ phương thức truyền thông')" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1 rounded text-xs font-semibold transition border border-blue-600">
                 Chạy tất cả
               </button>
               <button onclick="runCommand('python tool17_commech_auditor.py --server-mode', 'Mở toàn bộ 5 Server ComMech (Chạy liên tục - Bấm Stop để dừng)')" class="bg-indigo-700 hover:bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition border border-indigo-500 shadow-sm flex items-center gap-1.5" title="Mở đồng thời toàn bộ 5 Receiver Server (MQTT, Syslog, SMB, SMTP, SFTP) và chạy liên tục cho đến khi bấm Stop">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
                 <span>Bật 5 Server (Liên tục)</span>
               </button>
-              <button onclick="runCommand('python tool17_commech_auditor.py --id all --auto-trigger --wait 1.5 --no-pcap', 'Kích hoạt ComMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Kích hoạt toàn bộ các kênh truyền thông để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
+              <button onclick="runCommand('python tool17_commech_auditor.py --id all --auto-trigger --wait 1.5 --no-pcap --auth ' + (document.getElementById('commech_global_auth')?.value || 'auto'), 'Kích hoạt ComMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Kích hoạt toàn bộ các kênh truyền thông để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
                 <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 <span>Chạy (No PCAP)</span>
               </button>
@@ -901,6 +921,7 @@
                   <th class="p-2 border-r border-[#272c3a]">Dịch vụ</th>
                   <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
                   <th class="p-2 border-r border-[#272c3a] w-24">Hướng</th>
+                  <th class="p-2 border-r border-[#272c3a] w-48">Cơ chế xác thực</th>
                   <th class="p-2 border-r border-[#272c3a]">Bảo mật</th>
                   <th class="p-2 border-r border-[#272c3a]">Hạ cấp</th>
                   <th class="p-2 w-44 text-center">Hành động</th>
@@ -969,86 +990,87 @@
                   <table class="w-full text-left border-collapse">
                     <thead>
                       <tr class="bg-[#141924] text-[#848c9e] border-b border-[#222b3d]">
-                        <th class="py-1.5 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-24">Lần thử</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-20">Chạy lẻ</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider text-center w-36">Lần thử</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-[#1e2535] font-mono text-xs">
                       <!-- GĐ 1: Trước ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="onvif_g1_fail" type="text" value="1 - 4" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('onvif', 1)" title="GĐ1: Gửi 4 lần sai, lần 5 đúng để kiểm tra Reset bộ đếm" class="w-full py-1.5 px-1.5 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 hover:text-white border border-sky-500/30 font-semibold text-[10px] transition">
-                            Test GĐ1
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="onvif_g1_fail" type="text" value="1 - 4" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="onvif_g1_pass" type="number" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="onvif_g1_pass" type="number" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <!-- GĐ 2: Vượt ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors border-t-2 border-[#222b3d]">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="onvif_g2_fail" type="text" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('onvif', 2)" title="GĐ2: Gửi 5 lần sai, lần 6 đúng để kiểm tra Kích hoạt khóa" class="w-full py-1.5 px-1.5 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-white border border-indigo-500/30 font-semibold text-[10px] transition">
-                            Test GĐ2
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="onvif_g2_fail" type="text" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="onvif_g2_pass" type="number" value="6" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="onvif_g2_pass" type="number" value="6" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  <!-- Parameters: Tốc độ & Cổng -->
-                  <div class="p-2 bg-[#0d1017] border-t border-[#222b3d] grid grid-cols-2 gap-2 text-[11px]">
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
-                      <select id="onvif_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
-                        <option value="1.0">1.0 conn/s (Khóa logic)</option>
-                        <option value="0.0">Tối đa (Không trễ)</option>
-                      </select>
+                  <!-- Parameters: Tốc độ, Cổng & Cơ chế Xác thực -->
+                  <div class="p-2.5 bg-[#0d1017] border-t border-[#222b3d] space-y-2 text-[11px]">
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
+                        <select id="onvif_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
+                          <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                          <option value="0.0">Tối đa (Không trễ)</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
+                        <select id="onvif_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="443" selected>443 (HTTPS)</option>
+                          <option value="80">80 (HTTP)</option>
+                        </select>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
-                      <select id="onvif_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="443" selected>443 (HTTPS)</option>
-                        <option value="80">80 (HTTP)</option>
+                    <div class="flex items-center gap-2">
+                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Xác thực:</label>
+                      <select id="onvif_auth_type" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer" title="Cơ chế xác thực ONVIF SOAP (Auto, WS-Security SHA-1, SHA-256, PasswordText, HTTP Digest)">
+                        <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                        <option value="wsse_sha1">WS-Security Digest (SHA-1)</option>
+                        <option value="wsse_sha256">WS-Security SHA-256</option>
+                        <option value="wsse_text">WS-Security PasswordText</option>
+                        <option value="http_digest">HTTP Digest Auth</option>
                       </select>
                     </div>
                   </div>
@@ -1061,9 +1083,9 @@
 
               <!-- Action Button -->
               <div class="pt-1">
-                <button onclick="runLockoutStage('onvif', 'all')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                <button onclick="runLockoutMatrix('onvif')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Test Toàn bộ (Giai đoạn 1 & 2)</span>
+                  <span>Test</span>
                 </button>
               </div>
             </div>
@@ -1086,86 +1108,88 @@
                   <table class="w-full text-left border-collapse">
                     <thead>
                       <tr class="bg-[#141924] text-[#848c9e] border-b border-[#222b3d]">
-                        <th class="py-1.5 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-24">Lần thử</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-20">Chạy lẻ</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider text-center w-36">Lần thử</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-[#1e2535] font-mono text-xs">
                       <!-- GĐ 1: Trước ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="rtsp_g1_fail" type="text" value="1 - 4" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('rtsp', 1)" title="GĐ1: Gửi 4 lần sai, lần 5 đúng để kiểm tra Reset bộ đếm" class="w-full py-1.5 px-1.5 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 hover:text-white border border-sky-500/30 font-semibold text-[10px] transition">
-                            Test GĐ1
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="rtsp_g1_fail" type="text" value="1 - 4" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="rtsp_g1_pass" type="number" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="rtsp_g1_pass" type="number" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <!-- GĐ 2: Vượt ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors border-t-2 border-[#222b3d]">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="rtsp_g2_fail" type="text" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('rtsp', 2)" title="GĐ2: Gửi 5 lần sai, lần 6 đúng để kiểm tra Kích hoạt khóa" class="w-full py-1.5 px-1.5 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-white border border-indigo-500/30 font-semibold text-[10px] transition">
-                            Test GĐ2
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="rtsp_g2_fail" type="text" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="rtsp_g2_pass" type="number" value="6" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="rtsp_g2_pass" type="number" value="6" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  <!-- Parameters: Tốc độ & Cổng -->
-                  <div class="p-2 bg-[#0d1017] border-t border-[#222b3d] grid grid-cols-2 gap-2 text-[11px]">
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
-                      <select id="rtsp_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
-                        <option value="1.0">1.0 conn/s (Khóa logic)</option>
-                        <option value="0.0">Tối đa (Không trễ)</option>
-                      </select>
+                  <!-- Parameters: Tốc độ, Cổng & Cơ chế Xác thực -->
+                  <div class="p-2.5 bg-[#0d1017] border-t border-[#222b3d] space-y-2 text-[11px]">
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
+                        <select id="rtsp_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="4.0" selected>4.0 conn/s (Firewall 3/s)</option>
+                          <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                          <option value="0.0">Tối đa (Không trễ)</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
+                        <select id="rtsp_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="443" selected>443 (RTSPS / Tunnel)</option>
+                          <option value="554">554 (RTSP Clear)</option>
+                          <option value="322">322 (Axis RTSPS TLS)</option>
+                          <option value="9554">9554 (Custom RTSPS)</option>
+                        </select>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
-                      <select id="rtsp_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="443" selected>443 (RTSPS TLS)</option>
-                        <option value="554">554 (RTSP Clear)</option>
+                    <div class="flex items-center gap-2">
+                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Xác thực:</label>
+                      <select id="rtsp_auth_type" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer" title="Cơ chế xác thực luồng RTSP (Tự động đàm phán, Digest MD5, Digest SHA-256 hoặc Basic Auth)">
+                        <option value="auto" selected>Auto (Tự động đàm phán)</option>
+                        <option value="digest-md5">Digest MD5 (Tiêu chuẩn IP Cam)</option>
+                        <option value="digest-sha256">Digest SHA-256 (RFC 7616)</option>
+                        <option value="basic">Basic Auth (Axis / Base64)</option>
                       </select>
                     </div>
                   </div>
@@ -1178,9 +1202,9 @@
 
               <!-- Action Button -->
               <div class="pt-1">
-                <button onclick="runLockoutStage('rtsp', 'all')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                <button onclick="runLockoutMatrix('rtsp')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Test Toàn bộ (Giai đoạn 1 & 2)</span>
+                  <span>Test</span>
                 </button>
               </div>
             </div>
@@ -1203,83 +1227,80 @@
                   <table class="w-full text-left border-collapse">
                     <thead>
                       <tr class="bg-[#141924] text-[#848c9e] border-b border-[#222b3d]">
-                        <th class="py-1.5 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-24">Lần thử</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-20">Chạy lẻ</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider text-center w-36">Lần thử</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-[#1e2535] font-mono text-xs">
                       <!-- GĐ 1: Trước ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="ssh_g1_fail" type="text" value="1 - 4" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('ssh', 1)" title="GĐ1: Gửi 4 lần sai, lần 5 đúng để kiểm tra Reset bộ đếm" class="w-full py-1.5 px-1.5 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 hover:text-white border border-sky-500/30 font-semibold text-[10px] transition">
-                            Test GĐ1
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="ssh_g1_fail" type="text" value="1 - 4" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="ssh_g1_pass" type="number" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="ssh_g1_pass" type="number" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <!-- GĐ 2: Vượt ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors border-t-2 border-[#222b3d]">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="ssh_g2_fail" type="text" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('ssh', 2)" title="GĐ2: Gửi 5 lần sai, lần 6 đúng để kiểm tra Kích hoạt khóa" class="w-full py-1.5 px-1.5 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-white border border-indigo-500/30 font-semibold text-[10px] transition">
-                            Test GĐ2
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="ssh_g2_fail" type="text" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="ssh_g2_pass" type="number" value="6" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="ssh_g2_pass" type="number" value="6" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  <!-- Parameters: Tốc độ & Cổng -->
-                  <div class="p-2 bg-[#0d1017] border-t border-[#222b3d] grid grid-cols-2 gap-2 text-[11px]">
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
-                      <select id="ssh_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="3.0" selected>3.0 conn/s (Firewall SSH)</option>
-                        <option value="1.0">1.0 conn/s (Khóa logic)</option>
-                      </select>
+                  <!-- Parameters: Tốc độ, Cổng & Cơ chế Xác thực -->
+                  <div class="p-2.5 bg-[#0d1017] border-t border-[#222b3d] space-y-2 text-[11px]">
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
+                        <select id="ssh_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="3.0" selected>3.0 conn/s (Firewall SSH)</option>
+                          <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
+                        <input id="ssh_port" type="number" value="22" min="1" max="65535" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition">
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
-                      <input id="ssh_port" type="number" value="22" min="1" max="65535" class="w-full bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition">
+                    <div class="flex items-center gap-2">
+                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Xác thực:</label>
+                      <select id="ssh_auth_type" disabled class="w-full bg-[#141924]/60 border border-[#2a3449]/50 rounded px-2 py-1 text-[#848c9e] font-mono text-xs outline-none cursor-not-allowed" title="SSHv2 Password Authentication">
+                        <option value="password" selected>Password Authentication (SSHv2)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1291,9 +1312,9 @@
 
               <!-- Action Button -->
               <div class="pt-1">
-                <button onclick="runLockoutStage('ssh', 'all')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                <button onclick="runLockoutMatrix('ssh')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Test Toàn bộ (Giai đoạn 1 & 2)</span>
+                  <span>Test</span>
                 </button>
               </div>
             </div>
@@ -1316,85 +1337,85 @@
                   <table class="w-full text-left border-collapse">
                     <thead>
                       <tr class="bg-[#141924] text-[#848c9e] border-b border-[#222b3d]">
-                        <th class="py-1.5 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-24">Lần thử</th>
-                        <th class="py-1.5 px-2 font-semibold text-[10px] uppercase tracking-wider text-center w-20">Chạy lẻ</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider">Trạng thái thử nghiệm</th>
+                        <th class="py-2 px-3 font-semibold text-[10px] uppercase tracking-wider text-center w-36">Lần thử</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-[#1e2535] font-mono text-xs">
                       <!-- GĐ 1: Trước ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="web_g1_fail" type="text" value="1 - 4" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('web', 1)" title="GĐ1: Gửi 4 lần sai, lần 5 đúng để kiểm tra Reset bộ đếm" class="w-full py-1.5 px-1.5 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 hover:text-white border border-sky-500/30 font-semibold text-[10px] transition">
-                            Test GĐ1
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="web_g1_fail" type="text" value="1 - 4" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="web_g1_pass" type="number" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="web_g1_pass" type="number" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <!-- GĐ 2: Vượt ngưỡng -->
                       <tr class="hover:bg-[#131824]/60 transition-colors border-t-2 border-[#222b3d]">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Mật khẩu sai
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="web_g2_fail" type="text" value="5" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-1.5 py-0.5 text-rose-300 font-mono text-xs outline-none">
-                        </td>
-                        <td rowspan="2" class="py-1 px-2 text-center border-l border-[#222b3d] bg-[#0c1018]">
-                          <button onclick="runLockoutStage('web', 2)" title="GĐ2: Gửi 5 lần sai, lần 6 đúng để kiểm tra Kích hoạt khóa" class="w-full py-1.5 px-1.5 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-white border border-indigo-500/30 font-semibold text-[10px] transition">
-                            Test GĐ2
-                          </button>
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="web_g2_fail" type="text" value="5" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2 py-1 text-rose-300 font-mono text-xs outline-none">
                         </td>
                       </tr>
                       <tr class="hover:bg-[#131824]/60 transition-colors">
-                        <td class="py-1.5 px-3 text-[#cbd5e1]">
+                        <td class="py-2 px-3 text-[#cbd5e1]">
                           <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Mật khẩu đúng
                           </span>
                         </td>
-                        <td class="py-1 px-2 text-center">
-                          <input id="web_g2_pass" type="number" value="6" class="w-20 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-1.5 py-0.5 text-emerald-400 font-mono text-xs outline-none">
+                        <td class="py-1.5 px-3 text-center">
+                          <input id="web_g2_pass" type="number" value="6" class="w-24 text-center bg-[#141924] border border-[#2a3449] focus:border-emerald-500 rounded px-2 py-1 text-emerald-400 font-mono text-xs outline-none">
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  <!-- Parameters: Tốc độ & Cổng -->
-                  <div class="p-2 bg-[#0d1017] border-t border-[#222b3d] grid grid-cols-2 gap-2 text-[11px]">
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
-                      <select id="web_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="2.5" selected>2.5 conn/s (Chuẩn Web)</option>
-                        <option value="1.0">1.0 conn/s (Khóa logic)</option>
-                      </select>
+                  <!-- Parameters: Tốc độ, Cổng & Cơ chế Xác thực -->
+                  <div class="p-2.5 bg-[#0d1017] border-t border-[#222b3d] space-y-2 text-[11px]">
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Tốc độ:</label>
+                        <select id="web_rate" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="2.5" selected>2.5 conn/s (Chuẩn Web)</option>
+                          <option value="1.0">1.0 conn/s (Khóa logic)</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
+                        <select id="web_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer">
+                          <option value="443" selected>443 (HTTPS)</option>
+                          <option value="80">80 (HTTP)</option>
+                        </select>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Cổng:</label>
-                      <select id="web_port" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-0.5 text-white font-mono text-xs outline-none transition cursor-pointer">
-                        <option value="443" selected>443 (HTTPS)</option>
-                        <option value="80">80 (HTTP)</option>
+                    <div class="flex items-center gap-2">
+                      <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Xác thực:</label>
+                      <select id="web_auth_type" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer" title="Cơ chế xác thực Web Admin (Auto, Basic Auth, Digest Auth hoặc Vendor SPA Adapter)">
+                        <option value="auto" selected>Auto (Tự động đàm phán)</option>
+                        <option value="basic">HTTP Basic Auth (Base64)</option>
+                        <option value="digest">HTTP Digest Auth (MD5/SHA)</option>
+                        <option value="adapter">Adapter Web API (SPA Session)</option>
                       </select>
                     </div>
                   </div>
@@ -1407,9 +1428,9 @@
 
               <!-- Action Button -->
               <div class="pt-1">
-                <button onclick="runLockoutStage('web', 'all')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
+                <button onclick="runLockoutMatrix('web')" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Test Toàn bộ (Giai đoạn 1 & 2)</span>
+                  <span>Test</span>
                 </button>
               </div>
             </div>
@@ -3145,7 +3166,7 @@
       return isNaN(parsed) ? defaultVal : parsed;
     }
 
-    function runLockoutStage(type, stage) {
+    function runLockoutMatrix(type) {
       const g1Fail = parseAttempts(document.getElementById(`${type}_g1_fail`)?.value, 4);
       const g1Pass = parseAttempts(document.getElementById(`${type}_g1_pass`)?.value, 5);
       const g2Fail = parseAttempts(document.getElementById(`${type}_g2_fail`)?.value, 5);
@@ -3176,22 +3197,28 @@
         protoLabel = 'Web Admin';
       }
 
-      if (stage === 1) {
-        const cmd = `python ${scriptName} --port ${port} --fail-count ${g1Fail} --success-at ${g1Pass} --rate ${rate} --mode custom --stage 1`;
-        runCommand(cmd, `${protoLabel} GĐ1 (Sai 1-${g1Fail}, Đúng #${g1Pass})`);
-      } else if (stage === 2) {
-        const cmd = `python ${scriptName} --port ${port} --fail-count ${g2Fail} --success-at ${g2Pass} --rate ${rate} --mode custom --stage 2`;
-        runCommand(cmd, `${protoLabel} GĐ2 (Sai ${g2Fail} lần, Đúng #${g2Pass})`);
-      } else if (stage === 'all') {
-        const cmd1 = `python ${scriptName} --port ${port} --fail-count ${g1Fail} --success-at ${g1Pass} --rate ${rate} --mode custom --stage 1`;
-        const cmd2 = `python ${scriptName} --port ${port} --fail-count ${g2Fail} --success-at ${g2Pass} --rate ${rate} --mode custom --stage 2`;
-        const fullCmd = `${cmd1} && echo "" && echo ">>> HOÀN THÀNH GĐ1. NGHỈ 3 GIÂY TRƯỚC GĐ2 <<<" && sleep 3 && ${cmd2}`;
-        runCommand(fullCmd, `${protoLabel} Toàn bộ GĐ1+GĐ2 (Bảng chuẩn)`);
+      let authArg = '';
+      if (type === 'rtsp') {
+        const authType = document.getElementById('rtsp_auth_type')?.value || 'auto';
+        if (authType) authArg = ` --auth-type ${authType}`;
+      } else if (type === 'onvif') {
+        const authType = document.getElementById('onvif_auth_type')?.value || 'auto';
+        if (authType) authArg = ` --auth ${authType}`;
+      } else if (type === 'web') {
+        const authType = document.getElementById('web_auth_type')?.value || 'auto';
+        if (authType) authArg = ` --auth ${authType}`;
       }
+
+      const cmd = `python ${scriptName} --port ${port} --rate ${rate} --mode matrix --g1-fail ${g1Fail} --g1-pass ${g1Pass} --g2-fail ${g2Fail} --g2-pass ${g2Pass}${authArg}`;
+      runCommand(cmd, `${protoLabel} Kiểm thử Brute-Force (Ma trận)`);
+    }
+
+    function runLockoutStage(type, stage) {
+      runLockoutMatrix(type);
     }
 
     function runCustomLockout(type) {
-      runLockoutStage(type, 'all');
+      runLockoutMatrix(type);
     }
 
     function runMassReconnect() {
@@ -3204,13 +3231,7 @@
     }
 
     function runPresetLockout(type, failCount, successAt, rate) {
-      const g2Fail = document.getElementById(`${type}_g2_fail`);
-      const g2Pass = document.getElementById(`${type}_g2_pass`);
-      const r = document.getElementById(`${type}_rate`);
-      if (g2Fail) g2Fail.value = failCount;
-      if (g2Pass) g2Pass.value = successAt;
-      if (r && rate) r.value = rate;
-      runLockoutStage(type, 2);
+      runLockoutMatrix(type);
     }
 
     // 2.2. INPUT VALIDATION & API FUZZER RUNNERS (CLAUSE 3.10.1.3)
@@ -3843,6 +3864,176 @@
     let _authmechDefs = [];
     let _commechDefs = [];
 
+    function getAuthMechSelectHtml(d, idx) {
+      const id = (d.id || '').toLowerCase();
+      let options = [];
+      if (id.includes('web')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'digest-md5', text: 'Digest MD5' },
+          { val: 'digest-sha256', text: 'Digest SHA-256' },
+          { val: 'basic', text: 'Basic Auth' },
+          { val: 'adapter', text: 'Adapter API' },
+        ];
+      } else if (id.includes('rtsp')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'digest-md5', text: 'Digest MD5' },
+          { val: 'digest-sha256', text: 'Digest SHA-256' },
+          { val: 'basic', text: 'Basic Auth' },
+        ];
+      } else if (id.includes('onvif')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'wsse_sha1', text: 'WS-Security Digest (SHA-1)' },
+          { val: 'wsse_sha256', text: 'WS-Security SHA-256' },
+          { val: 'wsse_text', text: 'WS-Security PasswordText' },
+          { val: 'http_digest', text: 'HTTP Digest Auth' },
+        ];
+      } else if (id.includes('ssh')) {
+        options = [
+          { val: 'password', text: 'Password Auth (SSHv2)' },
+          { val: 'pubkey', text: 'Public Key Auth' },
+        ];
+      } else if (id.includes('cms')) {
+        options = [
+          { val: 'proprietary', text: 'Proprietary TLS Session' },
+          { val: 'token', text: 'Token / Signature Auth' },
+        ];
+      } else {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'basic', text: 'Basic Auth' },
+          { val: 'digest', text: 'Digest Auth' },
+        ];
+      }
+      return `
+        <select id="authmech_auth_type_${idx}" class="w-full bg-[#10141f] border border-[#272c3a] text-slate-200 text-xs rounded px-2 py-1 outline-none font-mono focus:border-indigo-500 cursor-pointer">
+          ${options.map(opt => `<option value="${escapeHtml(opt.val)}">${escapeHtml(opt.text)}</option>`).join('')}
+        </select>
+      `;
+    }
+
+    function getComMechSelectHtml(d, idx) {
+      const id = (d.id || '').toLowerCase();
+      let options = [];
+      if (id.includes('web')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'digest-md5', text: 'Digest MD5' },
+          { val: 'digest-sha256', text: 'Digest SHA-256' },
+          { val: 'basic', text: 'Basic Auth' },
+          { val: 'adapter', text: 'Adapter API' },
+        ];
+      } else if (id.includes('onvif')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'wsse_sha1', text: 'WS-Security Digest (SHA-1)' },
+          { val: 'wsse_sha256', text: 'WS-Security SHA-256' },
+          { val: 'wsse_text', text: 'WS-Security PasswordText' },
+          { val: 'http_digest', text: 'HTTP Digest Auth' },
+        ];
+      } else if (id.includes('rtsp')) {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'digest-md5', text: 'Digest MD5' },
+          { val: 'digest-sha256', text: 'Digest SHA-256' },
+          { val: 'basic', text: 'Basic Auth' },
+        ];
+      } else if (id.includes('snmp')) {
+        options = [
+          { val: 'auto', text: 'Auto (Ma trận USM)' },
+          { val: 'sha1_aes128', text: 'SHA-1 / AES-128' },
+          { val: 'sha256_aes256', text: 'SHA-256 / AES-256' },
+          { val: 'md5_des', text: 'MD5 / DES' },
+        ];
+      } else if (id.includes('ssh')) {
+        options = [
+          { val: 'password', text: 'Password Auth (SSHv2)' },
+          { val: 'pubkey', text: 'Public Key Auth' },
+        ];
+      } else if (id.includes('cms')) {
+        options = [
+          { val: 'proprietary', text: 'Proprietary TLS Session' },
+        ];
+      } else if (id.includes('mqtt')) {
+        options = [
+          { val: 'auto', text: 'Auto (Token / TLS Cert)' },
+          { val: 'tls_cert', text: 'Mutual TLS Certificate' },
+          { val: 'user_pass', text: 'Username / Password' },
+        ];
+      } else if (id.includes('syslog')) {
+        options = [
+          { val: 'auto', text: 'Auto (TLS Handshake)' },
+          { val: 'tls_mutual', text: 'Mutual TLS (RFC 5425)' },
+          { val: 'clear', text: 'Cleartext (RFC 5424)' },
+        ];
+      } else if (id.includes('smb')) {
+        options = [
+          { val: 'auto', text: 'Auto (NTLMv2 / Kerberos)' },
+          { val: 'ntlmv2', text: 'NTLMv2 Auth' },
+        ];
+      } else if (id.includes('smtp')) {
+        options = [
+          { val: 'auto', text: 'Auto (STARTTLS / AUTH)' },
+          { val: 'auth_login', text: 'AUTH LOGIN (Base64)' },
+          { val: 'auth_plain', text: 'AUTH PLAIN' },
+        ];
+      } else if (id.includes('sftp')) {
+        options = [
+          { val: 'auto', text: 'Auto (SSH Password / Key)' },
+          { val: 'password', text: 'Password Auth' },
+          { val: 'pubkey', text: 'Public Key Auth' },
+        ];
+      } else if (id.includes('cloud')) {
+        options = [
+          { val: 'auto', text: 'Auto (TLS Token / O3C)' },
+          { val: 'token', text: 'Bearer Token / OAuth2' },
+        ];
+      } else {
+        options = [
+          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+        ];
+      }
+      return `
+        <select id="commech_auth_type_${idx}" class="w-full bg-[#10141f] border border-[#272c3a] text-slate-200 text-xs rounded px-2 py-1 outline-none font-mono focus:border-blue-500 cursor-pointer">
+          ${options.map(opt => `<option value="${escapeHtml(opt.val)}">${escapeHtml(opt.text)}</option>`).join('')}
+        </select>
+      `;
+    }
+
+    function syncGlobalAuthToRows(tableType) {
+      if (tableType === 'authmech') {
+        const globalVal = document.getElementById('authmech_global_auth')?.value;
+        if (!globalVal) return;
+        _authmechDefs.forEach((_, idx) => {
+          const sel = document.getElementById('authmech_auth_type_' + idx);
+          if (sel) {
+            for (let i = 0; i < sel.options.length; i++) {
+              if (sel.options[i].value === globalVal) {
+                sel.value = globalVal;
+                break;
+              }
+            }
+          }
+        });
+      } else if (tableType === 'commech') {
+        const globalVal = document.getElementById('commech_global_auth')?.value;
+        if (!globalVal) return;
+        _commechDefs.forEach((_, idx) => {
+          const sel = document.getElementById('commech_auth_type_' + idx);
+          if (sel) {
+            for (let i = 0; i < sel.options.length; i++) {
+              if (sel.options[i].value === globalVal) {
+                sel.value = globalVal;
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
+
     function copyAuthFilter(idx, type) {
       const d = _authmechDefs[idx];
       if (!d) return;
@@ -3855,7 +4046,15 @@
     function runAuthMechCmd(idx, kind) {
       const d = _authmechDefs[idx];
       if (!d) return;
-      if (kind === 'test' && d.test_cmd) runCommand(d.test_cmd, `${d.id} ${d.name}`);
+      if (kind === 'test' && d.test_cmd) {
+        let cmd = d.test_cmd;
+        const sel = document.getElementById('authmech_auth_type_' + idx);
+        const authVal = sel ? sel.value : (document.getElementById('authmech_global_auth')?.value || 'auto');
+        if (authVal && !cmd.includes('--auth')) {
+          cmd += ` --auth ${authVal}`;
+        }
+        runCommand(cmd, `${d.id} ${d.name}`);
+      }
       else if (kind === 'enum' && d.enum_cmd) runCommand(d.enum_cmd, `Nmap Enum ${d.name}`);
       else if (kind === 'pcap' && d.pcap_name) openInWireshark(d.pcap_name);
     }
@@ -3869,7 +4068,15 @@
     function runComMechCmd(idx, kind) {
       const d = _commechDefs[idx];
       if (!d) return;
-      if (kind === 'test' && d.test_cmd) runCommand(d.test_cmd, `Kiểm thử ${d.name}`);
+      if (kind === 'test' && d.test_cmd) {
+        let cmd = d.test_cmd;
+        const sel = document.getElementById('commech_auth_type_' + idx);
+        const authVal = sel ? sel.value : (document.getElementById('commech_global_auth')?.value || 'auto');
+        if (authVal && !cmd.includes('--auth')) {
+          cmd += ` --auth ${authVal}`;
+        }
+        runCommand(cmd, `Kiểm thử ${d.name}`);
+      }
       else if (kind === 'enum' && d.enum_cmd) runCommand(d.enum_cmd, `Nmap Enum ${d.name}`);
       else if (kind === 'server' && d.server_cmd) runCommand(d.server_cmd, `Chạy Server ${d.name}`);
       else if (kind === 'pcap' && d.pcap_name) openInWireshark(d.pcap_name);
@@ -3912,6 +4119,9 @@
                   ${d.auth_factor ? `<div class="text-[10px] text-slate-400 mt-0.5 font-sans">${escapeHtml(d.auth_factor)}</div>` : ''}
                 </td>
                 <td class="p-2.5 border-r border-[#272c3a] font-mono text-cyan-400 font-semibold">${escapeHtml(d.port)}/tcp</td>
+                <td class="p-2 border-r border-[#272c3a]">
+                  ${getAuthMechSelectHtml(d, idx)}
+                </td>
                 <td class="p-2 border-r border-[#272c3a] text-[11px] text-slate-300 space-y-1">
                   <div class="flex items-center justify-between gap-1">
                     <div><span class="text-cyan-400 font-semibold">Cipher:</span> <code onclick="copyAuthFilter(${idx}, 'cipher')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-cyan-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">${escapeHtml(d.filter_cipher)}</code></div>
@@ -3934,6 +4144,7 @@
                 </td>
               </tr>
             `).join('');
+            syncGlobalAuthToRows('authmech');
           }
           if (grid) {
             grid.innerHTML = _authmechDefs.map((d, idx) => {
@@ -3976,6 +4187,9 @@
                 </td>
                 <td class="p-2 border-r border-[#272c3a] font-mono text-cyan-400">${escapeHtml(d.port)}</td>
                 <td class="p-2 border-r border-[#272c3a] text-[#848c9e]">${escapeHtml(d.direction)}</td>
+                <td class="p-2 border-r border-[#272c3a]">
+                  ${getComMechSelectHtml(d, idx)}
+                </td>
                 <td class="p-2 border-r border-[#272c3a] font-mono text-[11px] text-slate-300">${escapeHtml(d.protocol)}</td>
                 <td class="p-2 border-r border-[#272c3a] text-emerald-400 text-[11px]">${escapeHtml(d.downgrade)}</td>
                 <td class="p-2 text-center space-x-1 whitespace-nowrap">
@@ -3987,6 +4201,7 @@
                 </td>
               </tr>
             `).join('');
+            syncGlobalAuthToRows('commech');
           }
           if (grid) {
             grid.innerHTML = _commechDefs.map((d, idx) => {
@@ -4094,8 +4309,13 @@
       const rtspSel = document.getElementById('rtsp_port');
       if (rtspSel) {
         const prev = rtspSel.value;
-        rtspSel.innerHTML = `<option value="${pRtsps}">${pRtsps} (RTSPS TLS)</option><option value="${pRtsp}">${pRtsp} (RTSP Clear)</option>`;
-        rtspSel.value = (prev === String(pRtsp)) ? String(pRtsp) : String(pRtsps);
+        const portOpts = [];
+        if (pRtsps) portOpts.push({ val: pRtsps, label: `${pRtsps} (RTSPS${pRtsps === 443 ? ' / Tunnel' : ' TLS'})` });
+        if (pRtsp && pRtsp !== pRtsps) portOpts.push({ val: pRtsp, label: `${pRtsp} (RTSP Clear)` });
+        if (!portOpts.some(p => p.val === 554)) portOpts.push({ val: 554, label: '554 (RTSP Clear)' });
+        if (!portOpts.some(p => p.val === 322)) portOpts.push({ val: 322, label: '322 (Axis RTSPS)' });
+        rtspSel.innerHTML = portOpts.map(o => `<option value="${o.val}">${o.label}</option>`).join('');
+        rtspSel.value = portOpts.some(o => String(o.val) === prev) ? prev : String(portOpts[0].val);
       }
       const sshPortInput = document.getElementById('ssh_port');
       if (sshPortInput) sshPortInput.value = pSsh;
@@ -4717,6 +4937,8 @@
       });
       loadProfiles();
       loadFirmwareInfo();
+      document.getElementById('authmech_global_auth')?.addEventListener('change', () => syncGlobalAuthToRows('authmech'));
+      document.getElementById('commech_global_auth')?.addEventListener('change', () => syncGlobalAuthToRows('commech'));
       loadAuthMechTable();
       loadComMechTable();
       pollTargetStatus();

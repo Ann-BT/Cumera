@@ -192,7 +192,7 @@ def run_custom_sequence(
         else:
             test_pass = f"BruteForce_{step}#SSHBad"
             type_lbl = "[bold red]SAI[/bold red]"
-            display_pass = test_pass
+            display_pass = f"[yellow]{SSH_USER} : {test_pass}[/yellow]"
 
         ok, status, lat = attempt_ssh_login(SSH_USER, test_pass, port=port, timeout=2.5)
 
@@ -231,13 +231,94 @@ def run_custom_sequence(
     return verdict
 
 
+def run_matrix_sequence(
+    port: int,
+    g1_fail: int = 4,
+    g1_pass: int = 5,
+    g2_fail: int = 5,
+    g2_pass: int = 6,
+    rate_cps: float = 3.0
+) -> bool:
+    """Kiểm thử chuỗi ma trận duy nhất: GĐ1 (Reset trước ngưỡng) + GĐ2 (Khóa tài khoản sau ngưỡng)."""
+    limiter = PreciseRateLimiter(rate_cps=rate_cps)
+    total_steps = g1_fail + 1 + g2_fail + 1
+    table = Table(title=f"Tiến trình kiểm thử ma trận SSH ({total_steps} bước)", show_lines=True)
+    table.add_column("Bước", justify="center", style="bold")
+    table.add_column("Loại", justify="center")
+    table.add_column("Thời điểm phát", justify="center")
+    table.add_column("Mật khẩu thử nghiệm", justify="left")
+    table.add_column("Kết quả phản hồi SSH", justify="left")
+    table.add_column("Độ trễ", justify="right")
+
+    step_num = 0
+    g1_result = None
+    g2_result = None
+
+    for i in range(1, g1_fail + 1):
+        step_num += 1
+        pos, t_str = limiter.wait_next()
+        test_pass = f"BruteForce_{step_num}#SSHBad"
+        ok, status, lat = attempt_ssh_login(SSH_USER, test_pass, port=port, timeout=2.5)
+        is_blocked = any(kw in status for kw in ["TIMEOUT", "CONN_DROPPED", "BLOCKED", "Connection refused"])
+        style = "red" if is_blocked else "yellow"
+        table.add_row(f"#{step_num:02d}", "[bold red]SAI[/bold red]", t_str, f"[yellow]{SSH_USER} : {test_pass}[/yellow]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    step_num += 1
+    pos, t_str = limiter.wait_next()
+    ok, status, lat = attempt_ssh_login(SSH_USER, CORRECT_PASS, port=port, timeout=2.5)
+    g1_result = (step_num, ok, status)
+    style = "green" if ok else "red"
+    table.add_row(f"#{step_num:02d}", "[bold green]ĐÚNG[/bold green]", t_str, f"[bold green]{SSH_USER} : {CORRECT_PASS}[/bold green]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    table.add_section()
+    time.sleep(1.0)
+
+    for i in range(1, g2_fail + 1):
+        step_num += 1
+        pos, t_str = limiter.wait_next()
+        test_pass = f"BruteForce_{step_num}#SSHBad"
+        ok, status, lat = attempt_ssh_login(SSH_USER, test_pass, port=port, timeout=2.5)
+        is_blocked = any(kw in status for kw in ["TIMEOUT", "CONN_DROPPED", "BLOCKED", "Connection refused"])
+        style = "red" if is_blocked else "yellow"
+        table.add_row(f"#{step_num:02d}", "[bold red]SAI[/bold red]", t_str, f"[yellow]{SSH_USER} : {test_pass}[/yellow]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    step_num += 1
+    pos, t_str = limiter.wait_next()
+    ok, status, lat = attempt_ssh_login(SSH_USER, CORRECT_PASS, port=port, timeout=2.5)
+    g2_result = (step_num, ok, status)
+    is_locked = not ok
+    style = "green" if is_locked else "red"
+    table.add_row(f"#{step_num:02d}", "[bold green]ĐÚNG[/bold green]", t_str, f"[bold green]{SSH_USER} : {CORRECT_PASS}[/bold green]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    console.print(table)
+
+    g1_ok = (g1_result and g1_result[1])
+    g2_ok = (g2_result and not g2_result[1])
+
+    console.print("")
+    if g1_ok and g2_ok:
+        console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS) - GĐ1 Reset bộ đếm: THÀNH CÔNG | GĐ2 Khóa tài khoản: ĐÃ KHÓA (Bị từ chối)[/bold green]")
+        return True
+    elif g1_ok and not g2_ok:
+        console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL) - GĐ1 Reset bộ đếm: THÀNH CÔNG | GĐ2 Khóa tài khoản: KHÔNG KHÓA (Vẫn đăng nhập được)[/bold red]")
+        return False
+    else:
+        console.print(f"[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL) - GĐ1 Reset: {'THÀNH CÔNG' if g1_ok else 'THẤT BẠI'} | GĐ2 Khóa: {'ĐÃ KHÓA' if g2_ok else 'THẤT BẠI'}[/bold red]")
+        return False
+
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Bộ đo kiểm vét cạn & Khóa giao diện SSH (QCVN 11 Clause 2.1.5)")
     parser.add_argument("--port", type=int, default=SSH_PORT, help=f"Cổng SSH (Mặc định: {SSH_PORT})")
-    parser.add_argument("--mode", choices=["custom", "1", "2", "3", "reset", "lockout", "all"], default="custom", help="Chế độ chạy")
+    parser.add_argument("--mode", choices=["matrix", "custom", "1", "2", "3", "reset", "lockout", "all"], default="custom", help="Chế độ chạy")
     parser.add_argument("--fail-count", type=int, default=10, help="Số lần gửi sai liên tiếp (Mặc định: 10)")
     parser.add_argument("--success-at", type=int, default=11, help="Lượt chèn thử mật khẩu đúng (Mặc định: 11; 0=Không thử đúng)")
     parser.add_argument("--stage", type=int, choices=[1, 2], default=None, help="Giai đoạn kiểm thử (1: Reset trước ngưỡng, 2: Khóa sau ngưỡng)")
+    parser.add_argument("--g1-fail", type=int, default=4, help="GĐ1: Số lần thử sai (Mặc định: 4)")
+    parser.add_argument("--g1-pass", type=int, default=5, help="GĐ1: Lượt thử đúng (Mặc định: 5)")
+    parser.add_argument("--g2-fail", type=int, default=5, help="GĐ2: Số lần thử sai (Mặc định: 5)")
+    parser.add_argument("--g2-pass", type=int, default=6, help="GĐ2: Lượt thử đúng (Mặc định: 6)")
     parser.add_argument("--rate", type=float, default=3.0, help="Tốc độ gửi kết nối mới/giây (Mặc định: 3.0 conn/s)")
     return parser.parse_args()
 
@@ -252,11 +333,20 @@ def main():
         f"tcp port {port}",
         prefix=f"ssh_lockout_audit_{port}"
     )
-    if GLOBAL_PCAP_FILE:
+    if GLOBAL_PCAP_FILE and args.mode not in ("matrix", "custom"):
         print(f"[*] Đang tự động bắt gói tin PCAP vào: {GLOBAL_PCAP_FILE}\n")
 
     try:
-        if args.mode in ("1", "reset"):
+        if args.mode == "matrix":
+            run_matrix_sequence(
+                port=port,
+                g1_fail=args.g1_fail,
+                g1_pass=args.g1_pass,
+                g2_fail=args.g2_fail,
+                g2_pass=args.g2_pass,
+                rate_cps=args.rate
+            )
+        elif args.mode in ("1", "reset"):
             run_custom_sequence(port, fail_count=4, success_at=5, rate_cps=args.rate)
         elif args.mode in ("2", "lockout"):
             run_custom_sequence(port, fail_count=10, success_at=11, rate_cps=args.rate)

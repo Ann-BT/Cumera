@@ -22,12 +22,136 @@ class OryzaCameraAdapter(BaseCameraAdapter):
 
     def get_web_auth_endpoints(self) -> List[str]:
         return [
+            "/action/WEB_JsonAjax",
             "/",
             "/index.html",
             "/web/index.html",
             self.onvif_path or "/onvif/device_service",
             "/api/system/information",
         ]
+
+    def attempt_web_login(
+        self,
+        username: str,
+        password: str,
+        port: int = 443,
+        timeout: float = 3.0,
+    ) -> Optional[Tuple[bool, str, float]]:
+        """
+        Thực hiện xác thực Web Admin qua API WEB_JsonAjax chuẩn Tiandy/Oryza (XDigest SHA-256).
+        Returns: (is_success, status_str, latency_ms)
+        """
+        import time
+        import random
+        import base64
+        import requests
+
+        scheme = "https"
+        url = f"{scheme}://{self.ip}:{port}/action/WEB_JsonAjax"
+        t_start = time.time()
+
+        xml_challenge = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<CommandHead Command="11027">\n'
+            '    <Parameters Version="1">\n'
+            '        <DigestAuthentication OperatorType="2"/>\n'
+            '    </Parameters>\n'
+            '</CommandHead>'
+        )
+
+        try:
+            r1 = requests.post(
+                url,
+                data=xml_challenge.encode("utf-8"),
+                headers={"Content-Type": "application/xml", "Connection": "close"},
+                verify=False,
+                timeout=timeout
+            )
+            auth_header = r1.headers.get("WWW-Authenticate", "")
+        except requests.exceptions.Timeout:
+            elapsed = (time.time() - t_start) * 1000
+            return False, "TIMEOUT (Mạng/Dịch vụ bị đóng băng - Bị khóa)", elapsed
+        except requests.exceptions.ConnectionError:
+            elapsed = (time.time() - t_start) * 1000
+            return False, "CONN_REFUSED / DROPPED (Tường lửa ngắt kết nối)", elapsed
+        except Exception as e:
+            elapsed = (time.time() - t_start) * 1000
+            return False, f"ERROR ({e})", elapsed
+
+        if not auth_header:
+            return None
+
+        m_realm = re.search(r'realm="([^"]+)"', auth_header)
+        m_nonce = re.search(r'nonce="([^"]+)"', auth_header)
+        m_qop = re.search(r'qop="([^"]+)"', auth_header)
+        m_alg = re.search(r'algorithm="([^"]+)"', auth_header)
+
+        realm = m_realm.group(1) if m_realm else "WEB To 00773F"
+        nonce = m_nonce.group(1) if m_nonce else ""
+        qop = m_qop.group(1) if m_qop else "auth"
+        algorithm = m_alg.group(1) if m_alg else "SHA-256"
+
+        hex_chars = "abcdef0123456789"
+        vt = "".join(random.choice(hex_chars) for _ in range(16))
+        Ye = base64.b64encode(vt.encode("utf-8")).decode("utf-8")
+        nc_str = "00000002"
+        uri = "active/base/11027"
+
+        y = hashlib.sha256(f"{username}:{realm}:{password}".encode("utf-8")).hexdigest()
+        g = hashlib.sha256(f"POST:{uri}".encode("utf-8")).hexdigest()
+        resp_hash = hashlib.sha256(f"{y}:{nonce}:{nc_str}:{Ye}:{qop}:{g}".encode("utf-8")).hexdigest()
+
+        auth_hdr = (
+            f'XDigest username="{username}",realm="{realm}",nonce="{nonce}",'
+            f'uri="{uri}",algorithm="{algorithm}",qop="{qop}",nc="{nc_str}",'
+            f'cnonce="{Ye}",response="{resp_hash}"'
+        )
+
+        try:
+            r2 = requests.post(
+                url,
+                data=xml_challenge.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/xml",
+                    "Authorization": auth_hdr,
+                    "Connection": "close"
+                },
+                verify=False,
+                timeout=timeout
+            )
+            elapsed = (time.time() - t_start) * 1000
+            body = r2.text
+
+            m_code = re.search(r'<Result Code="([^"]+)"', body)
+            code_str = m_code.group(1) if m_code else ""
+
+            if code_str == "0":
+                return True, "HTTP 200 OK (Đăng nhập thành công)", elapsed
+            elif code_str == "-508":
+                m_rem = re.search(r'RemainCount="([^"]+)"', body)
+                rem = m_rem.group(1) if m_rem else "?"
+                return False, f"HTTP 401 Unauthorized (Sai mật khẩu, còn {rem} lần)", elapsed
+            elif code_str == "-515":
+                m_min = re.search(r'RemainingLockingMin="([^"]+)"', body)
+                m_sec = re.search(r'RemainingLockingSec="([^"]+)"', body)
+                mn = m_min.group(1) if m_min else "0"
+                sc = m_sec.group(1) if m_sec else "0"
+                return False, f"HTTP 401 BỊ KHÓA (Thời gian khóa: {mn}p {sc}s)", elapsed
+            elif code_str == "-507":
+                return False, "HTTP 401 Unauthorized (Sai tên người dùng hoặc mật khẩu)", elapsed
+            elif r2.status_code in (403, 429):
+                return False, f"HTTP {r2.status_code} (BỊ KHÓA / Rate Limited)", elapsed
+            else:
+                return False, f"HTTP {r2.status_code} (Result Code {code_str or 'ERR'})", elapsed
+        except requests.exceptions.Timeout:
+            elapsed = (time.time() - t_start) * 1000
+            return False, "TIMEOUT (Mạng/Dịch vụ bị đóng băng - Bị khóa)", elapsed
+        except requests.exceptions.ConnectionError:
+            elapsed = (time.time() - t_start) * 1000
+            return False, "CONN_REFUSED / DROPPED (Tường lửa ngắt kết nối)", elapsed
+        except Exception as e:
+            elapsed = (time.time() - t_start) * 1000
+            return False, f"ERROR ({e})", elapsed
 
     def get_config_endpoints(self) -> List[str]:
         return [

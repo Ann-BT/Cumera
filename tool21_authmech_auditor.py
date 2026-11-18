@@ -160,6 +160,16 @@ def copy_and_alias_pcap(src_pcap: str, base_name: str, aliases: Optional[List[st
     dst_primary = os.path.join(EVIDENCE_DIR, base_name)
     if os.path.exists(src_pcap):
         shutil.copy2(src_pcap, dst_primary)
+    # Tự động dọn dẹp các tệp alias cũ/thừa để bảo đảm mỗi bài đo chỉ có đúng 1 tệp PCAP
+    if aliases:
+        for al in aliases:
+            if al != base_name:
+                old_alias = os.path.join(EVIDENCE_DIR, al)
+                if os.path.exists(old_alias):
+                    try:
+                        os.remove(old_alias)
+                    except Exception:
+                        pass
     return dst_primary
 
 
@@ -167,13 +177,14 @@ def copy_and_alias_pcap(src_pcap: str, base_name: str, aliases: Optional[List[st
 # 1. AUTHMECH-1: GIAO DIỆN WEB QUẢN TRỊ (HTTPS/443)
 # ==============================================================================
 
-def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True) -> Dict[str, Any]:
+def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True, auth_type: str = "auto") -> Dict[str, Any]:
     """
     Đo kiểm AuthMech-1: Web Interface Authentication (Web-Authmech).
     - Hỗ trợ HTTPS hoặc fallback HTTP nếu camera chỉ mở HTTP
     - Đa nền tảng camera (Axis, Hikvision, Dahua, Uniview, VIGI, Generic)
+    - Tùy chọn cơ chế xác thực ép buộc hoặc auto: auto, basic, digest, digest-md5, digest-sha256, adapter
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-Web: Web-Authmech (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-Web: Web-Authmech (HTTPS/{DUT_IP}:{HTTPS_PORT}) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
         "id": "AuthMech-Web",
         "ixit_id": "Web-Authmech",
@@ -181,6 +192,7 @@ def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
         "port": HTTPS_PORT,
         "proto": "HTTPS / TLS",
         "auth_factor": "Username and password",
+        "auth_mode_selected": auth_type,
         "pcap": "authmech-web.pcap",
         "aliases": ["authmech-1_web.pcap", "Web-Authmech.pcap", "AuthMech-Web.pcap"]
     }
@@ -262,34 +274,70 @@ def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
             auth_challenge = auth_header_raw or "Bearer / Session Cookie"
             digest_algorithm = "Session Token"
 
-        # Bước 3: Xác thực với tài khoản và mật khẩu ĐÚNG (Digest trước, fallback Basic)
+        # Bước 3: Xác thực với tài khoản và mật khẩu ĐÚNG theo auth_type
         try:
-            r_auth = requests.get(
-                active_auth_url,
-                auth=HTTPDigestAuth(USER, PASSWORD),
-                verify=False,
-                timeout=3.5,
-                headers={"Connection": "close"}
-            )
-            if r_auth.status_code == 200 or "root." in r_auth.text:
-                auth_success = True
-            elif r_auth.status_code == 401:
-                r_basic = requests.get(
+            if auth_type == "basic":
+                auth_challenge = "Basic"
+                digest_algorithm = f"HTTP Basic Auth ({tls_ver if web_scheme == 'https' else 'HTTP Rõ'})"
+                r_auth = requests.get(active_auth_url, auth=HTTPBasicAuth(USER, PASSWORD), verify=False, timeout=3.5, headers={"Connection": "close"})
+                if r_auth.status_code == 200 or "root." in r_auth.text:
+                    auth_success = True
+            elif auth_type in ("digest", "digest-md5", "digest-sha256"):
+                auth_challenge = "Digest"
+                digest_algorithm = "HTTP Digest " + ("SHA-256" if "sha256" in auth_type else "MD5")
+                r_auth = requests.get(active_auth_url, auth=HTTPDigestAuth(USER, PASSWORD), verify=False, timeout=3.5, headers={"Connection": "close"})
+                if r_auth.status_code == 200 or "root." in r_auth.text:
+                    auth_success = True
+            elif auth_type == "adapter":
+                try:
+                    ok, status_str, _ = adapter.attempt_web_login(USER, PASSWORD, port=web_port)
+                    auth_success = ok
+                    auth_challenge = "Vendor Adapter"
+                    digest_algorithm = "SPA Token / Session"
+                except Exception:
+                    auth_success = False
+            else:
+                # Auto: Digest trước, fallback Basic rồi Adapter
+                r_auth = requests.get(
                     active_auth_url,
-                    auth=HTTPBasicAuth(USER, PASSWORD),
+                    auth=HTTPDigestAuth(USER, PASSWORD),
                     verify=False,
                     timeout=3.5,
                     headers={"Connection": "close"}
                 )
-                if r_basic.status_code == 200 or "root." in r_basic.text:
+                if r_auth.status_code == 200 or "root." in r_auth.text:
                     auth_success = True
+                elif r_auth.status_code == 401:
+                    r_basic = requests.get(
+                        active_auth_url,
+                        auth=HTTPBasicAuth(USER, PASSWORD),
+                        verify=False,
+                        timeout=3.5,
+                        headers={"Connection": "close"}
+                    )
+                    if r_basic.status_code == 200 or "root." in r_basic.text:
+                        auth_success = True
+                    else:
+                        try:
+                            ok_ad, _, _ = adapter.attempt_web_login(USER, PASSWORD, port=web_port)
+                            if ok_ad:
+                                auth_success = True
+                                auth_challenge = "Vendor Adapter"
+                                digest_algorithm = "SPA Token / Session"
+                        except Exception:
+                            pass
         except Exception as e:
             if not res.get("note"):
                 res["note"] = f"Lỗi xác thực: {e}"
 
         # Bước 4: Kiểm chứng camera từ chối khi nhập mật khẩu SAI
         try:
-            auth_wrong = HTTPDigestAuth(USER, "WrongPass#99999Bad") if auth_challenge == "Digest" else HTTPBasicAuth(USER, "WrongPass#99999Bad")
+            if auth_type == "basic":
+                auth_wrong = HTTPBasicAuth(USER, "WrongPass#99999Bad")
+            elif auth_type in ("digest", "digest-md5", "digest-sha256"):
+                auth_wrong = HTTPDigestAuth(USER, "WrongPass#99999Bad")
+            else:
+                auth_wrong = HTTPDigestAuth(USER, "WrongPass#99999Bad") if auth_challenge == "Digest" else HTTPBasicAuth(USER, "WrongPass#99999Bad")
             r_wrong = requests.get(
                 active_auth_url,
                 auth=auth_wrong,
@@ -299,6 +347,12 @@ def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
             )
             if r_wrong.status_code in (401, 403):
                 auth_wrong_rejected = True
+            elif auth_type == "adapter" or auth_challenge == "Vendor Adapter":
+                try:
+                    ok_bad, _, _ = adapter.attempt_web_login(USER, "WrongPass#99999Bad", port=web_port)
+                    auth_wrong_rejected = not ok_bad
+                except Exception:
+                    auth_wrong_rejected = True
         except Exception:
             pass
 
@@ -510,6 +564,7 @@ def audit_authmech_3_rtsp(
     pcap_override: Optional[str] = None,
     name_override: Optional[str] = None,
     launch_vlc: bool = True,
+    auth_type: str = "auto",
 ) -> Dict[str, Any]:
     """
     Đo kiểm AuthMech-3 (hoặc AuthMech-2 trên Oryza): RTSP Stream Authentication.
@@ -609,16 +664,21 @@ def audit_authmech_3_rtsp(
             auth_lines = [line.strip() for line in resp_raw.splitlines() if "WWW-Authenticate" in line]
             auth_line = next((l for l in auth_lines if "Digest" in l), auth_lines[0] if auth_lines else "")
 
-            if "Digest" in auth_line:
+            if auth_type == "basic":
+                auth_challenge = "Basic"
+                digest_algorithm = f"Basic Auth over {tls_ver}"
+                cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
+                auth_header_val = f"Basic {cred}"
+            elif "Digest" in auth_line or auth_type in ("digest", "digest-md5", "digest-sha256"):
                 auth_challenge = "Digest"
-                is_sha256 = "sha-256" in auth_line.lower()
+                is_sha256 = (auth_type == "digest-sha256") or ("sha-256" in auth_line.lower() and auth_type != "digest-md5")
                 digest_algorithm = f"Digest {'SHA-256' if is_sha256 else 'MD5'}"
                 import re
                 m_realm = re.search(r'realm="([^"]*)"', auth_line)
                 m_nonce = re.search(r'nonce="([^"]*)"', auth_line)
                 m_qop = re.search(r'qop="([^"]*)"', auth_line)
-                realm = m_realm.group(1) if m_realm else ""
-                nonce = m_nonce.group(1) if m_nonce else ""
+                realm = m_realm.group(1) if m_realm else "IP Camera"
+                nonce = m_nonce.group(1) if m_nonce else os.urandom(8).hex()
                 h_fn = hashlib.sha256 if is_sha256 else hashlib.md5
                 alg_name = "SHA-256" if is_sha256 else "MD5"
                 ha1 = h_fn(f"{USER}:{realm}:{PASSWORD}".encode()).hexdigest()
@@ -725,16 +785,22 @@ def audit_authmech_3_rtsp(
                 auth_lines = [line.strip() for line in resp_raw.splitlines() if "WWW-Authenticate" in line]
                 auth_line = next((l for l in auth_lines if "Digest" in l), auth_lines[0] if auth_lines else "")
 
-                if "Digest" in auth_line:
+                if auth_type == "basic":
+                    auth_challenge = "Basic"
+                    digest_algorithm = f"Basic Auth over {tls_ver if use_tls_rtsp else 'RTSP Clear'}"
+                    res["note"] = f"RTSP (cổng {rtsp_port_used}) ép buộc Basic Auth."
+                    cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
+                    auth_header_val = f"Basic {cred}"
+                elif "Digest" in auth_line or auth_type in ("digest", "digest-md5", "digest-sha256"):
                     auth_challenge = "Digest"
-                    is_sha256 = "sha-256" in auth_line.lower()
+                    is_sha256 = (auth_type == "digest-sha256") or ("sha-256" in auth_line.lower() and auth_type != "digest-md5")
                     digest_algorithm = f"Digest {'SHA-256' if is_sha256 else 'MD5'}"
                     import re
                     m_realm = re.search(r'realm="([^"]*)"', auth_line)
                     m_nonce = re.search(r'nonce="([^"]*)"', auth_line)
                     m_qop = re.search(r'qop="([^"]*)"', auth_line)
-                    realm = m_realm.group(1) if m_realm else ""
-                    nonce = m_nonce.group(1) if m_nonce else ""
+                    realm = m_realm.group(1) if m_realm else "IP Camera"
+                    nonce = m_nonce.group(1) if m_nonce else os.urandom(8).hex()
                     h_fn = hashlib.sha256 if is_sha256 else hashlib.md5
                     alg_name = "SHA-256" if is_sha256 else "MD5"
                     ha1 = h_fn(f"{USER}:{realm}:{PASSWORD}".encode()).hexdigest()
@@ -837,6 +903,7 @@ def audit_authmech_4_onvif(
     ixit_id_override: Optional[str] = None,
     pcap_override: Optional[str] = None,
     name_override: Optional[str] = None,
+    auth_type: str = "auto",
 ) -> Dict[str, Any]:
     """
     Đo kiểm AuthMech-4 (hoặc AuthMech-3 trên Oryza): ONVIF Management Interface (AuthMech-Onvif).
@@ -846,7 +913,7 @@ def audit_authmech_4_onvif(
     disp_name = name_override or "ONVIF Device Service"
     pcap_file = pcap_override or "authmech-onvif.pcap"
 
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH} SOAP)[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH} SOAP) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
         "id": aid,
         "ixit_id": ixit_id,
@@ -854,6 +921,7 @@ def audit_authmech_4_onvif(
         "port": ONVIF_HTTPS_PORT,
         "proto": "ONVIF SOAP over HTTPS (WS-Security)",
         "auth_factor": "Username and password",
+        "auth_mode_selected": auth_type,
         "pcap": pcap_file,
         "aliases": ["authmech-4_onvif.pcap", "authmech-3_onvif.pcap", f"{ixit_id}.pcap", f"{aid}.pcap"]
     }
@@ -894,53 +962,20 @@ def audit_authmech_4_onvif(
 
         time.sleep(0.3)
 
-        # Bước 2: Xây dựng bản tin ONVIF SOAP với WS-Security UsernameToken PasswordDigest
-        created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        nonce_bytes = os.urandom(16)
-        nonce_b64 = base64.b64encode(nonce_bytes).decode('ascii')
-
-        to_hash = nonce_bytes + created.encode('utf-8') + PASSWORD.encode('utf-8')
-        digest_b64 = base64.b64encode(hashlib.sha1(to_hash).digest()).decode('ascii')
-
-        soap_body_valid = f"""<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
-               xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
-  <soap:Header>
-    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
-                   xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
-      <wsse:UsernameToken>
-        <wsse:Username>{USER}</wsse:Username>
-        <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">{digest_b64}</wsse:Password>
-        <wsse:Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary">{nonce_b64}</wsse:Nonce>
-        <wsu:Created>{created}</wsu:Created>
-      </wsse:UsernameToken>
-    </wsse:Security>
-  </soap:Header>
-  <soap:Body>
-    <tds:GetDeviceInformation />
-  </soap:Body>
-</soap:Envelope>"""
-
+        # Bước 2: Gửi bản tin ONVIF SOAP xác thực theo auth_type
+        from tool11_onvif_lockout import send_onvif_request, auto_detect_auth_mode
         onvif_url = f"{onvif_scheme}://{DUT_IP}:{onvif_port}{ONVIF_PATH}"
-        headers = {
-            "Content-Type": "application/soap+xml; charset=utf-8; action=\"http://www.onvif.org/ver10/device/wsdl/GetDeviceInformation\"",
-            "Connection": "close"
-        }
+        effective_mode = auto_detect_auth_mode(onvif_url, USER, PASSWORD) if auth_type == "auto" else auth_type
+        ok_valid, status_valid, _, _ = send_onvif_request(onvif_url, USER, PASSWORD, auth_type=effective_mode, timeout=3.5)
+        wsse_auth_ok = ok_valid
 
-        r_valid = requests.post(onvif_url, data=soap_body_valid, headers=headers, verify=False, timeout=3.5)
-        if r_valid.status_code == 200:
-            wsse_auth_ok = True
-
-        # Bước 3: Thử gửi với PasswordDigest SAI để kiểm chứng Camera từ chối
-        bad_hash = nonce_bytes + created.encode('utf-8') + b"WrongPass#999Bad"
-        bad_digest_b64 = base64.b64encode(hashlib.sha1(bad_hash).digest()).decode('ascii')
-        soap_body_invalid = soap_body_valid.replace(digest_b64, bad_digest_b64)
-
-        r_invalid = requests.post(onvif_url, data=soap_body_invalid, headers=headers, verify=False, timeout=3.5)
-        if r_invalid.status_code in [400, 401, 403, 500] or "Fault" in r_invalid.text or "FailedAuthentication" in r_invalid.text:
-            fault_received_on_bad = True
+        # Bước 3: Thử gửi với mật khẩu SAI để kiểm chứng Camera từ chối
+        ok_bad, status_bad, _, _ = send_onvif_request(onvif_url, USER, "WrongPass#999Bad", auth_type=effective_mode, timeout=3.5)
+        fault_received_on_bad = not ok_bad
 
         res["status"] = "PASS" if (tls_ver in ["TLSv1.2", "TLSv1.3"] and wsse_auth_ok and fault_received_on_bad) else ("FAIL" if not wsse_auth_ok else "WARN")
+        res["auth_method"] = f"ONVIF ({effective_mode})"
+        res["cryptographic_details"] = f"Chế độ xác thực: {effective_mode.upper()} qua TLS {tls_ver}"
 
     except Exception as e:
         res["status"] = "FAIL"
@@ -951,8 +986,6 @@ def audit_authmech_4_onvif(
             stop_pcap_capture(pcap_proc, wait_sec=1.5)
         res["tls_version"] = tls_ver
         res["cipher_suite"] = active_cipher
-        res["auth_method"] = "WS-Security UsernameToken"
-        res["cryptographic_details"] = "PasswordDigest = Base64(SHA1(Nonce + Created + Password))"
         res["wsse_auth_ok"] = wsse_auth_ok
         res["fault_received_on_bad"] = fault_received_on_bad
 
@@ -1334,16 +1367,17 @@ def resolve_authmech_key(raw_id: str) -> Optional[str]:
     return k if k in ["web", "ssh", "rtsp", "onvif", "cms"] else None
 
 
-def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float = 3.0, record_pcap: bool = True, launch_vlc: bool = True) -> List[Dict[str, Any]]:
+def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float = 3.0, record_pcap: bool = True, launch_vlc: bool = True, auth_type: str = "auto") -> List[Dict[str, Any]]:
     """
     Chạy kiểm thử cho tất cả hoặc theo danh sách được yêu cầu.
     Hỗ trợ cả tên ngữ nghĩa: web, ssh, rtsp, onvif, cms và số thứ tự cũ 1..5.
+    Hỗ trợ tham số auth_type: auto, basic, digest, digest-md5, digest-sha256, wsse_sha1, wsse_sha256, wsse_text, http_digest, adapter.
     """
     handler_map = {
-        "web": audit_authmech_1_web,
+        "web": lambda wait_sec=3.0, record_pcap=True: audit_authmech_1_web(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type),
         "ssh": audit_authmech_2_ssh,
-        "rtsp": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc),
-        "onvif": audit_authmech_4_onvif,
+        "rtsp": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc, auth_type=auth_type),
+        "onvif": lambda wait_sec=3.0, record_pcap=True: audit_authmech_4_onvif(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type),
         "cms": lambda wait_sec=3.0, record_pcap=True: audit_authmech_cms(port=CMS_PORT, wait_sec=wait_sec, record_pcap=record_pcap),
     }
 
@@ -1379,6 +1413,7 @@ def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float 
 def main():
     parser = argparse.ArgumentParser(description="Bộ đo kiểm toàn diện các cơ chế xác thực AuthMech (QCVN 11 & IXIT 1)")
     parser.add_argument("--id", type=str, default="all", help="Chỉ định ID AuthMech cần kiểm (web, ssh, rtsp, onvif, cms, 1-5 hoặc 'all')")
+    parser.add_argument("--auth", "--auth-type", dest="auth_type", default="auto", help="Cơ chế xác thực ép buộc hoặc auto (auto, basic, digest, digest-md5, digest-sha256, wsse_sha1, wsse_sha256, wsse_text, http_digest, adapter)")
     parser.add_argument("--wait", type=float, default=3.0, help="Thời gian chờ đón bắt gói tin (giây)")
     parser.add_argument("--no-pcap", action="store_true", help="Không bắt và không ghi đè tệp PCAP bằng chứng (dùng để kích thích lưu lượng kiểm tra Telemetry)")
     parser.add_argument("--no-vlc", action="store_true", help="Không tự động mở trình phát VLC khi xác thực RTSP thành công")
@@ -1408,7 +1443,7 @@ def main():
     else:
         raw_keys = [req_raw]
 
-    results = run_authmech_audit(target_keys=raw_keys, wait_sec=args.wait, record_pcap=not args.no_pcap, launch_vlc=not args.no_vlc)
+    results = run_authmech_audit(target_keys=raw_keys, wait_sec=args.wait, record_pcap=not args.no_pcap, launch_vlc=not args.no_vlc, auth_type=args.auth_type)
 
     # Hiển thị bảng tổng hợp trên console
     t = Table(title=f"BẢNG TỔNG HỢP ĐO KIỂM CƠ CHẾ XÁC THỰC ({DUT_MODEL} - {adapter.vendor}){' [CHẾ ĐỘ NO-PCAP]' if args.no_pcap else ''}", show_lines=True)

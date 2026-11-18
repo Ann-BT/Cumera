@@ -45,6 +45,19 @@ class BaseCameraAdapter(ABC):
         """Return list of candidate URL paths for HTTP/HTTPS authentication & lockout auditing."""
         pass
 
+    def attempt_web_login(
+        self,
+        username: str,
+        password: str,
+        port: int = 443,
+        timeout: float = 3.0,
+    ) -> Optional[Tuple[bool, str, float]]:
+        """
+        Optional vendor-specific web login implementation.
+        Returns (is_success, status_str, latency_ms), or None to use default Basic/Digest auth.
+        """
+        return None
+
     @abstractmethod
     def get_config_endpoints(self) -> List[str]:
         """Return list of URL paths for configuration management challenge/reading."""

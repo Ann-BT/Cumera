@@ -497,7 +497,7 @@ def run_custom_sequence(
         else:
             test_pass = f"BruteForce_{step}#Audit"
             type_lbl = "[bold red]SAI[/bold red]"
-            display_pass = test_pass
+            display_pass = f"[yellow]{USER} : {test_pass}[/yellow]"
 
         ok, status, raw_preview, lat = send_onvif_request(url, USER, test_pass, auth_type=auth_mode, force_new_connection=True)
 
@@ -536,17 +536,100 @@ def run_custom_sequence(
     return verdict
 
 
+def run_matrix_sequence(
+    url: str,
+    port: int,
+    auth_mode: str,
+    g1_fail: int = 4,
+    g1_pass: int = 5,
+    g2_fail: int = 5,
+    g2_pass: int = 6,
+    rate_cps: float = 4.0
+) -> bool:
+    """Kiểm thử chuỗi ma trận duy nhất: GĐ1 (Reset trước ngưỡng) + GĐ2 (Khóa tài khoản sau ngưỡng)."""
+    limiter = PreciseRateLimiter(rate_cps=rate_cps)
+    total_steps = g1_fail + 1 + g2_fail + 1
+    table = Table(title=f"Tiến trình kiểm thử ma trận ONVIF ({total_steps} bước)", show_lines=True)
+    table.add_column("Bước", justify="center", style="bold")
+    table.add_column("Loại", justify="center")
+    table.add_column("Thời điểm phát", justify="center")
+    table.add_column("Mật khẩu thử nghiệm", justify="left")
+    table.add_column("Kết quả phản hồi", justify="left")
+    table.add_column("Độ trễ", justify="right")
+
+    step_num = 0
+    g1_result = None
+    g2_result = None
+
+    for i in range(1, g1_fail + 1):
+        step_num += 1
+        pos, t_str = limiter.wait_next()
+        test_pass = f"BruteForce_{step_num}#Audit"
+        ok, status, raw, lat = send_onvif_request(url, USER, test_pass, auth_type=auth_mode, force_new_connection=True)
+        is_blocked = any(kw in status for kw in ["TIMEOUT", "RST", "REFUSED", "DROP", "Rate-Limited", "429", "403"])
+        style = "red" if is_blocked else "yellow"
+        table.add_row(f"#{step_num:02d}", "[bold red]SAI[/bold red]", t_str, f"[yellow]{USER} : {test_pass}[/yellow]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    step_num += 1
+    pos, t_str = limiter.wait_next()
+    ok, status, raw, lat = send_onvif_request(url, USER, CORRECT_PASS, auth_type=auth_mode, force_new_connection=True)
+    g1_result = (step_num, ok, status)
+    style = "green" if (ok and "200 OK" in status) else "red"
+    table.add_row(f"#{step_num:02d}", "[bold green]ĐÚNG[/bold green]", t_str, f"[bold green]{USER} : {CORRECT_PASS}[/bold green]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    table.add_section()
+    time.sleep(1.0)
+
+    for i in range(1, g2_fail + 1):
+        step_num += 1
+        pos, t_str = limiter.wait_next()
+        test_pass = f"BruteForce_{step_num}#Audit"
+        ok, status, raw, lat = send_onvif_request(url, USER, test_pass, auth_type=auth_mode, force_new_connection=True)
+        is_blocked = any(kw in status for kw in ["TIMEOUT", "RST", "REFUSED", "DROP", "Rate-Limited", "429", "403"])
+        style = "red" if is_blocked else "yellow"
+        table.add_row(f"#{step_num:02d}", "[bold red]SAI[/bold red]", t_str, f"[yellow]{USER} : {test_pass}[/yellow]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    step_num += 1
+    pos, t_str = limiter.wait_next()
+    ok, status, raw, lat = send_onvif_request(url, USER, CORRECT_PASS, auth_type=auth_mode, force_new_connection=True)
+    g2_result = (step_num, ok, status)
+    is_locked = (not ok or "200 OK" not in status)
+    style = "green" if is_locked else "red"
+    table.add_row(f"#{step_num:02d}", "[bold green]ĐÚNG[/bold green]", t_str, f"[bold green]{USER} : {CORRECT_PASS}[/bold green]", f"[{style}]{status}[/{style}]", f"{lat:.1f} ms")
+
+    console.print(table)
+
+    g1_ok = (g1_result and g1_result[1] and "200 OK" in g1_result[2])
+    g2_ok = (g2_result and (not g2_result[1] or "200 OK" not in g2_result[2]))
+
+    console.print("")
+    if g1_ok and g2_ok:
+        console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS) - GĐ1 Reset bộ đếm: THÀNH CÔNG (200 OK) | GĐ2 Khóa tài khoản: ĐÃ KHÓA (Bị từ chối)[/bold green]")
+        return True
+    elif g1_ok and not g2_ok:
+        console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL) - GĐ1 Reset bộ đếm: THÀNH CÔNG | GĐ2 Khóa tài khoản: KHÔNG KHÓA (Vẫn xác thực thành công)[/bold red]")
+        return False
+    else:
+        console.print(f"[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL) - GĐ1 Reset: {'THÀNH CÔNG' if g1_ok else 'THẤT BẠI'} | GĐ2 Khóa: {'ĐÃ KHÓA' if g2_ok else 'THẤT BẠI'}[/bold red]")
+        return False
+
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Bộ đo kiểm vét cạn & Khóa dịch vụ ONVIF SOAP (QCVN 11 Clause 2.1.5)")
     parser.add_argument("--port", type=int, default=None, help="Cổng ONVIF chỉ định (80, 443 hoặc custom)")
     parser.add_argument("--threshold", type=int, default=LOCKOUT_THRESHOLD, help=f"Ngưỡng khóa liên tiếp (Mặc định: {LOCKOUT_THRESHOLD})")
-    parser.add_argument("--mode", choices=["custom", "1", "2", "3", "4", "burst", "reset", "lockout", "all"], default="custom", help="Chế độ: custom, 1/reset, 2/lockout, 3=Wordlist, 4/burst=Firewall, all")
+    parser.add_argument("--mode", choices=["matrix", "custom", "1", "2", "3", "4", "burst", "reset", "lockout", "all"], default="custom", help="Chế độ: custom, 1/reset, 2/lockout, 3=Wordlist, 4/burst=Firewall, all")
     parser.add_argument("--fail-count", type=int, default=10, help="Số lần gửi sai liên tiếp (Mặc định: 10)")
     parser.add_argument("--success-at", type=int, default=11, help="Lượt chèn thử mật khẩu đúng (Mặc định: 11; 0=Không thử đúng)")
     parser.add_argument("--wordlist", type=str, default=None, help="Đường dẫn file wordlist cho chế độ vét cạn từ điển")
-    parser.add_argument("--auth", choices=["wsse_sha1", "wsse_sha256", "wsse_text", "http_digest"], default=None, help="Chế độ xác thực ép buộc")
+    parser.add_argument("--auth", choices=["auto", "wsse_sha1", "wsse_sha256", "wsse_text", "http_digest"], default="auto", help="Chế độ xác thực ép buộc (hoặc auto)")
     parser.add_argument("--rate", type=float, default=4.0, help="Tốc độ gửi kết nối mới (kết nối/giây). Mặc định là 4.0 (250ms/gói để test Firewall 3 conn/s)")
     parser.add_argument("--stage", type=int, choices=[1, 2], default=None, help="Giai đoạn kiểm thử (1: Reset trước ngưỡng, 2: Khóa sau ngưỡng)")
+    parser.add_argument("--g1-fail", type=int, default=4, help="GĐ1: Số lần thử sai (Mặc định: 4)")
+    parser.add_argument("--g1-pass", type=int, default=5, help="GĐ1: Lượt thử đúng (Mặc định: 5)")
+    parser.add_argument("--g2-fail", type=int, default=5, help="GĐ2: Số lần thử sai (Mặc định: 5)")
+    parser.add_argument("--g2-pass", type=int, default=6, help="GĐ2: Lượt thử đúng (Mặc định: 6)")
     parser.add_argument("--burst-count", type=int, default=8, help="Số lượng kết nối mới đồng thời trong 1 giây cho chế độ test Firewall Rate-Limit (Mặc định: 8)")
     return parser.parse_args()
 
@@ -578,14 +661,28 @@ def main():
         bpf_filter,
         prefix="onvif_lockout_audit"
     )
-    if GLOBAL_PCAP_FILE:
+    if GLOBAL_PCAP_FILE and args.mode not in ("matrix", "custom"):
         console.print(f"[*] Đang tự động bắt gói tin PCAP vào: [green]{GLOBAL_PCAP_FILE}[/green]\n")
 
     try:
-        auth_mode = args.auth or auto_detect_auth_mode(url, USER, CORRECT_PASS)
+        if args.auth and args.auth != "auto":
+            auth_mode = args.auth
+        else:
+            auth_mode = auto_detect_auth_mode(url, USER, CORRECT_PASS)
 
         mode = args.mode
-        if mode in ("1", "reset"):
+        if mode == "matrix":
+            run_matrix_sequence(
+                url=url,
+                port=port,
+                auth_mode=auth_mode,
+                g1_fail=args.g1_fail,
+                g1_pass=args.g1_pass,
+                g2_fail=args.g2_fail,
+                g2_pass=args.g2_pass,
+                rate_cps=rate_cps
+            )
+        elif mode in ("1", "reset"):
             run_test_case_1(url, port, auth_mode, threshold, rate_cps=rate_cps)
         elif mode in ("2", "lockout"):
             run_test_case_2(url, port, auth_mode, threshold, rate_cps=rate_cps)
@@ -621,7 +718,7 @@ def main():
             ("Các gói tin xác thực sai (SOAP Fault / 401)", f"tcp.port == {port} && (http.response.code == 401 || xml contains \"Sender\" || xml contains \"FailedAuthentication\")"),
             ("Gói tin bị TƯỜNG LỬA CHẶN / Reset kết nối", f"tcp.port == {port} && (tcp.flags.reset == 1 || http.response.code in (403, 429))")
         ]
-        if args.mode != "custom":
+        if args.mode not in ("matrix", "custom"):
             display_wireshark_panel(
                 console,
                 GLOBAL_PCAP_FILE,

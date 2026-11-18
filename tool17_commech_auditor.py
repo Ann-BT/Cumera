@@ -582,15 +582,16 @@ def build_smb2_negotiate_response(msg_id: int, dialect: int = 0x0311) -> bytes:
 # NHÓM 1: CÁC BÀI ĐO MÁY ĐO LÀ CLIENT PROBE (CAMERA LÀ SERVER)
 # ==============================================================================
 
-def audit_commech_1_web(wait_sec: float = 3.0) -> Dict[str, Any]:
+def audit_commech_1_web(wait_sec: float = 3.0, auth_type: str = "auto") -> Dict[str, Any]:
     """Đo kiểm ComMech-Web: Giao diện Web (HTTPS & HTTP Clear)."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-Web: Web Interface (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]...")
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-Web: Web Interface (HTTPS/{DUT_IP}:{HTTPS_PORT}) [Cơ chế: {auth_type}][/bold cyan]...")
     res = {
         "id": "ComMech-Web",
         "name": f"Web Interface (HTTPS/{HTTPS_PORT})",
         "port": HTTPS_PORT,
         "proto": "IP/TCP/HTTPS",
         "direction": "DUT Server (Tool Probe)",
+        "auth_mode_selected": auth_type,
         "pcap": "commech-web_https.pcap",
         "aliases": ["commech-1_web_https.pcap", "commech-web.pcap"]
     }
@@ -705,15 +706,16 @@ def audit_commech_2_ssh(wait_sec: float = 3.0) -> Dict[str, Any]:
     return res
 
 
-def audit_commech_3_onvif(wait_sec: float = 3.0) -> Dict[str, Any]:
+def audit_commech_3_onvif(wait_sec: float = 3.0, auth_type: str = "auto") -> Dict[str, Any]:
     """Đo kiểm ComMech-ONVIF: ONVIF over HTTPS / HTTP."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-ONVIF: ONVIF Interface (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH})[/bold cyan]...")
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-ONVIF: ONVIF Interface (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH}) [Cơ chế: {auth_type}][/bold cyan]...")
     res = {
         "id": "ComMech-ONVIF",
         "name": f"ONVIF Interface (HTTPS/{ONVIF_HTTPS_PORT})",
         "port": ONVIF_HTTPS_PORT,
         "proto": "IP/TCP/HTTPS/ONVIF",
         "direction": "DUT Server (Tool Probe)",
+        "auth_mode_selected": auth_type,
         "pcap": "commech-onvif.pcap",
         "aliases": ["commech-3_onvif.pcap", "commech-4_onvif.pcap"]
     }
@@ -724,18 +726,19 @@ def audit_commech_3_onvif(wait_sec: float = 3.0) -> Dict[str, Any]:
         prefix="commech3_onvif"
     )
     try:
-        from tool11_onvif_lockout import send_onvif_request
+        from tool11_onvif_lockout import send_onvif_request, auto_detect_auth_mode
         url = f"https://{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH}"
-        ok, status_lbl, preview, lat = send_onvif_request(url, USER, PASS, auth_type="wsse_sha1")
+        effective_mode = auto_detect_auth_mode(url, USER, PASS) if auth_type == "auto" else auth_type
+        ok, status_lbl, preview, lat = send_onvif_request(url, USER, PASS, auth_type=effective_mode)
         if not ok and ONVIF_HTTP_PORT != ONVIF_HTTPS_PORT:
             http_test_url = f"http://{DUT_IP}:{ONVIF_HTTP_PORT}{ONVIF_PATH}"
-            ok_http, status_http, _, _ = send_onvif_request(http_test_url, USER, PASS, auth_type="wsse_sha1")
+            ok_http, status_http, _, _ = send_onvif_request(http_test_url, USER, PASS, auth_type=effective_mode)
             if ok_http:
                 ok = True
                 status_lbl = f"HTTP:{ONVIF_HTTP_PORT} ({status_http})"
                 res["port"] = ONVIF_HTTP_PORT
         res["auth_success"] = ok
-        res["auth_status"] = status_lbl
+        res["auth_status"] = f"{status_lbl} [{effective_mode.upper()}]"
 
         http_url = f"http://{DUT_IP}:{ONVIF_HTTP_PORT}{ONVIF_PATH}"
         http_rejected = False
@@ -843,15 +846,16 @@ def audit_commech_4_snmp(wait_sec: float = 3.0) -> Dict[str, Any]:
     return res
 
 
-def audit_commech_10_rtsp(wait_sec: float = 3.0) -> Dict[str, Any]:
+def audit_commech_10_rtsp(wait_sec: float = 3.0, auth_type: str = "auto") -> Dict[str, Any]:
     """Đo kiểm ComMech-RTSPS: RTSP over TLS (RTSPS)."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-RTSPS: RTSPS Interface (TLS/{DUT_IP}:{RTSPS_PORT}{RTSP_PATH})[/bold cyan]...")
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-RTSPS: RTSPS Interface (TLS/{DUT_IP}:{RTSPS_PORT}{RTSP_PATH}) [Cơ chế: {auth_type}][/bold cyan]...")
     res = {
         "id": "ComMech-RTSPS",
         "name": f"RTSPS Interface (TLS/{RTSPS_PORT})",
         "port": RTSPS_PORT,
         "proto": "IP/TCP/TLS/RTSP",
         "direction": "DUT Server (Tool Probe)",
+        "auth_mode_selected": auth_type,
         "pcap": "commech-rtsps.pcap",
         "aliases": ["commech-10_rtsps.pcap", "commech-3_rtsps.pcap"]
     }
@@ -874,12 +878,49 @@ def audit_commech_10_rtsp(wait_sec: float = 3.0) -> Dict[str, Any]:
                 active_cipher = ssock.cipher()
                 tls_ver = ssock.version()
 
-                # Gửi bản tin DESCRIBE xác thực để bóc tách thông số SDP luồng video đầy đủ trong PCAP
-                cred = base64.b64encode(f"{USER}:{PASS}".encode()).decode()
+                # Gửi bản tin DESCRIBE xác thực theo auth_type
+                rtsp_target_uri = f"rtsps://{DUT_IP}:{RTSPS_PORT}{RTSP_PATH}"
+                if auth_type == "basic":
+                    cred = base64.b64encode(f"{USER}:{PASS}".encode()).decode()
+                    auth_hdr_line = f"Authorization: Basic {cred}\r\n"
+                else:
+                    # Gửi DESCRIBE probe để lấy 401 challenge
+                    req_probe = f"DESCRIBE {rtsp_target_uri} RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: QCVN11-ComMech-Auditor\r\n\r\n"
+                    ssock.sendall(req_probe.encode())
+                    try:
+                        resp_probe = ssock.recv(4096).decode("utf-8", errors="ignore")
+                    except Exception:
+                        resp_probe = ""
+                    
+                    auth_line = next((l for l in resp_probe.splitlines() if "WWW-Authenticate" in l and "Digest" in l), "")
+                    if auth_line:
+                        import re
+                        m_realm = re.search(r'realm="([^"]*)"', auth_line)
+                        m_nonce = re.search(r'nonce="([^"]*)"', auth_line)
+                        m_qop = re.search(r'qop="([^"]*)"', auth_line)
+                        realm = m_realm.group(1) if m_realm else "IP Camera"
+                        nonce = m_nonce.group(1) if m_nonce else os.urandom(8).hex()
+                        is_sha256 = (auth_type == "digest-sha256") or ("sha-256" in auth_line.lower() and auth_type != "digest-md5")
+                        h_fn = hashlib.sha256 if is_sha256 else hashlib.md5
+                        alg_name = "SHA-256" if is_sha256 else "MD5"
+                        ha1 = h_fn(f"{USER}:{realm}:{PASS}".encode()).hexdigest()
+                        ha2 = h_fn(f"DESCRIBE:{rtsp_target_uri}".encode()).hexdigest()
+                        if m_qop and "auth" in m_qop.group(1):
+                            cnonce = base64.b16encode(os.urandom(8)).decode().lower()
+                            nc = "00000001"
+                            resp_hash = h_fn(f"{ha1}:{nonce}:{nc}:{cnonce}:auth:{ha2}".encode()).hexdigest()
+                            auth_hdr_line = f'Authorization: Digest username="{USER}", realm="{realm}", nonce="{nonce}", uri="{rtsp_target_uri}", qop=auth, nc={nc}, cnonce="{cnonce}", response="{resp_hash}", algorithm={alg_name}\r\n'
+                        else:
+                            resp_hash = h_fn(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest()
+                            auth_hdr_line = f'Authorization: Digest username="{USER}", realm="{realm}", nonce="{nonce}", uri="{rtsp_target_uri}", response="{resp_hash}", algorithm={alg_name}\r\n'
+                    else:
+                        cred = base64.b64encode(f"{USER}:{PASS}".encode()).decode()
+                        auth_hdr_line = f"Authorization: Basic {cred}\r\n"
+
                 req_rtsp = (
-                    f"DESCRIBE rtsps://{DUT_IP}:{RTSPS_PORT}{RTSP_PATH} RTSP/1.0\r\n"
-                    f"CSeq: 1\r\n"
-                    f"Authorization: Basic {cred}\r\n"
+                    f"DESCRIBE {rtsp_target_uri} RTSP/1.0\r\n"
+                    f"CSeq: 2\r\n"
+                    f"{auth_hdr_line}"
                     f"User-Agent: QCVN11-ComMech-Auditor\r\n\r\n"
                 )
                 ssock.sendall(req_rtsp.encode())
@@ -3160,6 +3201,7 @@ def main():
     parser.add_argument("--auto-trigger", action="store_true", help="Tự động gọi VAPIX kích hoạt Syslog/SMTP/SFTP (mặc định chờ bấm Test thủ công)")
     parser.add_argument("--no-pcap", action="store_true", help="Không bắt và không ghi đè tệp PCAP bằng chứng (dùng để kích thích lưu lượng kiểm tra Telemetry)")
     parser.add_argument("--enum", nargs="?", const="all", default=None, help="Bóc tách TOÀN BỘ Ciphersuite/KEX/SNMPv3 (1, 2, 3, 4, 10 hoặc 'all')")
+    parser.add_argument("--auth", "--auth-type", dest="auth_type", default="auto", help="Cơ chế xác thực ép buộc hoặc auto (auto, basic, digest, digest-md5, digest-sha256, wsse_sha1, wsse_sha256, wsse_text, http_digest, adapter)")
     args = parser.parse_args()
 
     if args.no_pcap:
@@ -3245,21 +3287,27 @@ def main():
                     res = audit_map[cid](wait_sec=args.wait, record_pcap=not args.no_pcap, forever=args.forever)
                 elif cid in ("cms", "20001") or (cid == "5" and is_oryza):
                     res = audit_map[cid](port=CMS_PORT, wait_sec=args.wait, record_pcap=not args.no_pcap, forever=args.forever)
+                elif cid in ("1", "web", "3", "onvif", "10", "rtsps"):
+                    res = audit_map[cid](wait_sec=args.wait, auth_type=args.auth_type)
                 else:
                     res = audit_map[cid](wait_sec=args.wait)
                 
                 if not args.no_pcap:
-                    # Sao chép và chuẩn hóa tên file pcap trong thư mục bằng chứng
+                    # Sao chép và chuẩn hóa tên file pcap trong thư mục bằng chứng (CHỈ 1 FILE DUY NHẤT)
                     if "pcap_file" in res and os.path.exists(res["pcap_file"]):
                         std_name = res.get("pcap", f"commech-{cid}.pcap")
                         dst_pcap = os.path.join(EVIDENCE_DIR, std_name)
                         shutil.copy2(res["pcap_file"], dst_pcap)
                         res["evidence_pcap"] = dst_pcap
+                        # Tự động dọn dẹp các tệp alias cũ/thừa để bảo đảm mỗi bài đo chỉ có đúng 1 tệp PCAP
                         for al in res.get("aliases", []):
-                            try:
-                                shutil.copy2(res["pcap_file"], os.path.join(EVIDENCE_DIR, al))
-                            except Exception:
-                                pass
+                            if al != std_name:
+                                old_alias = os.path.join(EVIDENCE_DIR, al)
+                                if os.path.exists(old_alias):
+                                    try:
+                                        os.remove(old_alias)
+                                    except Exception:
+                                        pass
                         cnt = get_pcap_packet_count(dst_pcap)
                         res["pcap_packet_count"] = cnt
                     is_cloud = (cid in ("11", "cloud", "o3c"))
