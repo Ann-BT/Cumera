@@ -27,6 +27,8 @@ TOOLKIT_DIR = os.path.dirname(os.path.abspath(__file__))
 if TOOLKIT_DIR not in sys.path:
     sys.path.insert(0, TOOLKIT_DIR)
 
+import toolkit_config
+
 from pyasn1.codec.ber import decoder
 from pysnmp.carrier.base import AbstractTransportDispatcher
 from pysnmp.hlapi.asyncio import (
@@ -88,7 +90,7 @@ def _make_console() -> Console:
 
 
 console = _make_console()
-CONF_PATH = os.path.join(TOOLKIT_DIR, "config.json")
+CONF_PATH = toolkit_config.CONF_PATH
 SYS_DESCR_OID = "1.3.6.1.2.1.1.1.0"
 
 # Ordered strongest -> weakest
@@ -113,27 +115,20 @@ PRIV_PROTOCOLS: List[Dict[str, Any]] = [
 
 
 def load_snmp_config() -> Dict[str, Any]:
-    """Load current DUT IP, port, and SNMPv3 credentials dynamically from config.json."""
-    cfg: Dict[str, Any] = {}
-    if os.path.exists(CONF_PATH):
-        try:
-            with open(CONF_PATH, encoding="utf-8") as f:
-                cfg = json.load(f)
-        except Exception:
-            cfg = {}
-
-    tc = cfg.get("target_camera", {})
-    sp = cfg.get("service_ports", {})
+    """Load current DUT IP, port, and SNMPv3 credentials dynamically via toolkit_config."""
+    cfg = toolkit_config.load_config()
+    tc = toolkit_config.get_target_info(cfg)
+    sp = toolkit_config.get_service_ports(cfg)
     s3 = cfg.get("snmp_v3") or cfg.get("snmp_credentials") or {}
 
-    cam_user = tc.get("username") or "admin"
-    cam_pass = tc.get("password") or "Psitest135##"
+    cam_user = tc.get("username", "admin")
+    cam_pass = tc.get("password", "")
     snmp_user = s3.get("user") or cam_user
     auth_pass = s3.get("auth_pass") or cam_pass
     priv_pass = s3.get("priv_pass") or auth_pass
 
     return {
-        "host": tc.get("ip") or "192.168.99.132",
+        "host": tc.get("ip", toolkit_config.DEFAULT_DUT_FALLBACK_IP),
         "port": int(sp.get("snmp") or sp.get("snmp_udp") or 161),
         "user": snmp_user,
         "auth_pass": auth_pass,

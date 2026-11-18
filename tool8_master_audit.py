@@ -427,4 +427,10 @@ def main():
     save_audit_reports(rep)
 
 if __name__ == '__main__':
+    if '-h' in sys.argv or '--help' in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(description="Tool 8: Master Audit - Đo kiểm tổng thể các giao thức mạng (QCVN 11)")
+        parser.add_argument("ip", nargs="?", default=DUT_IP, help=f"Địa chỉ IP của Camera DUT (mặc định: {DUT_IP})")
+        parser.print_help()
+        sys.exit(0)
     main()

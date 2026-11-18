@@ -258,4 +258,9 @@ def main():
         stop_pcap_capture(pcap_proc)
 
 if __name__ == '__main__':
+    if '-h' in sys.argv or '--help' in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(description="Tool 6: Máy chủ nhận cảnh báo Alarm Webhook / HTTP(S) cho Camera IP (QCVN 11)")
+        parser.print_help()
+        sys.exit(0)
     main()

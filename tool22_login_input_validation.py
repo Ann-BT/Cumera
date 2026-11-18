@@ -46,9 +46,11 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
 from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
+from adapters import get_camera_adapter
 
 console = make_console()
 config = load_config()
+adapter = get_camera_adapter(config)
 _target_info = get_target_info(config)
 SERVICE_PORTS = get_service_ports(config)
 
@@ -83,19 +85,10 @@ def check_icmp_integrity(ip: str) -> Tuple[bool, float]:
 
 def scan_login_surfaces(ip: str, port: int, scheme: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Dò quét thông minh các điểm đăng nhập Web/API trên đa dạng hãng Camera (Axis, Hikvision, Dahua, Uniview, Generic).
+    Dò quét thông minh các điểm đăng nhập Web/API theo adapter thiết bị (Axis, Oryza/Tiandy, Generic).
     """
     proto = scheme or ("https" if is_tls_port(ip, port) else "http")
-    endpoints = [
-        {"id": "SURF-01", "name": "Trang chủ Web Portal", "path": "/", "method": "GET", "expected_type": "Web UI Entry"},
-        {"id": "SURF-02", "name": "Giao diện Web SPA (Axis)", "path": "/camera/index.html", "method": "GET", "expected_type": "Web SPA Login Portal"},
-        {"id": "SURF-03", "name": "Cổng HTTP Auth (Axis CGI)", "path": "/axis-cgi/login.cgi", "method": "GET/POST", "expected_type": "HTTP Basic/Digest Auth Gateway"},
-        {"id": "SURF-04", "name": "Cổng Tham số (Axis CGI)", "path": "/axis-cgi/param.cgi", "method": "GET", "expected_type": "Config Management Challenge"},
-        {"id": "SURF-05", "name": "ISAPI Security (Hikvision)", "path": "/ISAPI/Security/userCheck", "method": "GET", "expected_type": "HTTP Auth Challenge"},
-        {"id": "SURF-06", "name": "RPC/CGI Auth (Dahua)", "path": "/cgi-bin/magicBox.cgi?action=getSystemInfo", "method": "GET", "expected_type": "HTTP Digest Challenge"},
-        {"id": "SURF-07", "name": "LAPI Security (Uniview)", "path": "/LAPI/V1.0/System/DeviceBasicInfo", "method": "GET", "expected_type": "REST Auth Gateway"},
-        {"id": "SURF-08", "name": "Dịch vụ ONVIF SOAP", "path": ONVIF_PATH, "method": "POST", "expected_type": "WS-Security SOAP"},
-    ]
+    endpoints = adapter.get_login_surfaces(ip, port)
 
     discovered = []
     for item in endpoints:
@@ -155,7 +148,8 @@ def create_login_audit_evidence_html(
             if s.get("realm") and s["realm"] not in ["None", "Chung hệ thống"]:
                 primary_realm = s["realm"]
     
-    paths_display = ", ".join(f"<code>{p}</code>" for p in (detected_dialog_paths[:2] if detected_dialog_paths else ["/camera/index.html", "/axis-cgi/login.cgi"]))
+    fallback_paths = [s["path"] for s in adapter.get_login_surfaces(target_ip, port)[:2]]
+    paths_display = ", ".join(f"<code>{p}</code>" for p in (detected_dialog_paths[:2] if detected_dialog_paths else fallback_paths))
 
     html_content = f"""<!DOCTYPE html>
 <html lang="vi">

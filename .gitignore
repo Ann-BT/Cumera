@@ -19,6 +19,8 @@ captures/*.pcapng
 captures/*.log
 captures/*.json
 captures/*.html
+captures/*.md
+!captures/rtsp_auth_wireshark_proof.md
 captures/sslkeys.log
 captures/evidence/
 captures/uploads/

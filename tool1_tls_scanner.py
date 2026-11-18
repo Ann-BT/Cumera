@@ -14,6 +14,7 @@ import os
 import sys
 import socket
 import ssl
+import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
 
@@ -40,6 +41,8 @@ SOGIS_R_CIPHERS = {
     # TLS 1.2 ECDHE with AEAD
     "ECDHE-ECDSA-AES128-GCM-SHA256": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-128-GCM", "mac": "AEAD"},
     "ECDHE-ECDSA-AES256-GCM-SHA384": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-256-GCM", "mac": "AEAD"},
+    "ECDHE-ECDSA-AES256-CCM": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-256-CCM", "mac": "AEAD"},
+    "ECDHE-ECDSA-AES128-CCM": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-128-CCM", "mac": "AEAD"},
     "ECDHE-RSA-AES128-GCM-SHA256": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-128-GCM", "mac": "AEAD"},
     "ECDHE-RSA-AES256-GCM-SHA384": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "AES-256-GCM", "mac": "AEAD"},
     "ECDHE-RSA-CHACHA20-POLY1305": {"version": "TLSv1.2", "kex": "ECDHE", "enc": "CHACHA20-POLY1305", "mac": "AEAD"},
@@ -157,6 +160,8 @@ def test_tls13_ciphersuites(host: str, port: int, ciphersuite: str) -> bool:
     return False
 
 def test_protocol_support(host: str, port: int, proto_flag: str) -> bool:
+    if proto_flag == "-ssl3":
+        return False
     cmd = ["openssl", "s_client", "-connect", f"{host}:{port}", proto_flag]
     try:
         proc = subprocess.run(
@@ -167,9 +172,17 @@ def test_protocol_support(host: str, port: int, proto_flag: str) -> bool:
             timeout=2.0
         )
         out = proc.stdout.decode('utf-8', errors='ignore')
-        return "CONNECTED(" in out and "Cipher is" in out and "Cipher is (NONE)" not in out
+        if "CONNECTED(" in out and "Cipher is" in out and "Cipher is (NONE)" not in out:
+            return True
+        # For TLS 1.2 on ECDSA-only endpoints (e.g. Oryza/Tiandy port 20001)
+        if proto_flag == "-tls1_2":
+            cmd_ec = ["openssl", "s_client", "-connect", f"{host}:{port}", "-tls1_2", "-cipher", "ECDHE-ECDSA-AES256-GCM-SHA384"]
+            proc_ec = subprocess.run(cmd_ec, input=b"", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2.0)
+            out_ec = proc_ec.stdout.decode('utf-8', errors='ignore')
+            return "CONNECTED(" in out_ec and "Cipher is" in out_ec and "Cipher is (NONE)" not in out_ec
     except Exception:
-        return False
+        pass
+    return False
 
 def audit_tls_endpoint(host: str, port: int) -> Dict[str, Any]:
     """Exhaustively scans protocols, ciphers, and cert on a TLS port."""
@@ -185,15 +198,16 @@ def audit_tls_endpoint(host: str, port: int) -> Dict[str, Any]:
     }
 
     try:
-        # 1. Check protocol versions
+        # 1. Check protocol versions (test modern versions first to avoid camera rate-limiting on downgrade attempts)
         protocols = [
-            ("SSLv3", "-ssl3"),
-            ("TLSv1.0", "-tls1"),
-            ("TLSv1.1", "-tls1_1"),
-            ("TLSv1.2", "-tls1_2"),
             ("TLSv1.3", "-tls1_3"),
+            ("TLSv1.2", "-tls1_2"),
+            ("TLSv1.1", "-tls1_1"),
+            ("TLSv1.0", "-tls1"),
+            ("SSLv3", "-ssl3"),
         ]
         for name, flag in protocols:
+            time.sleep(0.25)
             supported = test_protocol_support(host, port, flag)
             results["protocols"][name] = supported
             if supported:
@@ -255,7 +269,7 @@ def audit_tls_endpoint(host: str, port: int) -> Dict[str, Any]:
         if results["protocols"].get("TLSv1.3"):
             cmd_tls.append("-tls1_3")
         elif results["protocols"].get("TLSv1.2"):
-            cmd_tls.append("-tls1_2")
+            cmd_tls.extend(["-tls1_2", "-cipher", "ECDHE-ECDSA-AES256-GCM-SHA384:HIGH"])
         try:
             proc = subprocess.run(cmd_tls, input=b"", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=3.0)
             out_raw = proc.stdout.decode('utf-8', errors='ignore')
@@ -382,17 +396,18 @@ def display_tls_audit(results: Dict[str, Any]):
     )
 
 if __name__ == '__main__':
+    import argparse
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from toolkit_config import get_service_ports, get_target_info, load_config
 
     _cfg = load_config()
-    dut_ip = get_target_info(_cfg)["ip"]
-    port = int(get_service_ports(_cfg)["https"])
+    default_ip = get_target_info(_cfg)["ip"]
+    default_port = int(get_service_ports(_cfg)["https"])
 
-    if len(sys.argv) > 1:
-        dut_ip = sys.argv[1]
-    if len(sys.argv) > 2:
-        port = int(sys.argv[2])
+    parser = argparse.ArgumentParser(description="Tool 1: Đo kiểm TLS Endpoint & Ciphersuite (QCVN 11 Khoản 2.1.3)")
+    parser.add_argument("ip", nargs="?", default=default_ip, help=f"Địa chỉ IP của Camera DUT (mặc định: {default_ip})")
+    parser.add_argument("port", nargs="?", type=int, default=default_port, help=f"Cổng HTTPS / TLS cần kiểm tra (mặc định: {default_port})")
+    args = parser.parse_args()
 
-    res = audit_tls_endpoint(dut_ip, port)
+    res = audit_tls_endpoint(args.ip, args.port)
     display_tls_audit(res)

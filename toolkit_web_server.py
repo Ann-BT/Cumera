@@ -40,13 +40,19 @@ if str(BASE_DIR) not in sys.path:
 
 from toolkit_config import (
     detect_host_network,
+    get_active_profile,
+    get_profile,
     get_service_ports,
     get_target_info,
+    list_profiles,
     load_config as tc_load_config,
     normalize_service_ports,
     probe_common_camera_ports,
     save_config as tc_save_config,
+    switch_profile,
+    update_profile,
 )
+from adapters import get_camera_adapter
 
 # Tự động nhận diện môi trường ảo .venv (ưu tiên trong thư mục hiện tại, rồi thư mục cha)
 VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python"
@@ -70,12 +76,13 @@ if not CONFIG_FILE.exists() and EXAMPLE_CONFIG_FILE.exists():
 HTML_FILE = BASE_DIR / "ui_dashboard.html"
 
 def get_current_model() -> str:
-    if CONFIG_FILE.exists():
-        try:
-            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            return cfg.get("target_camera", {}).get("model", "Generic IP Camera")
-        except Exception:
-            pass
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        info = get_target_info(cfg)
+        if info.get("model"):
+            return info["model"]
+    except Exception:
+        pass
     return "Generic IP Camera"
 
 def get_evidence_dirs():
@@ -86,7 +93,7 @@ def get_evidence_dirs():
         except Exception:
             pass
 
-    current_model = cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
+    current_model = get_current_model()
     base_custom = cfg.get("evidence_base_dir", "").strip()
 
     # ComMech directory
@@ -98,7 +105,6 @@ def get_evidence_dirs():
     else:
         candidates_commech = [
             PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech",
-            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "ComMech",
             PROJECT_DIR / "Mẫu lưu bằng chứng" / "ComMech",
             CAPTURES_DIR / "evidence" / "ComMech",
             CAPTURES_DIR
@@ -114,7 +120,6 @@ def get_evidence_dirs():
     else:
         candidates_authmech = [
             PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech",
-            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "AuthMech",
             PROJECT_DIR / "Mẫu lưu bằng chứng" / "AuthMech",
             CAPTURES_DIR / "evidence" / "AuthMech",
             CAPTURES_DIR
@@ -210,6 +215,7 @@ async def get_target_status():
                 latency_ms = 0.5
 
     return {
+        "active_profile": get_active_profile(cfg),
         "ip": ip,
         "model": target["model"],
         "firmware": target["firmware"],
@@ -221,6 +227,76 @@ async def get_target_status():
     }
 
 
+@app.get("/api/profiles")
+async def get_profiles():
+    """List all available camera profiles and the active profile ID."""
+    try:
+        active_profile = get_active_profile()
+        raw_profiles = list_profiles()
+        profiles_summary = []
+        for p in raw_profiles:
+            pdata = p.get("data", {})
+            profiles_summary.append({
+                "id": p["id"],
+                "name": p.get("name") or p["id"],
+                "vendor": p.get("vendor", "Unknown"),
+                "model": p.get("model", ""),
+                "ip": p.get("ip", ""),
+                "firmware": p.get("firmware", ""),
+                "evidence_base_dir": p.get("evidence_base_dir") or pdata.get("evidence_base_dir", ""),
+                "firmware_base_dir": pdata.get("firmware_config", {}).get("base_dir", ""),
+                "is_active": (p["id"] == active_profile),
+            })
+        return {
+            "status": "ok",
+            "active_profile": active_profile,
+            "profiles": profiles_summary
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc danh sách profiles: {e}")
+
+
+@app.post("/api/profiles/switch")
+async def switch_camera_profile(data: dict):
+    """Switch active camera profile, persist to config.json, and return updated config."""
+    profile_id = (data.get("profile_id") or data.get("id") or "").strip()
+    if not profile_id:
+        raise HTTPException(status_code=400, detail="Thiếu profile_id.")
+    try:
+        new_cfg = switch_profile(profile_id)
+        target_ip = get_target_info(new_cfg)["ip"]
+        host_iface, host_ip = detect_host_network(target_ip, new_cfg)
+        new_cfg["host_info"] = {"interface": host_iface, "ip": host_ip}
+        new_cfg["service_ports"] = normalize_service_ports(new_cfg.get("service_ports"))
+        return {
+            "status": "ok",
+            "message": f"Đã chuyển sang Profile: {new_cfg.get('name') or profile_id}",
+            "active_profile": profile_id,
+            "config": new_cfg
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi chuyển profile: {e}")
+
+
+@app.get("/api/firmware/info")
+async def get_firmware_info():
+    """Retrieve firmware base_dir and config for active profile."""
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        fw_cfg = cfg.get("firmware_config", {})
+        base_dir = fw_cfg.get("base_dir", "")
+        return {
+            "status": "ok",
+            "active_profile": get_active_profile(cfg),
+            "base_dir": base_dir,
+            "firmware_config": fw_cfg,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc thông tin firmware: {e}")
+
+
 @app.get("/api/config")
 async def get_config():
     """Retrieve current target configuration with normalized service ports and live host network info."""
@@ -228,6 +304,7 @@ async def get_config():
         cfg = tc_load_config(str(CONFIG_FILE))
         if not cfg and CONFIG_FILE.exists():
             cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        cfg["active_profile"] = get_active_profile(cfg)
         cfg["service_ports"] = normalize_service_ports(cfg.get("service_ports"))
         target_ip = get_target_info(cfg)["ip"]
         host_iface, host_ip = detect_host_network(target_ip, cfg)
@@ -235,6 +312,44 @@ async def get_config():
         return cfg
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/authmech/definitions")
+async def get_authmech_definitions():
+    """Return dynamic AuthMech definitions according to active camera profile."""
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        adapter = get_camera_adapter(cfg)
+        defs = adapter.get_authmech_definitions()
+        return {
+            "status": "ok",
+            "active_profile": adapter.profile_id,
+            "vendor": adapter.vendor,
+            "model": adapter.model,
+            "dut_ip": adapter.ip,
+            "definitions": defs,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc định nghĩa AuthMech: {e}")
+
+
+@app.get("/api/commech/definitions")
+async def get_commech_definitions():
+    """Return dynamic ComMech definitions according to active camera profile."""
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        adapter = get_camera_adapter(cfg)
+        defs = adapter.get_commech_definitions()
+        return {
+            "status": "ok",
+            "active_profile": adapter.profile_id,
+            "vendor": adapter.vendor,
+            "model": adapter.model,
+            "dut_ip": adapter.ip,
+            "definitions": defs,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc định nghĩa ComMech: {e}")
 
 
 _CONFIG_PORT_FIELD_MAP = {
@@ -329,6 +444,12 @@ async def save_config(data: dict):
         current["test_host"] = {"ip": host_ip, "interface": host_iface}
 
         saved = tc_save_config(current, str(CONFIG_FILE))
+        active_prof = current.get("active_profile") or current.get("profile_id")
+        if active_prof:
+            try:
+                update_profile(active_prof, current)
+            except Exception:
+                pass
         saved_with_host = dict(saved)
         saved_with_host["host_info"] = {"interface": host_iface, "ip": host_ip}
         return {
@@ -419,10 +540,18 @@ async def get_evidence_folders():
         except Exception:
             pass
 
-    current_model = cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
+    current_model = get_current_model()
     base_custom = cfg.get("evidence_base_dir", "").strip()
 
-    presets = [
+    presets = []
+    if base_custom:
+        presets.append({
+            "id": "profile_base",
+            "name": f"Theo Profile ({cfg.get('name') or current_model})",
+            "path": base_custom,
+            "exists": Path(base_custom).exists()
+        })
+    presets.extend([
         {
             "id": "model",
             "name": f"Theo Model ({current_model})",
@@ -441,7 +570,7 @@ async def get_evidence_folders():
             "path": str(CAPTURES_DIR),
             "exists": CAPTURES_DIR.exists()
         }
-    ]
+    ])
 
     return {
         "evidence_base_dir": base_custom or str(c_dir.parent if c_dir.name in ["ComMech", "AuthMech"] else c_dir),
@@ -601,14 +730,14 @@ async def get_firmware_signing_result():
 
 @app.get("/api/firmware_signing/download_tampered")
 async def download_tampered_firmware(path: str):
-    """Download a generated 1-byte tampered firmware .bin file."""
+    """Download a generated 1-byte tampered firmware (.bin / .encap) file."""
     target = Path(path).resolve()
     workspace_root = BASE_DIR.parent.resolve()
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="Không tìm thấy file tampered firmware.")
-    if "_TAMPERED_1BYTE" not in target.name or not target.name.endswith(".bin"):
-        raise HTTPException(status_code=400, detail="Chỉ cho phép tải file *_TAMPERED_1BYTE.bin.")
-    if workspace_root not in target.parents:
+    if "_TAMPERED" not in target.name or (not target.name.endswith(".bin") and not target.name.endswith(".encap")):
+        raise HTTPException(status_code=400, detail="Chỉ cho phép tải file *_TAMPERED*.bin hoặc *.encap.")
+    if workspace_root not in target.parents and "/home/merlin/PSI" not in str(target):
         raise HTTPException(status_code=403, detail="Đường dẫn nằm ngoài workspace.")
     return FileResponse(path=str(target), filename=target.name, media_type="application/octet-stream")
 
@@ -641,21 +770,31 @@ async def upload_telemetry_geoip_pcap(request: Request, filename: str = "uploade
     }
 
 
-def get_current_model() -> str:
-    try:
-        if CONFIG_FILE.exists():
-            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            return cfg.get("target_camera", {}).get("model", "AXIS Q1806-LE")
-    except Exception:
-        pass
-    return "AXIS Q1806-LE"
-
-
 @app.post("/api/open_wireshark")
 async def open_wireshark(data: dict):
     """Launch Wireshark on the specified PCAP file in background."""
     pcap_path = data.get("pcap_path", "")
     target_file = None
+
+    LEGACY_PCAP_ALIASES = {
+        "authmech-web.pcap": ["authmech-1_web.pcap", "Web-Authmech.pcap"],
+        "authmech-ssh.pcap": ["authmech-2_ssh.pcap", "SSH-Authmech.pcap"],
+        "authmech-rtsp.pcap": ["authmech-3_rtsps.pcap", "authmech-2_rtsp.pcap", "RTSP-Authmech.pcap"],
+        "authmech-onvif.pcap": ["authmech-4_onvif.pcap", "authmech-3_onvif.pcap", "AuthMech-Onvif.pcap"],
+        "authmech-cms.pcap": ["authmech-cms_20001.pcap"],
+        "commech-web_https.pcap": ["commech-1_web_https.pcap", "commech-web.pcap"],
+        "commech-ssh.pcap": ["commech-2_ssh.pcap"],
+        "commech-onvif.pcap": ["commech-3_onvif.pcap", "commech-4_onvif.pcap"],
+        "commech-snmpv3.pcap": ["commech-4_snmpv3.pcap", "commech-9_snmpv3.pcap"],
+        "commech-cms.pcap": ["commech-5_cms.pcap"],
+        "commech-rtsps.pcap": ["commech-10_rtsps.pcap", "commech-3_rtsps.pcap"],
+        "commech-mqtt.pcap": ["commech-5_mqtt.pcap"],
+        "commech-syslog.pcap": ["commech-6_syslog.pcap"],
+        "commech-smb.pcap": ["commech-7_smb.pcap"],
+        "commech-smtp.pcap": ["commech-8_smtp.pcap", "commech-7_smtp.pcap"],
+        "commech-sftp.pcap": ["commech-9_sftp.pcap", "commech-6_sftp.pcap"],
+        "commech-cloud.pcap": ["commech-11_o3c.pcap"],
+    }
 
     if pcap_path and os.path.exists(pcap_path):
         target_file = pcap_path
@@ -663,23 +802,28 @@ async def open_wireshark(data: dict):
         filename = os.path.basename(pcap_path) if pcap_path else ""
         current_model = get_current_model()
         c_dir, a_dir = get_evidence_dirs()
-        candidates = [
-            c_dir / filename,
-            a_dir / filename,
-            PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech" / filename,
-            PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech" / filename,
-            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "ComMech" / filename,
-            PROJECT_DIR / "AXIS Q1806-LE" / "Mẫu lưu bằng chứng" / "AuthMech" / filename,
-            PROJECT_DIR / "Mẫu lưu bằng chứng" / "ComMech" / filename,
-            PROJECT_DIR / "Mẫu lưu bằng chứng" / "AuthMech" / filename,
-            CAPTURES_DIR / "evidence" / "ComMech" / filename,
-            CAPTURES_DIR / "evidence" / "AuthMech" / filename,
-            CAPTURES_DIR / filename,
-            BASE_DIR / filename,
-        ]
-        for c in candidates:
-            if c.exists() and c.is_file():
-                target_file = str(c)
+        filenames_to_try = [filename] + LEGACY_PCAP_ALIASES.get(filename, [])
+
+        for fn in filenames_to_try:
+            if not fn:
+                continue
+            candidates = [
+                c_dir / fn,
+                a_dir / fn,
+                PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "ComMech" / fn,
+                PROJECT_DIR / current_model / "Mẫu lưu bằng chứng" / "AuthMech" / fn,
+                PROJECT_DIR / "Mẫu lưu bằng chứng" / "ComMech" / fn,
+                PROJECT_DIR / "Mẫu lưu bằng chứng" / "AuthMech" / fn,
+                CAPTURES_DIR / "evidence" / "ComMech" / fn,
+                CAPTURES_DIR / "evidence" / "AuthMech" / fn,
+                CAPTURES_DIR / fn,
+                BASE_DIR / fn,
+            ]
+            for c in candidates:
+                if c.exists() and c.is_file():
+                    target_file = str(c)
+                    break
+            if target_file:
                 break
 
         if not target_file and filename:
@@ -715,6 +859,56 @@ async def open_wireshark(data: dict):
         return {"status": "ok", "message": f"Đã khởi chạy Wireshark mở tệp: {os.path.basename(target_file)}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Không thể khởi chạy Wireshark: {str(e)}")
+
+
+@app.post("/api/open_cms")
+async def open_cms():
+    """Launch manufacturer CMS client via Wine."""
+    cms_exe = Path("/home/merlin/.wine/drive_c/Program Files (x86)/CMS/client/CMS.exe")
+    if not cms_exe.exists():
+        raise HTTPException(status_code=404, detail="Không tìm thấy tệp CMS.exe trong Wine (/home/merlin/.wine/drive_c/Program Files (x86)/CMS/client/CMS.exe)")
+
+    # 1. Đảm bảo CMU background server đang chạy
+    cmu_running = False
+    try:
+        proc = subprocess.run(["pgrep", "-f", "CMU.exe"], capture_output=True, text=True)
+        if proc.stdout.strip():
+            cmu_running = True
+    except Exception:
+        pass
+
+    env = os.environ.copy()
+    env["WINEPREFIX"] = "/home/merlin/.wine"
+
+    if not cmu_running:
+        cmu_exe = Path("/home/merlin/.wine/drive_c/Program Files (x86)/CMS/server/CMU.exe")
+        if cmu_exe.exists():
+            subprocess.Popen(
+                ["wine", str(cmu_exe)],
+                cwd=str(cmu_exe.parent),
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            time.sleep(1)
+
+    # 2. Khởi chạy CMS Client
+    try:
+        subprocess.Popen(
+            ["wine", str(cms_exe)],
+            cwd=str(cms_exe.parent),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        return {
+            "status": "ok",
+            "message": "Đã khởi chạy CMS Client. Đăng nhập CMS: admin / admin (Server: 127.0.0.1:10086), sau đó nhấn F7 để thêm camera 192.168.99.84:20001."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể khởi chạy CMS.exe: {e}")
 
 
 REPO_NAME = "Ann-BT/Cumera"
@@ -1002,6 +1196,8 @@ async def websocket_run(websocket: WebSocket):
                 elif parts[0] == "sudo":
                     if len(parts) > 1 and parts[1] in ["python", "python3"]:
                         exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[2:]
+                    elif len(parts) > 1 and (parts[1].endswith(".py") or (BASE_DIR / parts[1]).is_file()):
+                        exec_cmd = ["sudo", str(VENV_PYTHON)] + parts[1:]
                     else:
                         exec_cmd = parts
                 elif parts[0] == "ping":
@@ -1021,6 +1217,21 @@ async def websocket_run(websocket: WebSocket):
                         exec_cmd = win_ping
                     else:
                         exec_cmd = parts
+                elif parts[0] == "nmap":
+                    nmap_bin = shutil.which("nmap")
+                    if not nmap_bin and sys.platform == "win32":
+                        for cand in [
+                            r"C:\Program Files (x86)\Nmap\nmap.exe",
+                            r"C:\Program Files\Nmap\nmap.exe",
+                        ]:
+                            if os.path.exists(cand):
+                                nmap_bin = cand
+                                break
+                    exec_cmd = [nmap_bin or "nmap"] + parts[1:]
+                elif parts[0].endswith(".py") or (BASE_DIR / parts[0]).is_file():
+                    exec_cmd = [str(VENV_PYTHON)] + parts
+                elif shutil.which(parts[0]):
+                    exec_cmd = parts
                 else:
                     exec_cmd = [str(VENV_PYTHON)] + parts
 

@@ -92,4 +92,9 @@ def main():
     )
 
 if __name__ == '__main__':
+    if '-h' in sys.argv or '--help' in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(description="Tool 7: Tự động khám phá ONVIF WS-Discovery qua UDP 3702 (QCVN 11 Khoản 2.1.3)")
+        parser.print_help()
+        sys.exit(0)
     main()

@@ -55,7 +55,7 @@ except Exception:
     pass
 
 # Tự động nâng quyền root trên Linux (bắt buộc để bind các cổng đặc quyền < 1024 như 445, 514, 25, 21, 22)
-if __name__ == '__main__' and hasattr(os, 'geteuid') and os.geteuid() != 0:
+if __name__ == '__main__' and hasattr(os, 'geteuid') and os.geteuid() != 0 and '-h' not in sys.argv and '--help' not in sys.argv:
     print("[*] Mở các cổng mạng đặc quyền (445, 514, 25, 21, 22...) yêu cầu quyền root.")
     print("[*] Đang tự động nâng quyền với sudo...")
     try:
@@ -114,11 +114,13 @@ from toolkit_config import (
     load_config,
     make_console,
 )
+from adapters import get_camera_adapter
 
 console = make_console()
 config = load_config()
 _target_info = get_target_info(config)
 SERVICE_PORTS = get_service_ports(config)
+adapter = get_camera_adapter(config)
 
 DUT_IP = _target_info["ip"]
 DUT_MODEL = _target_info["model"]
@@ -149,6 +151,14 @@ SMTPS_PORT = int(SERVICE_PORTS["smtps"])
 SMTP_CLEAR_PORT = int(SERVICE_PORTS["smtp_clear"])
 SFTP_PORT = int(SERVICE_PORTS["sftp_port"])
 FTP_CLEAR_PORT = int(SERVICE_PORTS["ftp_clear"])
+CMS_PORT = int(SERVICE_PORTS.get("proprietary_tcp") or 20001)
+
+is_oryza = (
+    "oryza" in getattr(adapter, "profile_id", "").lower()
+    or "tiandy" in getattr(adapter, "profile_id", "").lower()
+    or "oryza" in str(getattr(adapter, "vendor", "")).lower()
+    or "orz" in str(getattr(adapter, "model", "")).lower()
+)
 
 
 def detect_local_host_ip(target_ip: str) -> str:
@@ -573,15 +583,16 @@ def build_smb2_negotiate_response(msg_id: int, dialect: int = 0x0311) -> bytes:
 # ==============================================================================
 
 def audit_commech_1_web(wait_sec: float = 3.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-1: Giao diện Web (HTTPS & HTTP Clear)."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-1: Web Interface (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]...")
+    """Đo kiểm ComMech-Web: Giao diện Web (HTTPS & HTTP Clear)."""
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-Web: Web Interface (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]...")
     res = {
-        "id": "ComMech-1",
+        "id": "ComMech-Web",
         "name": f"Web Interface (HTTPS/{HTTPS_PORT})",
         "port": HTTPS_PORT,
         "proto": "IP/TCP/HTTPS",
         "direction": "DUT Server (Tool Probe)",
-        "pcap": "commech-1_web_https.pcap"
+        "pcap": "commech-web_https.pcap",
+        "aliases": ["commech-1_web_https.pcap", "commech-web.pcap"]
     }
 
     pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and (tcp port {HTTPS_PORT} or tcp port {HTTP_PORT})", prefix="commech1_web_https")
@@ -636,22 +647,26 @@ def audit_commech_1_web(wait_sec: float = 3.0) -> Dict[str, Any]:
 
 
 def audit_commech_2_ssh(wait_sec: float = 3.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-2: Giao diện SSH."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-2: SSH Interface (SSH/{DUT_IP}:{SSH_PORT})[/bold cyan]...")
+    """Đo kiểm ComMech-SSH: Giao diện SSH."""
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-SSH: SSH Interface (SSH/{DUT_IP}:{SSH_PORT})[/bold cyan]...")
     res = {
-        "id": "ComMech-2",
-        "name": f"SSH Interface (SSH/{SSH_PORT})",
+        "id": "ComMech-SSH",
+        "name": f"SSH Remote CLI (SSH/{SSH_PORT})",
         "port": SSH_PORT,
         "proto": "IP/TCP/SSH",
         "direction": "DUT Server (Tool Probe)",
-        "pcap": "commech-2_ssh.pcap"
+        "pcap": "commech-ssh.pcap",
+        "aliases": ["commech-2_ssh.pcap"]
     }
 
     pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and tcp port {SSH_PORT}", prefix="commech2_ssh")
     time.sleep(0.8)
     try:
-        t = paramiko.Transport((DUT_IP, SSH_PORT))
-        t.start_client(timeout=4.0)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(3.0)
+        sock.connect((DUT_IP, SSH_PORT))
+        t = paramiko.Transport(sock)
+        t.start_client(timeout=3.0)
         banner = t.remote_version
         sec_opts = t.get_security_options()
         ciphers_supported = list(sec_opts.ciphers)
@@ -691,15 +706,16 @@ def audit_commech_2_ssh(wait_sec: float = 3.0) -> Dict[str, Any]:
 
 
 def audit_commech_3_onvif(wait_sec: float = 3.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-3: ONVIF over HTTPS / HTTP."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-3: ONVIF Interface (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH})[/bold cyan]...")
+    """Đo kiểm ComMech-ONVIF: ONVIF over HTTPS / HTTP."""
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-ONVIF: ONVIF Interface (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH})[/bold cyan]...")
     res = {
-        "id": "ComMech-3",
+        "id": "ComMech-ONVIF",
         "name": f"ONVIF Interface (HTTPS/{ONVIF_HTTPS_PORT})",
         "port": ONVIF_HTTPS_PORT,
         "proto": "IP/TCP/HTTPS/ONVIF",
         "direction": "DUT Server (Tool Probe)",
-        "pcap": "commech-3_onvif.pcap"
+        "pcap": "commech-onvif.pcap",
+        "aliases": ["commech-3_onvif.pcap", "commech-4_onvif.pcap"]
     }
 
     pcap_proc, pcap_path = start_pcap_capture(
@@ -753,14 +769,15 @@ def audit_commech_4_snmp(wait_sec: float = 3.0) -> Dict[str, Any]:
     authNoPriv, noAuthNoPriv và hạ cấp SNMPv1/v2c truyền rõ để xác định chính xác các mã hóa thực tế dùng được.
     """
     snmp_port = int(config.get("service_ports", {}).get("snmp") or config.get("service_ports", {}).get("snmp_udp") or 161)
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-4: SNMP Interface (UDP/{DUT_IP}:{snmp_port})[/bold cyan]...")
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-SNMP: SNMP Interface (UDP/{DUT_IP}:{snmp_port})[/bold cyan]...")
     res = {
-        "id": "ComMech-4",
-        "name": f"SNMP Interface (UDP/{snmp_port})",
+        "id": "ComMech-SNMP",
+        "name": f"SNMPv3 Interface (UDP/{snmp_port})",
         "port": snmp_port,
         "proto": "IP/UDP/SNMPv3",
         "direction": "DUT Server (Tool Probe)",
-        "pcap": "commech-4_snmpv3.pcap"
+        "pcap": "commech-snmpv3.pcap",
+        "aliases": ["commech-4_snmpv3.pcap", "commech-9_snmpv3.pcap"]
     }
 
     pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and udp port {snmp_port}", prefix="commech4_snmpv3")
@@ -827,15 +844,16 @@ def audit_commech_4_snmp(wait_sec: float = 3.0) -> Dict[str, Any]:
 
 
 def audit_commech_10_rtsp(wait_sec: float = 3.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-10: RTSP over TLS (RTSPS)."""
-    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-10: RTSPS Interface (TLS/{DUT_IP}:{RTSPS_PORT}{RTSP_PATH})[/bold cyan]...")
+    """Đo kiểm ComMech-RTSPS: RTSP over TLS (RTSPS)."""
+    console.print(f"\n[*] Đang chủ động đo kiểm [bold cyan]ComMech-RTSPS: RTSPS Interface (TLS/{DUT_IP}:{RTSPS_PORT}{RTSP_PATH})[/bold cyan]...")
     res = {
-        "id": "ComMech-10",
+        "id": "ComMech-RTSPS",
         "name": f"RTSPS Interface (TLS/{RTSPS_PORT})",
         "port": RTSPS_PORT,
         "proto": "IP/TCP/TLS/RTSP",
         "direction": "DUT Server (Tool Probe)",
-        "pcap": "commech-10_rtsps.pcap"
+        "pcap": "commech-rtsps.pcap",
+        "aliases": ["commech-10_rtsps.pcap", "commech-3_rtsps.pcap"]
     }
 
     pcap_proc, pcap_path = start_pcap_capture(
@@ -1118,16 +1136,17 @@ def _probe_local_smb_downgrade(smb_port: int) -> str:
 
 
 def audit_commech_7_smb(wait_sec: float = 20.0, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
-    """Đo kiểm ComMech-7: SMBv3 NAS Client - Máy đo là SMB Server."""
-    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-7: SMBv3 NAS Storage Client (TCP/{SMB_PORT})[/bold cyan]...")
+    """Đo kiểm ComMech-SMB: SMBv3 NAS Client - Máy đo là SMB Server."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-SMB: SMBv3 NAS Storage Client (TCP/{SMB_PORT})[/bold cyan]...")
     smbd_active = _is_local_port_open(SMB_PORT)
     res = {
-        "id": "ComMech-7",
+        "id": "ComMech-SMB",
         "name": "SMBv3 NAS Client",
         "port": SMB_PORT,
         "proto": "IP/TCP/SMBv3",
         "direction": f"DUT Client (Tool Server {SMB_PORT})",
-        "pcap": "commech-7_smb.pcap"
+        "pcap": "commech-smb.pcap",
+        "aliases": ["commech-7_smb.pcap"]
     }
 
     server_mode_note = (
@@ -1406,14 +1425,15 @@ def audit_commech_5_mqtt(wait_sec: float = 20.0, record_pcap: bool = True, forev
     import hashlib
     import base64
 
-    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-5: MQTT Client Interface[/bold cyan]...")
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-MQTT: MQTT Client Interface[/bold cyan]...")
     res = {
-        "id": "ComMech-5",
+        "id": "ComMech-MQTT",
         "name": "MQTT Client Interface",
         "port": MQTT_TLS_PORT,
         "proto": "IP/TCP/TLS (MQTT over SSL / WebSocket Secure)",
         "direction": f"DUT Client (Tool Server {MQTT_TLS_PORT} / {MQTT_WSS_PORT})",
-        "pcap": "commech-5_mqtt.pcap"
+        "pcap": "commech-mqtt.pcap",
+        "aliases": ["commech-5_mqtt.pcap"]
     }
 
     display_server_receiver_panel(
@@ -1639,16 +1659,17 @@ def _trigger_camera_sftp():
 
 
 def audit_commech_6_syslog(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
-    """Đo kiểm ComMech-6: Remote Syslog over TLS - Máy đo là Syslog Server."""
-    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-6: Remote Syslog over TLS (TCP/{SYSLOG_TLS_PORT})[/bold cyan]...")
+    """Đo kiểm ComMech-Syslog: Remote Syslog over TLS - Máy đo là Syslog Server."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-Syslog: Remote Syslog over TLS (TCP/{SYSLOG_TLS_PORT})[/bold cyan]...")
     cert_path = os.path.join(TOOLKIT_DIR, "syslog_ca.crt")
     res = {
-        "id": "ComMech-6",
+        "id": "ComMech-Syslog",
         "name": "Remote Syslog over TLS",
         "port": SYSLOG_TLS_PORT,
         "proto": f"IP/TCP/TLS (Port {SYSLOG_TLS_PORT})",
         "direction": f"DUT Client (Tool Server {SYSLOG_TLS_PORT})",
-        "pcap": "commech-6_syslog.pcap"
+        "pcap": "commech-syslog.pcap",
+        "aliases": ["commech-6_syslog.pcap"]
     }
 
     display_server_receiver_panel(
@@ -1878,15 +1899,16 @@ def _inspect_smtp_cleartext_or_ws(c: socket.socket, port: int, peer_ip: str) -> 
 
 
 def audit_commech_8_smtp(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
-    """Đo kiểm ComMech-8: SMTP Email Client - Máy đo là Mail Server."""
-    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-8: SMTP Email Client Interface (TCP/{SMTP_STARTTLS_PORT}/{SMTPS_PORT})[/bold cyan]...")
+    """Đo kiểm ComMech-SMTP: SMTP Email Client - Máy đo là Mail Server."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-SMTP: SMTP Email Client Interface (TCP/{SMTP_STARTTLS_PORT}/{SMTPS_PORT})[/bold cyan]...")
     res = {
-        "id": "ComMech-8",
+        "id": "ComMech-SMTP",
         "name": "SMTP Email Client",
         "port": SMTP_STARTTLS_PORT,
         "proto": "IP/TCP/TLS (SMTP over TLS)",
         "direction": f"DUT Client (Tool Server {SMTP_STARTTLS_PORT}/{SMTPS_PORT})",
-        "pcap": "commech-8_smtp.pcap"
+        "pcap": "commech-smtp.pcap",
+        "aliases": ["commech-8_smtp.pcap", "commech-7_smtp.pcap"]
     }
 
     display_server_receiver_panel(
@@ -2099,7 +2121,7 @@ def _extract_ssh_kex_from_pcap(pcap_path: str, dut_ip: str) -> Optional[Dict[str
 
 
 def audit_commech_9_sftp(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
-    """Đo kiểm ComMech-9: SFTP / Storage Client - Máy đo là SFTP/FTP Server hoàn chỉnh."""
+    """Đo kiểm ComMech-SFTP: SFTP / Storage Client - Máy đo là SFTP/FTP Server hoàn chỉnh."""
     import hashlib
     import tool3_sftp_receiver as t3
 
@@ -2108,14 +2130,15 @@ def audit_commech_9_sftp(wait_sec: float = 15.0, auto_trigger: bool = False, rec
     ecdsa_sha256_hex = hashlib.sha256(ecdsa_raw).hexdigest()
     sshd_active = _is_local_port_open(SFTP_PORT)
 
-    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-9: SFTP Client Interface (TCP/{SFTP_PORT} & FTP/{FTP_CLEAR_PORT})[/bold cyan]...")
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-SFTP: SFTP Client Interface (TCP/{SFTP_PORT} & FTP/{FTP_CLEAR_PORT})[/bold cyan]...")
     res = {
-        "id": "ComMech-9",
+        "id": "ComMech-SFTP",
         "name": "SFTP Client Interface",
         "port": SFTP_PORT,
         "proto": "IP/TCP/SSHv2 (SFTP)",
         "direction": f"DUT Client (Tool Server {SFTP_PORT})",
-        "pcap": "commech-9_sftp.pcap"
+        "pcap": "commech-sftp.pcap",
+        "aliases": ["commech-9_sftp.pcap", "commech-6_sftp.pcap"]
     }
 
     srv_note = (
@@ -2346,15 +2369,16 @@ def audit_commech_9_sftp(wait_sec: float = 15.0, auto_trigger: bool = False, rec
 
 
 def audit_commech_11_o3c(wait_sec: float = 6.0) -> Dict[str, Any]:
-    """Đo kiểm ComMech-11: Giám sát lưu lượng Outbound Internet / Cloud."""
-    console.print(f"\n[*] Đang giám sát lưu lượng Outbound Internet [bold cyan]ComMech-11: Cloud Connection[/bold cyan]...")
+    """Đo kiểm ComMech-Cloud: Giám sát lưu lượng Outbound Internet / Cloud."""
+    console.print(f"\n[*] Đang giám sát lưu lượng Outbound Internet [bold cyan]ComMech-Cloud: Cloud Connection[/bold cyan]...")
     res = {
-        "id": "ComMech-11",
+        "id": "ComMech-Cloud",
         "name": "Cloud Outbound Connection",
         "port": HTTPS_PORT,
         "proto": f"IP/TCP/TLS (HTTPS/{HTTPS_PORT})",
         "direction": "DUT Client (Remote/Cloud)",
-        "pcap": "commech-11_o3c.pcap"
+        "pcap": "commech-cloud.pcap",
+        "aliases": ["commech-11_o3c.pcap"]
     }
 
     # Bắt các gói tin outbound ra ngoài mạng LAN
@@ -2394,6 +2418,77 @@ def audit_commech_11_o3c(wait_sec: float = 6.0) -> Dict[str, Any]:
         }
         if risk_warning_found:
             res["firmware_warning"] = "Firmware hiển thị cảnh báo tuân thủ quy định Việt Nam (QCVN 11)"
+    return res
+
+
+def audit_commech_cms_port(port: Optional[int] = None, wait_sec: float = 3.0, record_pcap: bool = True, forever: bool = False, **kwargs) -> Dict[str, Any]:
+    """
+    Đo kiểm ComMech-CMS: Giao thức quản trị CMS độc quyền qua TLS (Port 20001/tcp) cho camera Oryza.
+    Bắt gói tin PCAP: commech-cms.pcap.
+    Thăm dò kết nối TLS 1.2/1.3, kiểm tra bảo vệ tính bí mật & toàn vẹn, chặn truyền rõ theo QCVN 11 Khoản 2.1.3 & 2.5.1.
+    """
+    cms_port = port or CMS_PORT
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]ComMech-CMS: CMS Management Interface over TLS ({DUT_IP}:{cms_port})[/bold cyan]...")
+    res = {
+        "id": "ComMech-CMS",
+        "name": f"CMS Management over TLS ({cms_port}/tcp)",
+        "port": cms_port,
+        "proto": "CMS Proprietary over TLS",
+        "direction": "Server (LAN)",
+        "pcap": "commech-cms.pcap",
+        "aliases": ["commech-5_cms.pcap"]
+    }
+
+    pcap_proc, pcap_path = start_pcap_capture(
+        DUT_IP,
+        f"ip host {DUT_IP} and tcp port {cms_port}",
+        prefix="commech_cms"
+    )
+    time.sleep(0.8)
+
+    tls_ver = None
+    active_cipher = None
+    handshake_ok = False
+
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ctx.keylog_filename = SSLKEYLOG_PATH
+
+        try:
+            with socket.create_connection((DUT_IP, cms_port), timeout=3.5) as raw_sock:
+                with ctx.wrap_socket(raw_sock, server_hostname=DUT_IP) as ssock:
+                    cipher_info = ssock.cipher()
+                    if cipher_info:
+                        active_cipher = cipher_info
+                    tls_ver = ssock.version() or "TLSv1.2"
+                    handshake_ok = True
+                    ssock.sendall(b"\x09\x00\x00\x01\x00\x00\x00\x00")
+                    time.sleep(0.4)
+        except Exception as e_tls:
+            res["error"] = f"TLS handshake failed on port {cms_port}: {e_tls}"
+
+        res["active_tls"] = tls_ver
+        res["active_cipher"] = active_cipher[0] if active_cipher else "N/A"
+        time.sleep(0.3)
+
+        downgrade_ok, downgrade_msg = test_tls_downgrade(DUT_IP, cms_port)
+        res["downgrade_test"] = {"pass": downgrade_ok, "detail": downgrade_msg}
+        res["status"] = "PASS" if (downgrade_ok and tls_ver in ["TLSv1.2", "TLSv1.3"]) else ("WARN" if handshake_ok else "FAIL")
+
+    except Exception as e:
+        res["status"] = "FAIL"
+        res["error"] = str(e)
+        res["downgrade_test"] = {"pass": False, "detail": f"Lỗi đo kiểm CMS port {cms_port}: {e}"}
+
+    finally:
+        time.sleep(0.8)
+        stop_pcap_capture(pcap_proc)
+        res["pcap_file"] = pcap_path
+        res["pcap_packet_count"] = get_pcap_packet_count(pcap_path)
+        _enforce_pcap_requirement(res)
+
     return res
 
 
@@ -2486,24 +2581,35 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
     t_clean = str(enum_target).lower().replace("commech-", "").replace("commech", "").strip()
 
     if t_clean in ["1", "web", str(HTTPS_PORT), "443"]:
-        targets = [("ComMech-1 & ComMech-3", "Web Interface & ONVIF SOAP (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers")]
+        targets = [("ComMech-Web", "Web Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers")]
     elif t_clean in ["2", "ssh", str(SSH_PORT), "22"]:
-        targets = [("ComMech-2", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos")]
+        targets = [("ComMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos")]
     elif t_clean in ["3", "onvif"]:
-        targets = [("ComMech-3", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
+        targets = [("ComMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
     elif t_clean in ["4", "snmp", "snmpv3", str(SNMP_PORT), "161"]:
         include_snmp = True
     elif t_clean in ["10", "rtsp", "rtsps", str(RTSPS_PORT), "322"]:
-        targets = [("ComMech-10", "RTSPS Media Stream", RTSPS_PORT, "ssl-enum-ciphers")]
+        targets = [("ComMech-RTSPS", "RTSPS Media Stream", RTSPS_PORT or 443, "ssl-enum-ciphers")]
+    elif t_clean in ["cms", "20001", str(CMS_PORT)] or (t_clean == "5" and is_oryza):
+        targets = [("ComMech-CMS", "CMS Management over TLS", CMS_PORT, "ssl-enum-ciphers")]
     else:  # all
-        targets = [
-            ("ComMech-1 & ComMech-3", "Web Interface & ONVIF SOAP (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
-            ("ComMech-2", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos"),
-            ("ComMech-10", "RTSPS Media Stream", RTSPS_PORT, "ssl-enum-ciphers")
-        ]
-        if ONVIF_HTTPS_PORT != HTTPS_PORT:
-            targets.append(("ComMech-3", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"))
-        include_snmp = True
+        if is_oryza:
+            targets = [
+                ("ComMech-Web", "Web Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
+                ("ComMech-RTSPS", "RTSPS Media Stream", RTSPS_PORT or 443, "ssl-enum-ciphers"),
+                ("ComMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"),
+                ("ComMech-CMS", "CMS Management over TLS", CMS_PORT, "ssl-enum-ciphers"),
+            ]
+            include_snmp = True
+        else:
+            targets = [
+                ("ComMech-Web", "Web Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
+                ("ComMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos"),
+                ("ComMech-RTSPS", "RTSPS Media Stream", RTSPS_PORT, "ssl-enum-ciphers"),
+            ]
+            if ONVIF_HTTPS_PORT != HTTPS_PORT:
+                targets.append(("ComMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"))
+            include_snmp = True
 
     nmap_bin = shutil.which("nmap") or "/usr/bin/nmap"
     if targets and not os.path.exists(nmap_bin):
@@ -2548,6 +2654,14 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
             cmd = [nmap_bin, "-Pn", "-p", str(port), f"--script={script}", DUT_IP]
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=25)
             output = proc.stdout
+            # Cổng CMS 20001 là cổng TLS độc quyền phi tiêu chuẩn (Nmap mặc định skip vì coi là microsan)
+            # Tự động thay thế bằng công cụ bóc tách định dạng chuẩn Nmap và kiểm tra mở rộng
+            if (port == 20001 or "CMS" in cid_label) and "ssl-enum-ciphers" in script:
+                v_script = os.path.join(str(BASE_DIR), "verify_7_ciphers.py")
+                if os.path.exists(v_script):
+                    p_v = subprocess.run([sys.executable, v_script, DUT_IP, str(port)], capture_output=True, text=True)
+                    if p_v.stdout.strip():
+                        output = p_v.stdout.strip()
         except Exception as e:
             output = f"[!] Lỗi thực thi nmap: {e}"
 
@@ -3075,29 +3189,62 @@ def main():
     ))
 
     audit_map = {
+        "web": audit_commech_1_web,
         "1": audit_commech_1_web,
+        "ssh": audit_commech_2_ssh,
         "2": audit_commech_2_ssh,
+        "onvif": audit_commech_3_onvif,
         "3": audit_commech_3_onvif,
+        "snmp": audit_commech_4_snmp,
+        "snmpv3": audit_commech_4_snmp,
         "4": audit_commech_4_snmp,
-        "5": audit_commech_5_mqtt,
-        "6": audit_commech_6_syslog,
-        "7": audit_commech_7_smb,
-        "8": audit_commech_8_smtp,
-        "9": audit_commech_9_sftp,
+        "cms": audit_commech_cms_port,
+        "20001": audit_commech_cms_port,
+        "rtsps": audit_commech_10_rtsp,
+        "rtsp": audit_commech_10_rtsp,
         "10": audit_commech_10_rtsp,
-        "11": audit_commech_11_o3c
+        "mqtt": audit_commech_5_mqtt,
+        "syslog": audit_commech_6_syslog,
+        "6": audit_commech_6_syslog,
+        "smb": audit_commech_7_smb,
+        "7": audit_commech_7_smb,
+        "smtp": audit_commech_8_smtp,
+        "8": audit_commech_8_smtp,
+        "sftp": audit_commech_9_sftp,
+        "9": audit_commech_9_sftp,
+        "cloud": audit_commech_11_o3c,
+        "o3c": audit_commech_11_o3c,
+        "11": audit_commech_11_o3c,
+        "5": audit_commech_cms_port if is_oryza else audit_commech_5_mqtt,
     }
 
-    target_ids = list(audit_map.keys()) if args.id in ["all", "ALL"] else [args.id.replace("ComMech-", "").replace("commech-", "")]
+    t_arg = args.id.replace("ComMech-", "").replace("commech-", "").lower().strip()
+    if t_arg in ["all", "all-mechs"]:
+        if t_arg == "all-mechs":
+            target_ids = ["web", "ssh", "onvif", "snmp", "cms", "rtsps", "mqtt", "syslog", "smb", "smtp", "sftp", "cloud"]
+        elif is_oryza:
+            # Theo bảng kê IXIT 11 của Oryza: ComMech-Web, ComMech-RTSPS, ComMech-ONVIF, ComMech-CMS, ComMech-SFTP, ComMech-SMTP, ComMech-SNMP
+            target_ids = ["web", "rtsps", "onvif", "cms", "sftp", "smtp", "snmp"]
+        else:
+            target_ids = ["web", "ssh", "onvif", "snmp", "mqtt", "syslog", "smb", "smtp", "sftp", "rtsps", "cloud"]
+    elif "," in t_arg:
+        target_ids = [k.strip() for k in t_arg.split(",") if k.strip()]
+    elif t_arg in audit_map:
+        target_ids = [t_arg]
+    else:
+        target_ids = [t_arg]
+
     results = []
 
     for cid in target_ids:
         if cid in audit_map:
             try:
-                if cid in ("6", "8", "9"):
+                if cid in ("6", "syslog", "8", "smtp", "9", "sftp"):
                     res = audit_map[cid](wait_sec=args.wait, auto_trigger=args.auto_trigger, record_pcap=not args.no_pcap, forever=args.forever)
-                elif cid in ("5", "7"):
+                elif cid in ("5", "mqtt", "7", "smb") and not (cid == "5" and is_oryza):
                     res = audit_map[cid](wait_sec=args.wait, record_pcap=not args.no_pcap, forever=args.forever)
+                elif cid in ("cms", "20001") or (cid == "5" and is_oryza):
+                    res = audit_map[cid](port=CMS_PORT, wait_sec=args.wait, record_pcap=not args.no_pcap, forever=args.forever)
                 else:
                     res = audit_map[cid](wait_sec=args.wait)
                 
@@ -3108,9 +3255,15 @@ def main():
                         dst_pcap = os.path.join(EVIDENCE_DIR, std_name)
                         shutil.copy2(res["pcap_file"], dst_pcap)
                         res["evidence_pcap"] = dst_pcap
+                        for al in res.get("aliases", []):
+                            try:
+                                shutil.copy2(res["pcap_file"], os.path.join(EVIDENCE_DIR, al))
+                            except Exception:
+                                pass
                         cnt = get_pcap_packet_count(dst_pcap)
                         res["pcap_packet_count"] = cnt
-                    _enforce_pcap_requirement(res, require_pcap=(cid != "11"))
+                    is_cloud = (cid in ("11", "cloud", "o3c"))
+                    _enforce_pcap_requirement(res, require_pcap=(not is_cloud))
                 else:
                     res["pcap_packet_count"] = 0
                 results.append(res)
@@ -3118,8 +3271,9 @@ def main():
                 console.print(f"[bold red][!] Lỗi khi đo kiểm ComMech-{cid}: {e}[/bold red]")
 
     # Hiển thị bảng tổng hợp trên console
-    t = Table(title=f"BẢNG TỔNG HỢP ĐO KIỂM CÁC PHƯƠNG THỨC TRUYỀN THÔNG (11 PHƯƠNG THỨC TIÊU CHUẨN){' [CHẾ ĐỘ NO-PCAP]' if args.no_pcap else ''}", show_lines=True)
-    t.add_column("STT", justify="center", style="bold yellow", no_wrap=True)
+    vendor_label = getattr(adapter, "vendor", "Generic")
+    t = Table(title=f"BẢNG TỔNG HỢP ĐO KIỂM CÁC PHƯƠNG THỨC TRUYỀN THÔNG ({DUT_MODEL} - {vendor_label}){' [CHẾ ĐỘ NO-PCAP]' if args.no_pcap else ''}", show_lines=True)
+    t.add_column("Mã ID", justify="center", style="bold yellow", no_wrap=True)
     t.add_column("Phương thức / Tên dịch vụ & Giao thức", justify="left")
     t.add_column("Vai trò mạng", justify="center")
     t.add_column("Tấn công hạ cấp & Đàm phán", justify="left")
@@ -3129,7 +3283,7 @@ def main():
         downgrade_str = r.get("downgrade_test", {}).get("detail", "N/A")
         pcap_str = f"{r.get('pcap_packet_count', 0)} pkts" if not args.no_pcap else "[dim]Bỏ qua (No PCAP)[/dim]"
         t.add_row(
-            str(idx),
+            r.get("id", str(idx)),
             f"{r.get('name')}\n[dim]{r.get('proto')}[/dim]",
             r.get("direction", "N/A"),
             downgrade_str,

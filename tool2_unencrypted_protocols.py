@@ -430,11 +430,12 @@ def display_auth_audit(results: Dict[str, Any]):
     )
 
 if __name__ == '__main__':
-    dut = DUT_IP
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--ip" and len(sys.argv) > 2:
-            dut = sys.argv[2]
-        elif not sys.argv[1].startswith("-"):
-            dut = sys.argv[1]
+    import argparse
+    parser = argparse.ArgumentParser(description="Tool 2: Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh (HTTP, RTSP, RTSPS) - QCVN 11 Khoản 2.1.3")
+    parser.add_argument("ip_pos", nargs="?", default=None, help=f"Địa chỉ IP của Camera DUT (mặc định: {DUT_IP})")
+    parser.add_argument("--ip", dest="ip_opt", default=None, help="Địa chỉ IP của Camera DUT (tùy chọn cờ --ip)")
+    args = parser.parse_args()
+
+    dut = args.ip_opt or args.ip_pos or DUT_IP
     data = run_full_auth_audit(dut)
     display_auth_audit(data)

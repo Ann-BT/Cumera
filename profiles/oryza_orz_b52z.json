@@ -1,0 +1,117 @@
+{
+  "profile_id": "oryza_orz_b52z",
+  "name": "Oryza ORZ-B52Z-AJBMIR60-S1",
+  "vendor": "Oryza Systems",
+  "hardware_heritage": "Tiandy",
+  "model": "ORZ-B52Z-AJBMIR60-S1",
+  "firmware": "v5.2.1615.2412.514.0.1.0.6",
+  "mac_samples": [
+    "78:CE:A5:00:77:3F",
+    "78:CE:A5:00:77:40"
+  ],
+  "evidence_base_dir": "/home/merlin/PSI/Version 3 - 261109/Bằng chứng",
+  "firmware_config": {
+    "base_dir": "/home/merlin/PSI/Version 3 - 261109/FW-2",
+    "intermediate": "Intermediate Version/v5.2.1615.2412.514.0.1.0.6.encap",
+    "old": "Old/v5.2.1615.2412.514.0.1.0.2.encap",
+    "new": "New/v5.2.1615.2412.514.0.1.0.7.encap"
+  },
+  "target_camera": {
+    "ip": "192.168.99.84",
+    "model": "ORZ-B52Z-AJBMIR60-S1",
+    "firmware": "v5.2.1615.2412.514.0.1.0.6",
+    "username": "admin",
+    "password": "Psitest135#",
+    "ssh_username": "admin",
+    "ssh_password": "Psitest135#"
+  },
+  "test_host": {
+    "ip": "192.168.99.20",
+    "interface": "enp3s0"
+  },
+  "ixit_declared_ports": [
+    22,
+    80,
+    161,
+    443,
+    554,
+    3702,
+    20001
+  ],
+  "service_ports": {
+    "http": 80,
+    "https": 443,
+    "onvif_http": 80,
+    "onvif_https": 443,
+    "onvif_path": "/onvif/device_service",
+    "onvif_ws_discovery_udp": 3702,
+    "rtsp": 554,
+    "rtsp_cleartext": 554,
+    "rtsps": 443,
+    "rtsps_tls": 443,
+    "rtsp_path": "/snl/live/1/1",
+    "ssh": 22,
+    "snmp": 161,
+    "snmp_udp": 161,
+    "proprietary_tcp": 20001,
+    "mqtt_tls": 8883,
+    "mqtt_wss": 443,
+    "mqtt_clear": 1883,
+    "syslog_tls": 6514,
+    "syslog_clear": 514,
+    "smb": 445,
+    "smtp_starttls": 587,
+    "smtps": 465,
+    "smtp_clear": 25,
+    "smtp_receiver": [
+      25,
+      465,
+      587
+    ],
+    "sftp_port": 22,
+    "ftp_clear": 21,
+    "sftp_receiver": [
+      21,
+      22
+    ],
+    "alarm_receiver_http": 8088,
+    "alarm_receiver_https": 8443
+  },
+  "baseline_declaration": {
+    "tls_version_expected": "TLSv1.3",
+    "tls_ciphers_declared": [
+      "TLS_AES_256_GCM_SHA384",
+      "TLS_AES_128_GCM_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+    ],
+    "auth_value_mechanisms_declared": [
+      "Digest",
+      "Digest-SHA256"
+    ],
+    "prohibited_auth_found": [],
+    "lockout_thresholds": {
+      "web": 5,
+      "ssh": 5,
+      "rtsp": 5,
+      "onvif": 5,
+      "duration_minutes": 5
+    }
+  },
+  "snmp_v3": {
+    "user": "admin",
+    "auth_pass": "",
+    "priv_pass": "",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES128"
+  },
+  "snmp_credentials": {
+    "user": "admin",
+    "auth_pass": "",
+    "priv_pass": "",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES128"
+  }
+}

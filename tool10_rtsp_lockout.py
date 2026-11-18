@@ -123,16 +123,21 @@ def send_rtsp(username: str, password: str, seq: int, port: int, use_tls: bool, 
         return False, f"ERROR: {e}", ""
 
 
-def run_custom_sequence(port: int, use_tls: bool, fail_count: int, success_at: int, rate_cps: float = 4.0) -> bool:
+def run_custom_sequence(
+    port: int,
+    use_tls: bool,
+    fail_count: int,
+    success_at: int,
+    rate_cps: float = 4.0,
+    stage: Optional[int] = None,
+    threshold: int = 5
+) -> bool:
     """
-    Thực hiện kịch bản tấn công tùy chỉnh:
+    Thực hiện kịch bản tấn công tùy chỉnh RTSP/RTSPS:
     - fail_count: Tổng số lần sai dự định
     - success_at: Vị trí chèn lần thử mật khẩu đúng (0 = không thử đúng)
     - rate_cps: Tốc độ phát kết nối
     """
-    proto_label = f"RTSPS (TLS - Cổng {port})" if use_tls else f"RTSP (Cleartext - Cổng {port})"
-    
-    # Tính toán tổng số bước
     if success_at <= 0:
         total_steps = fail_count
     elif success_at > fail_count:
@@ -140,113 +145,66 @@ def run_custom_sequence(port: int, use_tls: bool, fail_count: int, success_at: i
     else:
         total_steps = fail_count + 1
 
-    console.print(Panel(
-        f"[bold white]KỊCH BẢN ĐO KIỂM VÉT CẠN TÙY CHỈNH LUỒNG VIDEO RTSP/RTSPS[/bold white]\n"
-        f"• Mục tiêu DUT       : [cyan]{DUT_IP}:{port}[/cyan] ({proto_label})\n"
-        f"• Tài khoản kiểm thử : [bold green]{USER}[/bold green]\n"
-        f"• Số lần thử sai     : [bold red]{fail_count} lần[/bold red]\n"
-        f"• Lượt thử mật khẩu ĐÚNG: [bold yellow]{'Không thử đúng' if success_at <= 0 else f'Lượt thứ {success_at}'}[/bold yellow]\n"
-        f"• Tổng số bước chạy  : [bold white]{total_steps} bước[/bold white]\n"
-        f"• Tốc độ phát        : [bold magenta]{rate_cps:.1f} kết nối mới/giây[/bold magenta] (Kiểm tra Firewall Rate-Limit)",
-        title="THIẾT LẬP KỊCH BẢN TẤN CÔNG (CLAUSE 2.1.5)",
-        border_style="cyan"
-    ))
-
     limiter = PreciseRateLimiter(rate_cps=rate_cps)
-    history = []
-    exceeded_fw = 0
-    blocked_fw = 0
+    table = Table(title=f"Tiến trình kịch bản tùy chỉnh RTSP ({total_steps} bước)", show_lines=True)
+    table.add_column("Bước", justify="center", style="bold")
+    table.add_column("Loại", justify="center")
+    table.add_column("Thời điểm phát", justify="center")
+    table.add_column("Mật khẩu thử nghiệm", justify="left")
+    table.add_column("Kết quả phản hồi", justify="left")
+    table.add_column("Độ trễ", justify="right")
+
     success_attempt_result = None
 
-    print("-" * 80)
     for step in range(1, total_steps + 1):
         pos, t_str = limiter.wait_next()
         is_success_step = (step == success_at)
         
         if is_success_step:
             test_pass = CORRECT_PASS
-            type_label = "[bold green][ĐÚNG - KIỂM CHỨNG][/bold green]"
+            type_lbl = "[bold green]ĐÚNG[/bold green]"
+            display_pass = f"[bold green]{USER} : {CORRECT_PASS}[/bold green]"
         else:
             test_pass = f"WrongPass_{step}#Audit"
-            type_label = "[bold red][SAI - THỬ VÉT CẠN][/bold red]"
+            type_lbl = "[bold red]SAI[/bold red]"
+            display_pass = test_pass
 
+        t_req = time.time()
         ok, status, raw = send_rtsp(USER, test_pass, seq=100 + step, port=port, use_tls=use_tls)
-        
-        is_blocked = any(kw in status for kw in ["TIMEOUT", "RESET", "REFUSED", "EMPTY_REPLY"])
-        if pos == 4:
-            exceeded_fw += 1
-            if is_blocked:
-                blocked_fw += 1
-            fw_label = f"[{pos}/4 - VƯỢT NGƯỠNG FW 3/S]"
-        else:
-            fw_label = f"[{pos}/4]"
+        lat = (time.time() - t_req) * 1000
 
-        console.print(f"  Bước #{step:02d} {type_label} {fw_label:<28} | {t_str} | Phản hồi: {status}")
+        is_blocked = any(kw in status for kw in ["TIMEOUT", "RESET", "REFUSED", "EMPTY_REPLY"])
+        style = "green" if (is_success_step and ok and "200 OK" in status) else ("red" if is_blocked else "yellow")
+        table.add_row(
+            f"#{step:02d}",
+            type_lbl,
+            t_str,
+            display_pass,
+            f"[{style}]{status}[/{style}]",
+            f"{lat:.1f} ms"
+        )
 
         if is_success_step:
             success_attempt_result = (step, ok, status)
-            if raw:
-                print("  --- BẰNG CHỨNG NGUYÊN VĂN PHẢN HỒI LƯỢT THỬ ĐÚNG ---")
-                print("  " + raw.strip().replace("\n", "\n  "))
-                print("  ----------------------------------------------------")
 
-        history.append({
-            "step": step,
-            "is_correct": is_success_step,
-            "status": status,
-            "blocked": is_blocked
-        })
+    console.print(table)
 
-    print("-" * 80)
-    console.print(f"[*] THỐNG KÊ TƯỜNG LỬA RATE-LIMIT (NGƯỠNG 3 KẾT NỐI/GIÂY):")
-    console.print(f"    • Số lần phát ở gói thứ 4 trong 1 giây: {exceeded_fw} lần")
-    console.print(f"    • Số lần bị tường lửa Drop/Reset: {blocked_fw} / {exceeded_fw}")
-
-    # Đánh giá kết quả kịch bản
+    is_reset_test = (stage == 1) if stage in (1, 2) else (fail_count < threshold or (0 < success_at <= fail_count and fail_count <= threshold))
     verdict = False
-    console.print("\n" + "=" * 80)
-    if success_at > fail_count:
-        # Mục đích: Thử đúng sau khi đã vượt ngưỡng sai -> Kỳ vọng BỊ KHÓA
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: KÍCH HOẠT KHÓA TÀI KHOẢN KHI VƯỢT NGƯỠNG SAI")
-        if success_attempt_result and "200 OK" not in success_attempt_result[2]:
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt thứ {success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.")
-            console.print(f"    -> Phản hồi: {success_attempt_result[2]}")
-            verdict = True
-        else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> Thiết bị vẫn trả về 200 OK tại lượt thứ {success_at} sau {fail_count} lần sai.")
-    elif 0 < success_at <= fail_count:
-        # Mục đích: Thử đúng trước ngưỡng -> Kỳ vọng ĐĂNG NHẬP THÀNH CÔNG (Reset bộ đếm)
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: RESET BỘ ĐẾM KHI NHẬP ĐÚNG TRƯỚC NGƯỠNG")
+    console.print("")
+    if is_reset_test:
         if success_attempt_result and "200 OK" in success_attempt_result[2]:
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt thứ {success_at} được chấp nhận thành công (200 OK). Bộ đếm đã được reset.")
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ1: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} được chấp nhận (200 OK). Bộ đếm đã reset.[/bold green]")
             verdict = True
         else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> Mật khẩu đúng tại lượt thứ {success_at} bị từ chối dù chưa vượt ngưỡng.")
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ1: KHÔNG ĐẠT (FAIL) - Mật khẩu đúng tại lượt #{success_at} bị từ chối dù chưa vượt ngưỡng.[/bold red]")
     else:
-        # Chỉ gửi sai để đo kiểm tường lửa
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: ĐO LƯỜNG TƯỜNG LỬA CHỐNG TẤN CÔNG VÉT CẠN LIÊN TỤC")
-        console.print(f"    -> Đã gửi {fail_count} lần sai liên tiếp.")
-        verdict = True
-    console.print("=" * 80)
+        if success_attempt_result and "200 OK" not in success_attempt_result[2]:
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ2: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.[/bold green]")
+            verdict = True
+        else:
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ2: KHÔNG ĐẠT (FAIL) - Thiết bị vẫn cho phép truy cập tại lượt #{success_at} sau {fail_count} lần sai.[/bold red]")
 
-    filters = [
-        ("Toàn bộ lưu lượng phiên RTSP kiểm thử", f"tcp.port == {port} && (rtsp || tls)"),
-        ("Các gói tin xác thực sai (401)", f"tcp.port == {port} && rtsp.status == 401"),
-        ("Gói tin xác thực thành công (200 OK)", f"tcp.port == {port} && rtsp.status == 200"),
-        ("Gói tin bị Tường lửa Reset (RST flag)", f"tcp.port == {port} && tcp.flags.reset == 1")
-    ]
-    display_wireshark_panel(
-        console,
-        GLOBAL_PCAP_FILE,
-        filters,
-        is_tls=use_tls,
-        sort_tip=f"Click tiêu đề cột No. hoặc CSeq trong Wireshark để kiểm tra chuỗi xác thực tại cổng {port}.",
-        title=f"BẰNG CHỨNG GÓI TIN RTSP AUDIT (CỔNG {port})"
-    )
     return verdict
 
 
@@ -257,6 +215,7 @@ def parse_arguments():
     parser.add_argument("--mode", choices=["custom", "1", "2", "3", "reset", "lockout", "all"], default="custom", help="Chế độ: custom, reset, lockout, all")
     parser.add_argument("--fail-count", type=int, default=10, help="Số lần gửi sai liên tiếp (Mặc định: 10)")
     parser.add_argument("--success-at", type=int, default=11, help="Lượt chèn thử mật khẩu đúng (Mặc định: 11; 0=Không thử đúng)")
+    parser.add_argument("--stage", type=int, choices=[1, 2], default=None, help="Giai đoạn kiểm thử (1: Reset trước ngưỡng, 2: Khóa sau ngưỡng)")
     parser.add_argument("--rate", type=float, default=4.0, help="Tốc độ gửi kết nối mới/giây (Mặc định: 4.0 conn/s)")
     return parser.parse_args()
 
@@ -292,13 +251,13 @@ def main():
                 console.print("\n[bold cyan]>>> GIAI ĐOẠN 2: KIỂM CHỨNG KÍCH HOẠT KHÓA SAU 10 LẦN SAI <<<[/bold cyan]")
                 run_custom_sequence(port, use_tls, fail_count=10, success_at=11, rate_cps=args.rate)
         else:
-            # Mode custom theo đúng tham số CLI
             run_custom_sequence(
                 port=port,
                 use_tls=use_tls,
                 fail_count=args.fail_count,
                 success_at=args.success_at,
-                rate_cps=args.rate
+                rate_cps=args.rate,
+                stage=args.stage
             )
     finally:
         stop_pcap_capture(pcap_proc)

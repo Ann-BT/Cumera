@@ -458,7 +458,9 @@ def run_custom_sequence(
     auth_mode: str,
     fail_count: int,
     success_at: int,
-    rate_cps: float = 4.0
+    rate_cps: float = 4.0,
+    stage: Optional[int] = None,
+    threshold: int = 5
 ) -> bool:
     """
     Kịch bản đo kiểm tùy chỉnh cho ONVIF SOAP (QCVN 11 Clause 2.1.5):
@@ -473,32 +475,15 @@ def run_custom_sequence(
     else:
         total_steps = fail_count + 1
 
-    console.print(Panel(
-        f"[bold white]KỊCH BẢN ĐO KIỂM VÉT CẠN TÙY CHỈNH DỊCH VỤ ONVIF SOAP[/bold white]\n"
-        f"• Mục tiêu DUT       : [cyan]{url}[/cyan] (Cổng {port})\n"
-        f"• Cơ chế xác thực    : [yellow]{auth_mode.upper()}[/yellow]\n"
-        f"• Tài khoản kiểm thử : [bold green]{USER}[/bold green]\n"
-        f"• Số lần thử sai     : [bold red]{fail_count} lần[/bold red]\n"
-        f"• Lượt thử mật khẩu ĐÚNG: [bold yellow]{'Không thử đúng' if success_at <= 0 else f'Lượt thứ {success_at}'}[/bold yellow]\n"
-        f"• Tổng số bước chạy  : [bold white]{total_steps} bước[/bold white]\n"
-        f"• Tốc độ phát        : [bold magenta]{rate_cps:.1f} kết nối mới/giây[/bold magenta] (Kiểm tra Firewall Rate-Limit)",
-        title="THIẾT LẬP KỊCH BẢN TẤN CÔNG (CLAUSE 2.1.5)",
-        border_style="cyan"
-    ))
-
     limiter = PreciseRateLimiter(rate_cps=rate_cps)
     table = Table(title=f"Tiến trình kịch bản tùy chỉnh ONVIF ({total_steps} bước)", show_lines=True)
     table.add_column("Bước", justify="center", style="bold")
     table.add_column("Loại", justify="center")
-    table.add_column("Vị trí trong 1s", justify="center")
     table.add_column("Thời điểm phát", justify="center")
     table.add_column("Mật khẩu thử nghiệm", justify="left")
     table.add_column("Kết quả phản hồi", justify="left")
-    table.add_column("Đánh giá Firewall", justify="center")
     table.add_column("Độ trễ", justify="right")
 
-    exceeded_fw = 0
-    blocked_fw = 0
     success_attempt_result = None
 
     for step in range(1, total_steps + 1):
@@ -508,34 +493,22 @@ def run_custom_sequence(
         if is_success_step:
             test_pass = CORRECT_PASS
             type_lbl = "[bold green]ĐÚNG[/bold green]"
+            display_pass = f"[bold green]{USER} : {CORRECT_PASS}[/bold green]"
         else:
             test_pass = f"BruteForce_{step}#Audit"
             type_lbl = "[bold red]SAI[/bold red]"
+            display_pass = test_pass
 
         ok, status, raw_preview, lat = send_onvif_request(url, USER, test_pass, auth_type=auth_mode, force_new_connection=True)
 
         is_blocked = any(kw in status for kw in ["TIMEOUT", "RST", "REFUSED", "DROP", "Rate-Limited", "429", "403"])
-        if pos_in_sec == 4:
-            exceeded_fw += 1
-            if is_blocked:
-                blocked_fw += 1
-                fw_eval = "[bold red]CHẶN (3/S)[/bold red]"
-            else:
-                fw_eval = "[bold yellow]CHẤP NHẬN[/bold yellow]"
-            pos_str = f"[bold magenta][{pos_in_sec}/4 - VƯỢT][/bold magenta]"
-        else:
-            fw_eval = "[green]Bình thường[/green]" if not is_blocked else "[red]BỊ CHẶN SỚM[/red]"
-            pos_str = f"[{pos_in_sec}/4]"
-
         style = "green" if (is_success_step and ok) else ("red" if is_blocked else "yellow")
         table.add_row(
             f"#{step:02d}",
             type_lbl,
-            pos_str,
             t_str,
-            test_pass if not is_success_step else "******",
+            display_pass,
             f"[{style}]{status}[/{style}]",
-            fw_eval,
             f"{lat:.1f} ms"
         )
 
@@ -544,215 +517,23 @@ def run_custom_sequence(
 
     console.print(table)
 
-    console.print(f"\n[*] THỐNG KÊ TƯỜNG LỬA RATE-LIMIT (NGƯỠNG 3 KẾT NỐI/GIÂY):")
-    console.print(f"    • Số lần phát ở gói thứ 4 trong 1 giây: {exceeded_fw} lần")
-    console.print(f"    • Số lần bị tường lửa Drop/Reset: {blocked_fw} / {exceeded_fw}")
-
+    is_reset_test = (stage == 1) if stage in (1, 2) else (fail_count < threshold or (0 < success_at <= fail_count and fail_count <= threshold))
     verdict = False
-    console.print("\n" + "=" * 80)
-    if success_at > fail_count:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: KÍCH HOẠT KHÓA TÀI KHOẢN KHI VƯỢT NGƯỠNG SAI")
-        if success_attempt_result and (not success_attempt_result[1] or "200 OK" not in success_attempt_result[2]):
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt #{success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.")
-            verdict = True
-        else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> Thiết bị vẫn chấp nhận mật khẩu đúng tại lượt #{success_at} sau {fail_count} lần sai.")
-    elif 0 < success_at <= fail_count:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: RESET BỘ ĐẾM KHI NHẬP ĐÚNG TRƯỚC NGƯỠNG")
+    console.print("")
+    if is_reset_test:
         if success_attempt_result and success_attempt_result[1] and "200 OK" in success_attempt_result[2]:
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt #{success_at} được chấp nhận (200 OK). Bộ đếm đã được reset.")
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ1: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} xác thực thành công (200 OK). Bộ đếm đã được reset.[/bold green]")
             verdict = True
         else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> Mật khẩu đúng tại lượt #{success_at} bị từ chối dù chưa vượt ngưỡng.")
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ1: KHÔNG ĐẠT (FAIL) - Mật khẩu đúng tại lượt #{success_at} bị từ chối dù chưa vượt ngưỡng.[/bold red]")
     else:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: ĐO LƯỜNG TƯỜNG LỬA CHỐNG TẤN CÔNG VÉT CẠN LIÊN TỤC")
-        console.print(f"    -> Đã hoàn thành {fail_count} lần sai liên tiếp.")
-        verdict = True
-    console.print("=" * 80)
+        if success_attempt_result and (not success_attempt_result[1] or "200 OK" not in success_attempt_result[2]):
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ2: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.[/bold green]")
+            verdict = True
+        else:
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ2: KHÔNG ĐẠT (FAIL) - Thiết bị vẫn cho phép xác thực thành công tại lượt #{success_at} sau {fail_count} lần sai.[/bold red]")
+
     return verdict
-
-
-def run_wordlist_bruteforce(
-    url: str,
-    port: int,
-    auth_mode: str,
-    wordlist_path: Optional[str] = None,
-    max_attempts: int = 50,
-    rate_cps: float = 4.0
-) -> None:
-    """Test Case 3: Chế độ thử nghiệm vét cạn từ điển ở tốc độ 4 kết nối/giây."""
-    console.print("\n" + "=" * 80)
-    console.print(f"  [bold magenta][CHẾ ĐỘ THỬ NGHIỆM VÉT CẠN TỪ ĐIỂN - DICTIONARY BRUTE-FORCE AUDIT][/bold magenta]")
-    console.print(f"  Mục tiêu: {url} | Tài khoản: {USER} | Cơ chế: {auth_mode.upper()} | Tốc độ: {rate_cps:.1f} kết nối/giây")
-    console.print("=" * 80)
-
-    passwords: List[str] = []
-    if wordlist_path and os.path.isfile(wordlist_path):
-        console.print(f"[*] Nạp danh sách từ file wordlist: {wordlist_path}")
-        with open(wordlist_path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                p = line.strip()
-                if p and p not in passwords:
-                    passwords.append(p)
-                    if len(passwords) >= max_attempts:
-                        break
-    else:
-        console.print(f"[*] Sử dụng danh sách Top {len(TOP_CAMERA_PASSWORDS)} mật khẩu camera phổ biến nhất.")
-        passwords = list(TOP_CAMERA_PASSWORDS[:max_attempts])
-
-    limiter = PreciseRateLimiter(rate_cps=rate_cps)
-    table = Table(title="Tiến trình vét cạn mật khẩu ONVIF SOAP", show_lines=True)
-    table.add_column("STT", justify="center", style="bold")
-    table.add_column("Vị trí trong 1s", justify="center")
-    table.add_column("Thời điểm phát", justify="center")
-    table.add_column("Mật khẩu thử nghiệm", justify="left")
-    table.add_column("Trạng thái", justify="center")
-    table.add_column("Phản hồi dịch vụ", justify="left")
-    table.add_column("Độ trễ", justify="right")
-
-    success_found = False
-    lockout_detected = False
-
-    for idx, pwd in enumerate(passwords, start=1):
-        pos_in_sec, t_str = limiter.wait_next()
-        is_success, status_lbl, preview, lat = send_onvif_request(url, USER, pwd, auth_type=auth_mode, force_new_connection=True)
-
-        pos_str = f"[bold magenta][{pos_in_sec}/4 - VƯỢT][/bold magenta]" if pos_in_sec == 4 else f"[{pos_in_sec}/4]"
-
-        if is_success:
-            table.add_row(f"{idx:02d}", pos_str, t_str, pwd, "[bold green]TRÚNG MẬT KHẨU[/bold green]", f"[bold green]{status_lbl}[/bold green]", f"{lat:.1f} ms")
-            success_found = True
-            console.print(table)
-            console.print(f"\n[bold green][!] ĐÃ TÌM THẤY MẬT KHẨU HỢP LỆ: '{pwd}' (Tài khoản: {USER})[/bold green]")
-            break
-        elif any(sig in status_lbl for sig in ["TIMEOUT", "RESET", "REFUSED", "Rate-Limited", "429", "403"]):
-            table.add_row(f"{idx:02d}", pos_str, t_str, pwd, "[bold yellow]BỊ KHÓA / CHẶN[/bold yellow]", f"[bold red]{status_lbl}[/bold red]", f"{lat:.1f} ms")
-            lockout_detected = True
-            console.print(table)
-            console.print(f"\n[bold yellow][!] PHÁT HIỆN DỊCH VỤ ĐÃ KÍCH HOẠT CHẶN / RATE-LIMIT TẠI LẦN THỬ THỨ #{idx}![/bold yellow]")
-            break
-        else:
-            table.add_row(f"{idx:02d}", pos_str, t_str, pwd, "[dim]Sai[/dim]", status_lbl, f"{lat:.1f} ms")
-
-    if not success_found and not lockout_detected:
-        console.print(table)
-        console.print("\n[+] Đã hoàn thành vét cạn danh sách từ điển; dịch vụ tiếp nhận toàn bộ mà không gặp crash.")
-
-
-def run_firewall_rate_limit_test(
-    url: str,
-    port: int,
-    auth_mode: str,
-    burst_count: int = 8,
-    timeout_sec: float = 2.5
-) -> bool:
-    """Test Case 4: Kiểm chứng tính năng giới hạn tần suất kết nối mới của tường lửa (Firewall Rate-Limiting)."""
-    console.print("\n" + "=" * 80)
-    console.print(f"  [bold red][TEST CASE 4] KIỂM CHỨNG GIỚI HẠN TẦN SUẤT KẾT NỐI MỚI (FIREWALL RATE-LIMIT)[/bold red]")
-    console.print(f"  Mục tiêu: {url} (Cổng {port})")
-    console.print(f"  Cam kết IXIT: Mặc định tối đa 3 kết nối mới / giây (default 3 new connections per second)")
-    console.print(f"  Kịch bản đo: Gửi đồng thời {burst_count} kết nối TCP mới trong cùng cửa sổ <= 1.0 giây")
-    console.print("=" * 80)
-
-    barrier = threading.Barrier(burst_count)
-    results = []
-
-    def worker(idx: int):
-        try:
-            barrier.wait(timeout=2.0)
-        except threading.BrokenBarrierError:
-            pass
-
-        t_launch = time.time()
-        time_stamp_str = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        fake_pass = f"BurstConn_{idx}#RateTest"
-
-        ok, status_lbl, preview, lat = send_onvif_request(
-            url,
-            USER,
-            fake_pass,
-            auth_type=auth_mode,
-            timeout=timeout_sec,
-            force_new_connection=True
-        )
-        t_finish = time.time()
-        return {
-            "idx": idx,
-            "launch_time": t_launch,
-            "finish_time": t_finish,
-            "time_str": time_stamp_str,
-            "status": status_lbl,
-            "is_ok": ok,
-            "latency": lat
-        }
-
-    t_global_start = time.time()
-    with ThreadPoolExecutor(max_workers=burst_count) as executor:
-        futures = [executor.submit(worker, i) for i in range(1, burst_count + 1)]
-        for f in as_completed(futures):
-            results.append(f.result())
-    t_global_end = time.time()
-
-    results.sort(key=lambda x: x["launch_time"])
-    burst_window_sec = t_global_end - t_global_start
-
-    table = Table(title=f"Diễn tiến gửi dồn {burst_count} kết nối mới trong {burst_window_sec:.3f}s", show_lines=True)
-    table.add_column("Kết nối #", justify="center", style="bold")
-    table.add_column("Thời điểm phát SYN", justify="center")
-    table.add_column("Độ trễ", justify="right")
-    table.add_column("Trạng thái phản hồi / TCP", justify="left")
-    table.add_column("Phân loại Tường lửa", justify="center")
-
-    accepted_count = 0
-    blocked_count = 0
-
-    for r in results:
-        status_text = r["status"]
-        is_blocked = any(kw in status_text for kw in ["TIMEOUT", "RST", "REFUSED", "DROP", "Rate-Limited", "429", "403"])
-
-        if is_blocked:
-            blocked_count += 1
-            fw_label = "[bold red]BỊ CHẶN (BAN/DROP/RST)[/bold red]"
-            st_style = "red"
-        else:
-            accepted_count += 1
-            fw_label = "[bold green]CHẤP NHẬN[/bold green]"
-            st_style = "green"
-
-        table.add_row(
-            f"#{r['idx']:02d}",
-            r["time_str"],
-            f"{r['latency']:.1f} ms",
-            f"[{st_style}]{status_text}[/{st_style}]",
-            fw_label
-        )
-
-    console.print(table)
-
-    console.print("\n" + "-" * 80)
-    console.print(f"[*] Thống kê lưu lượng kết nối:")
-    console.print(f"    • Tổng kết nối mới khởi tạo: [bold white]{burst_count}[/bold white] kết nối")
-    console.print(f"    • Thời gian hoàn tất đợt burst: [bold white]{burst_window_sec:.3f}[/bold white] giây")
-    console.print(f"    • Tốc độ kết nối thực tế: [bold cyan]{burst_count / max(0.001, burst_window_sec):.1f}[/bold cyan] kết nối/giây (Ngưỡng cam kết: 3 conn/s)")
-    console.print(f"    • Số kết nối được chấp nhận qua firewall: [bold {'green' if accepted_count <= 4 else 'yellow'}]{accepted_count}[/bold {'green' if accepted_count <= 4 else 'yellow'}]")
-    console.print(f"    • Số kết nối bị firewall Drop / Reset / Timeout: [bold {'red' if blocked_count > 0 else 'dim'}]{blocked_count}[/bold {'red' if blocked_count > 0 else 'dim'}]")
-    console.print("-" * 80)
-
-    if blocked_count > 0:
-        console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS) - TƯỜNG LỬA CÓ KÍCH HOẠT RATE-LIMIT![/bold green]")
-        return True
-    elif accepted_count == burst_count:
-        console.print("[bold yellow][!] ĐÁNH GIÁ: CẢNH BÁO / KHÔNG KÍCH HOẠT (FAIL/WARN)![/bold yellow]")
-        console.print(f"    -> Toàn bộ {burst_count} kết nối mới trong {burst_window_sec:.2f}s đều được chấp nhận.")
-        console.print(f"    -> Tường lửa của thiết bị chưa bật hoặc không áp dụng rule Rate-Limit 3 new conn/s trên cổng {port}.")
-        return False
-    else:
-        console.print("[bold yellow][?] ĐÁNH GIÁ: KẾT QUẢ CẦN KIỂM TRA LẠI THÊM TRÊN PCAP.[/bold yellow]")
-        return False
 
 
 def parse_arguments():
@@ -765,6 +546,7 @@ def parse_arguments():
     parser.add_argument("--wordlist", type=str, default=None, help="Đường dẫn file wordlist cho chế độ vét cạn từ điển")
     parser.add_argument("--auth", choices=["wsse_sha1", "wsse_sha256", "wsse_text", "http_digest"], default=None, help="Chế độ xác thực ép buộc")
     parser.add_argument("--rate", type=float, default=4.0, help="Tốc độ gửi kết nối mới (kết nối/giây). Mặc định là 4.0 (250ms/gói để test Firewall 3 conn/s)")
+    parser.add_argument("--stage", type=int, choices=[1, 2], default=None, help="Giai đoạn kiểm thử (1: Reset trước ngưỡng, 2: Khóa sau ngưỡng)")
     parser.add_argument("--burst-count", type=int, default=8, help="Số lượng kết nối mới đồng thời trong 1 giây cho chế độ test Firewall Rate-Limit (Mặc định: 8)")
     return parser.parse_args()
 
@@ -777,17 +559,18 @@ def main():
     threshold = args.threshold
     rate_cps = args.rate
 
-    console.print(Panel(
-        f"[bold white]BỘ ĐO KIỂM PHÒNG VỆ VÉT CẠN & KHÓA DỊCH VỤ ONVIF SOAP (QCVN 11)[/bold white]\n"
-        f"• Mục tiêu DUT IP : [cyan]{DUT_IP}[/cyan]\n"
-        f"• Cổng đo kiểm    : [yellow]{port}[/yellow] ({'HTTPS / TLS' if is_https else 'HTTP / Cleartext'})\n"
-        f"• Endpoint SOAP   : [bold blue]{url}[/bold blue]\n"
-        f"• Tài khoản kiểm thử: [bold green]{USER}[/bold green]\n"
-        f"• Ngưỡng khóa IXIT: [bold red]{threshold} lần sai liên tiếp[/bold red] (Khóa {LOCKOUT_DURATION_MIN} phút)\n"
-        f"• Tốc độ phát kiểm thử: [bold magenta]{rate_cps:.1f} kết nối mới/giây[/bold magenta] (Giãn cách 250ms/kết nối để kiểm chứng Firewall 3 conn/s)",
-        title="THÔNG TIN THIẾT LẬP ĐO KIỂM",
-        border_style="cyan"
-    ))
+    if args.mode != "custom":
+        console.print(Panel(
+            f"[bold white]BỘ ĐO KIỂM PHÒNG VỆ VÉT CẠN & KHÓA DỊCH VỤ ONVIF SOAP (QCVN 11)[/bold white]\n"
+            f"• Mục tiêu DUT IP : [cyan]{DUT_IP}[/cyan]\n"
+            f"• Cổng đo kiểm    : [yellow]{port}[/yellow] ({'HTTPS / TLS' if is_https else 'HTTP / Cleartext'})\n"
+            f"• Endpoint SOAP   : [bold blue]{url}[/bold blue]\n"
+            f"• Tài khoản kiểm thử: [bold green]{USER}[/bold green]\n"
+            f"• Ngưỡng khóa IXIT: [bold red]{threshold} lần sai liên tiếp[/bold red] (Khóa {LOCKOUT_DURATION_MIN} phút)\n"
+            f"• Tốc độ phát kiểm thử: [bold magenta]{rate_cps:.1f} kết nối mới/giây[/bold magenta] (Giãn cách 250ms/kết nối để kiểm chứng Firewall 3 conn/s)",
+            title="THÔNG TIN THIẾT LẬP ĐO KIỂM",
+            border_style="cyan"
+        ))
 
     bpf_filter = f"tcp port {port}"
     pcap_proc, GLOBAL_PCAP_FILE = start_pcap_capture(
@@ -825,7 +608,9 @@ def main():
                 auth_mode=auth_mode,
                 fail_count=args.fail_count,
                 success_at=args.success_at,
-                rate_cps=rate_cps
+                rate_cps=rate_cps,
+                stage=args.stage,
+                threshold=threshold
             )
         else:
             console.print("Chế độ không hợp lệ.")
@@ -836,14 +621,15 @@ def main():
             ("Các gói tin xác thực sai (SOAP Fault / 401)", f"tcp.port == {port} && (http.response.code == 401 || xml contains \"Sender\" || xml contains \"FailedAuthentication\")"),
             ("Gói tin bị TƯỜNG LỬA CHẶN / Reset kết nối", f"tcp.port == {port} && (tcp.flags.reset == 1 || http.response.code in (403, 429))")
         ]
-        display_wireshark_panel(
-            console,
-            GLOBAL_PCAP_FILE,
-            filters,
-            is_tls=is_https,
-            sort_tip="Click tiêu đề cột No. hoặc Time để theo dõi chuỗi xác thực SOAP và thời điểm kích hoạt khóa chống vét cạn.",
-            title="BẰNG CHỨNG GÓI TIN ONVIF SOAP LOCKOUT AUDIT (WIRESHARK EVIDENCE)"
-        )
+        if args.mode != "custom":
+            display_wireshark_panel(
+                console,
+                GLOBAL_PCAP_FILE,
+                filters,
+                is_tls=is_https,
+                sort_tip="Click tiêu đề cột No. hoặc Time để theo dõi chuỗi xác thực SOAP và thời điểm kích hoạt khóa chống vét cạn.",
+                title="BẰNG CHỨNG GÓI TIN ONVIF SOAP LOCKOUT AUDIT (WIRESHARK EVIDENCE)"
+            )
 
     finally:
         stop_pcap_capture(pcap_proc)

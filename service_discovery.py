@@ -86,6 +86,11 @@ CAMERA_KNOWN_PORTS = {
     2020: ("TP-Link-Ctrl", "TP-Link VIGI / Tapo Management Port", "tcp", "Vendor SDK"),
     8800: ("TP-Link-Media", "TP-Link Media Discovery Port", "tcp", "Vendor SDK"),
     4520: ("Hanwha-Ctrl", "Hanwha / Samsung Camera Control Port", "tcp", "Vendor SDK"),
+    20001: ("CMS-Mgmt", "Tiandy / Oryza CMS Management Protocol (TLS)", "tcp", "Vendor SDK"),
+    20002: ("CMS-Data", "Tiandy / Oryza CMS Secondary Data Port", "tcp", "Vendor SDK"),
+    20003: ("CMS-Media", "Tiandy / Oryza CMS Media Stream Port", "tcp", "Vendor SDK"),
+    30001: ("Tiandy-SDK", "Tiandy / Oryza Secondary Communication Port", "tcp", "Vendor SDK"),
+    8083: ("HTTP-Internal", "Internal Media / API Stream Port", "tcp", "Web/Admin"),
 
     # Network Services, VoIP & IoT Protocols
     1883: ("MQTT", "Giao thức tin nhắn IoT MQTT (Cleartext)", "tcp", "IoT/Cloud"),
@@ -118,7 +123,7 @@ TOP_TCP_PORTS = [
     5060, 5061, 5222, 5353, 5432, 5555, 5672, 5683, 5684, 5900, 5984, 6000, 6001, 6379, 6667, 6668, 7000,
     7070, 7777, 8000, 8008, 8080, 8081, 8088, 8090, 8181, 8200, 8443, 8554, 8800, 8883, 8888, 8899, 9000,
     9010, 9020, 9090, 9100, 9200, 9443, 9554, 9999, 10000, 10001, 10443, 10554, 11211, 27017, 34567, 34599,
-    35000, 37777, 38888, 49152, 50000, 60001
+    35000, 37777, 38888, 49152, 50000, 60001, 8083, 20001, 20002, 20003, 30001
 ]
 
 def load_config() -> Dict[str, Any]:
@@ -491,6 +496,26 @@ def probe_udp_services(ip: str) -> Dict[int, Dict[str, Any]]:
 # --------------------------------------------------------------------------
 # High-Speed Multi-Threaded Port Scanner
 # --------------------------------------------------------------------------
+def scan_ports_with_nmap(ip: str) -> Optional[List[int]]:
+    """Runs high-speed Nmap port scan across all 65535 TCP ports if nmap is installed."""
+    import shutil
+    import subprocess
+    if not shutil.which("nmap"):
+        return None
+    try:
+        cmd = ["nmap", "-p-", "--min-rate", "1500", "-T4", "--open", "-n", ip]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        open_ports = []
+        for line in res.stdout.splitlines():
+            if "/tcp" in line and "open" in line:
+                parts = line.split("/")
+                if parts[0].strip().isdigit():
+                    open_ports.append(int(parts[0].strip()))
+        return sorted(open_ports)
+    except Exception:
+        return None
+
+
 def scan_tcp_ports_fast(ip: str, ports_to_scan: List[int], timeout: float = 0.35, max_workers: int = 120) -> List[int]:
     """Scans a list of TCP ports using ThreadPoolExecutor for high-speed scanning."""
     open_ports = []
@@ -648,23 +673,27 @@ def scan_camera_services(
     """
     start_time = time.time()
 
+    # Load declared ports first
+    if declared_ixit_ports is None:
+        declared_ixit_ports = get_declared_ixit_ports()
+
     # Determine TCP ports to scan
-    if scan_mode == "full_range":
+    open_tcp = None
+    if scan_mode == "nmap":
+        open_tcp = scan_ports_with_nmap(ip)
+        ports_list = list(range(1, 65536))
+    elif scan_mode == "full_range":
         ports_list = list(range(1, 65536))
         max_workers = 250
     elif scan_mode in ["top_1000", "auto"]:
-        ports_list = sorted(list(set(TOP_TCP_PORTS + list(CAMERA_KNOWN_PORTS.keys()))))
+        ports_list = sorted(list(set(TOP_TCP_PORTS + list(CAMERA_KNOWN_PORTS.keys()) + list(declared_ixit_ports))))
         max_workers = 150
     elif scan_mode == "custom" and custom_ports:
         ports_list = sorted(list(set(custom_ports)))
         max_workers = 150
     else: # Default: camera_known
-        ports_list = sorted([p for p, v in CAMERA_KNOWN_PORTS.items() if v[2] == "tcp"])
+        ports_list = sorted(list(set([p for p, v in CAMERA_KNOWN_PORTS.items() if v[2] == "tcp"] + list(declared_ixit_ports))))
         max_workers = 120
-
-    # Load declared ports
-    if declared_ixit_ports is None:
-        declared_ixit_ports = get_declared_ixit_ports()
 
     results = {
         "ip": ip,
@@ -687,7 +716,8 @@ def scan_camera_services(
     }
 
     # 1. High-speed TCP Scan
-    open_tcp = scan_tcp_ports_fast(ip, ports_list, timeout=0.25 if scan_mode == "full_range" else 0.35, max_workers=max_workers)
+    if open_tcp is None:
+        open_tcp = scan_tcp_ports_fast(ip, ports_list, timeout=0.25 if scan_mode == "full_range" else 0.35, max_workers=max_workers)
     results["tcp_open"] = open_tcp
 
     # 2. Deep Protocol & Banner Identification on Open TCP Ports
@@ -957,6 +987,7 @@ def main():
     parser = argparse.ArgumentParser(description="Universal Service & Comprehensive Port Discovery Module")
     parser.add_argument("target_ip", nargs="?", default=None, help="Địa chỉ IP của Camera DUT")
     parser.add_argument("--ip", default=None, help="Địa chỉ IP của Camera DUT")
+    parser.add_argument("--nmap", action="store_true", help="Sử dụng Nmap quét toàn dải 1 - 65535 cổng TCP cực nhanh")
     parser.add_argument("--full", action="store_true", help="Quét toàn bộ 1 - 65535 cổng TCP + UDP + API endpoints (Toàn diện)")
     parser.add_argument("--fast", action="store_true", help="Quét danh mục cổng camera đặc thù (~50 cổng) + UDP + API")
     parser.add_argument("--auto", action="store_true", help="Tự động quét toàn diện không dừng tương tác (Mặc định)")
@@ -973,7 +1004,9 @@ def main():
         return
 
     # Non-interactive / Automated execution:
-    if args.full:
+    if args.nmap:
+        mode = "nmap"
+    elif args.full:
         mode = "full_range"
     elif args.fast:
         mode = "camera_known"

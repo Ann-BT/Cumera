@@ -22,6 +22,8 @@ from rich.console import Console
 
 TOOLKIT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONF_PATH = os.path.join(TOOLKIT_DIR, "config.json")
+PROFILES_DIR = os.path.join(TOOLKIT_DIR, "profiles")
+DEFAULT_PROFILE_ID = "axis_q1806_le"
 
 DEFAULT_HOST_FALLBACK_IP = "127.0.0.1"
 DEFAULT_DUT_FALLBACK_IP = "192.168.1.100"
@@ -179,6 +181,131 @@ def save_config(cfg: Dict[str, Any], path: Optional[str] = None) -> Dict[str, An
     with open(target_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     return data
+
+
+def get_active_profile(cfg: Optional[Dict[str, Any]] = None) -> str:
+    """Return active profile ID from config, defaulting to axis_q1806_le for 100% backward compatibility."""
+    data = cfg if cfg is not None else load_config()
+    if isinstance(data, dict):
+        active = data.get("active_profile") or data.get("profile_id")
+        if active and isinstance(active, str) and active.strip():
+            return active.strip()
+    return DEFAULT_PROFILE_ID
+
+
+def list_profiles() -> List[Dict[str, Any]]:
+    """List all available camera profiles in the profiles directory."""
+    if not os.path.isdir(PROFILES_DIR):
+        return []
+
+    active_id = get_active_profile()
+    profiles: List[Dict[str, Any]] = []
+
+    for fname in sorted(os.listdir(PROFILES_DIR)):
+        if not fname.endswith(".json"):
+            continue
+        pid = fname[:-5]
+        fpath = os.path.join(PROFILES_DIR, fname)
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                pdata = json.load(f)
+            if not isinstance(pdata, dict):
+                continue
+            tc = pdata.get("target_camera", {})
+            name = pdata.get("name") or tc.get("model") or pid
+            vendor = pdata.get("vendor") or "Unknown"
+            model = tc.get("model") or pdata.get("model") or ""
+            fw = tc.get("firmware") or pdata.get("firmware") or ""
+            ip = tc.get("ip") or ""
+            ev_dir = pdata.get("evidence_base_dir") or ""
+            profiles.append({
+                "id": pid,
+                "name": name,
+                "vendor": vendor,
+                "model": model,
+                "firmware": fw,
+                "ip": ip,
+                "evidence_base_dir": ev_dir,
+                "is_active": (pid == active_id),
+                "file_path": fpath,
+                "data": pdata,
+            })
+        except Exception:
+            continue
+
+    return profiles
+
+
+def get_profile(profile_id: str) -> Optional[Dict[str, Any]]:
+    """Load profile JSON dictionary by ID."""
+    clean_id = profile_id[:-5] if profile_id.endswith(".json") else profile_id
+    fpath = os.path.join(PROFILES_DIR, f"{clean_id}.json")
+    if not os.path.isfile(fpath):
+        return None
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def update_profile(profile_id: str, updates: Dict[str, Any]) -> bool:
+    """Update profile JSON with active config parameters (e.g. IP, credentials, ports)."""
+    clean_id = profile_id[:-5] if profile_id.endswith(".json") else profile_id
+    fpath = os.path.join(PROFILES_DIR, f"{clean_id}.json")
+    if not os.path.isfile(fpath):
+        return False
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return False
+        if "target_camera" in updates and isinstance(updates["target_camera"], dict):
+            data.setdefault("target_camera", {}).update(updates["target_camera"])
+        if "service_ports" in updates and isinstance(updates["service_ports"], dict):
+            data.setdefault("service_ports", {}).update(updates["service_ports"])
+        if "evidence_base_dir" in updates:
+            data["evidence_base_dir"] = updates["evidence_base_dir"]
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+
+def switch_profile(profile_id: str) -> Dict[str, Any]:
+    """
+    Switch active camera profile.
+    Reads profiles/<profile_id>.json, sets active_profile, and synchronously overwrites config.json
+    preserving complete schema backward compatibility for all 24 tools.
+    """
+    clean_id = profile_id[:-5] if profile_id.endswith(".json") else profile_id
+    pdata = get_profile(clean_id)
+    if pdata is None:
+        raise FileNotFoundError(f"Profile '{clean_id}' not found in {PROFILES_DIR}")
+
+    new_cfg = dict(pdata)
+    new_cfg["active_profile"] = clean_id
+    if "profile_id" not in new_cfg:
+        new_cfg["profile_id"] = clean_id
+
+    # Synchronously persist to config.json
+    saved_cfg = save_config(new_cfg)
+    ev_dir = new_cfg.get("evidence_base_dir")
+    if ev_dir:
+        try:
+            os.makedirs(ev_dir, exist_ok=True)
+        except Exception:
+            pass
+    return saved_cfg
+
+
+def get_adapter(cfg: Optional[Dict[str, Any]] = None):
+    """Return vendor camera adapter instance for active profile."""
+    from adapters import get_camera_adapter
+    return get_camera_adapter(cfg)
+
 
 
 def get_target_info(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
@@ -454,7 +581,7 @@ def parse_onvif_xaddr(xaddrs: str) -> Dict[str, Any]:
 
 def probe_common_camera_ports(ip: str, timeout: float = 0.45) -> Dict[str, Any]:
     """Concurrently scan common IP camera TCP ports, UDP 3702, vendor hints, and RTSP path."""
-    tcp_candidates = [21, 22, 23, 80, 322, 332, 443, 554, 1883, 2222, 3702, 8000, 8080, 8443, 8554, 8883, 34567, 37777]
+    tcp_candidates = [21, 22, 23, 80, 322, 332, 443, 554, 1883, 2222, 3702, 8000, 8080, 8083, 8443, 8554, 8883, 20001, 20002, 20003, 30001, 34567, 37777]
     open_tcp: List[int] = []
     with ThreadPoolExecutor(max_workers=len(tcp_candidates)) as ex:
         futs = {ex.submit(_tcp_open, ip, p, timeout): p for p in tcp_candidates}
@@ -529,7 +656,7 @@ def probe_common_camera_ports(ip: str, timeout: float = 0.45) -> Dict[str, Any]:
     elif 2222 in open_tcp:
         suggested["ssh"] = 2222
 
-    for prop_p in (8000, 37777, 34567):
+    for prop_p in (8000, 20001, 37777, 34567):
         if prop_p in open_tcp:
             suggested["proprietary_tcp"] = prop_p
             break

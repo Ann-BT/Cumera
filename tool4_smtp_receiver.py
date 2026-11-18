@@ -27,6 +27,13 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import ssl
 import ipaddress
 
+# Xử lý --help trước khi kiểm tra quyền root
+if __name__ == '__main__' and ('-h' in sys.argv or '--help' in sys.argv):
+    import argparse
+    parser = argparse.ArgumentParser(description="Tool 4: Máy chủ giả lập SMTP / SMTPS đo kiểm mật mã email cho Camera IP (QCVN 11 Khoản 2.1.3 & Phụ lục IXIT ComMech-SMTP)")
+    parser.print_help()
+    sys.exit(0)
+
 # Tự động nâng quyền root nếu chạy dưới quyền user thường (bắt buộc cho cổng 25, 465, 587 trên Linux)
 if __name__ == '__main__' and hasattr(os, 'geteuid') and os.geteuid() != 0:
     print("[*] Mở cổng SMTP đặc quyền (< 1024) yêu cầu quyền root.")

@@ -149,7 +149,14 @@ def attempt_ssh_login(username: str, password: str, port: int = 22, timeout: flo
                 pass
 
 
-def run_custom_sequence(port: int, fail_count: int, success_at: int, rate_cps: float = 3.0) -> bool:
+def run_custom_sequence(
+    port: int,
+    fail_count: int,
+    success_at: int,
+    rate_cps: float = 3.0,
+    stage: Optional[int] = None,
+    threshold: int = 5
+) -> bool:
     """
     Chạy kịch bản tấn công tùy chỉnh cho SSH:
     - fail_count: Số lần thử sai liên tiếp
@@ -163,18 +170,6 @@ def run_custom_sequence(port: int, fail_count: int, success_at: int, rate_cps: f
     else:
         total_steps = fail_count + 1
 
-    console.print(Panel(
-        f"[bold white]KỊCH BẢN ĐO KIỂM VÉT CẠN TÙY CHỈNH GIAO DIỆN SSH (OS LINUX)[/bold white]\n"
-        f"• Mục tiêu DUT IP    : [cyan]{DUT_IP}:{port}[/cyan]\n"
-        f"• Tài khoản kiểm thử : [bold green]{SSH_USER}[/bold green]\n"
-        f"• Số lần thử sai     : [bold red]{fail_count} lần[/bold red]\n"
-        f"• Lượt thử mật khẩu ĐÚNG: [bold yellow]{'Không thử đúng' if success_at <= 0 else f'Lượt thứ {success_at}'}[/bold yellow]\n"
-        f"• Tổng số bước chạy  : [bold white]{total_steps} bước[/bold white]\n"
-        f"• Tốc độ phát        : [bold magenta]{rate_cps:.1f} kết nối mới/giây[/bold magenta] (Kiểm tra Firewall SSH Rate-Limit)",
-        title="THIẾT LẬP KỊCH BẢN TẤN CÔNG SSH (CLAUSE 2.1.5)",
-        border_style="cyan"
-    ))
-
     limiter = PreciseRateLimiter(rate_cps=rate_cps)
     table = Table(title=f"Tiến trình kịch bản tùy chỉnh SSH ({total_steps} bước)", show_lines=True)
     table.add_column("Bước", justify="center", style="bold")
@@ -185,7 +180,6 @@ def run_custom_sequence(port: int, fail_count: int, success_at: int, rate_cps: f
     table.add_column("Độ trễ", justify="right")
 
     success_attempt_result = None
-    dropped_count = 0
 
     for step in range(1, total_steps + 1):
         pos, t_str = limiter.wait_next()
@@ -194,22 +188,21 @@ def run_custom_sequence(port: int, fail_count: int, success_at: int, rate_cps: f
         if is_success_step:
             test_pass = CORRECT_PASS
             type_lbl = "[bold green]ĐÚNG[/bold green]"
+            display_pass = f"[bold green]{SSH_USER} : {CORRECT_PASS}[/bold green]"
         else:
             test_pass = f"BruteForce_{step}#SSHBad"
             type_lbl = "[bold red]SAI[/bold red]"
+            display_pass = test_pass
 
         ok, status, lat = attempt_ssh_login(SSH_USER, test_pass, port=port, timeout=2.5)
 
         is_blocked = any(kw in status for kw in ["TIMEOUT", "CONN_DROPPED", "BLOCKED", "Connection refused"])
-        if is_blocked:
-            dropped_count += 1
-
         style = "green" if (is_success_step and ok) else ("red" if is_blocked else "yellow")
         table.add_row(
             f"#{step:02d}",
             type_lbl,
             t_str,
-            test_pass if not is_success_step else "******",
+            display_pass,
             f"[{style}]{status}[/{style}]",
             f"{lat:.1f} ms"
         )
@@ -219,47 +212,22 @@ def run_custom_sequence(port: int, fail_count: int, success_at: int, rate_cps: f
 
     console.print(table)
 
+    is_reset_test = (stage == 1) if stage in (1, 2) else (fail_count < threshold or (0 < success_at <= fail_count and fail_count <= threshold))
     verdict = False
-    console.print("\n" + "=" * 80)
-    if success_at > fail_count:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: KÍCH HOẠT KHÓA GIAO DIỆN SSH KHI VƯỢT NGƯỠNG SAI")
-        if success_attempt_result and not success_attempt_result[1]:
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt #{success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.")
-            console.print(f"    -> Chi tiết: {success_attempt_result[2]}")
-            verdict = True
-        else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> SSH vẫn cho phép đăng nhập tại lượt #{success_at} sau {fail_count} lần sai.")
-    elif 0 < success_at <= fail_count:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: RESET BỘ ĐẾM KHI NHẬP ĐÚNG TRƯỚC NGƯỠNG")
+    console.print("")
+    if is_reset_test:
         if success_attempt_result and success_attempt_result[1]:
-            console.print("[bold green][+] ĐÁNH GIÁ: ĐẠT (PASS)![/bold green]")
-            console.print(f"    -> Mật khẩu đúng tại lượt #{success_at} đăng nhập thành công. Bộ đếm đã được reset.")
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ1: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} đăng nhập thành công. Bộ đếm đã reset.[/bold green]")
             verdict = True
         else:
-            console.print("[bold red][-] ĐÁNH GIÁ: KHÔNG ĐẠT (FAIL)![/bold red]")
-            console.print(f"    -> SSH từ chối mật khẩu đúng tại lượt #{success_at} dù chưa vượt ngưỡng.")
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ1: KHÔNG ĐẠT (FAIL) - SSH từ chối mật khẩu đúng tại lượt #{success_at} dù chưa vượt ngưỡng.[/bold red]")
     else:
-        console.print("  [MỤC TIÊU KIỂM ĐỊNH]: ĐO LƯỜNG TƯỜNG LỬA CHỐNG VÉT CẠN SSH LIÊN TỤC")
-        console.print(f"    -> Đã gửi {fail_count} lần sai liên tiếp (Số lần bị drop/timeout: {dropped_count}).")
-        verdict = True
-    console.print("=" * 80)
+        if success_attempt_result and not success_attempt_result[1]:
+            console.print(f"[bold green][+] ĐÁNH GIÁ GĐ2: ĐẠT (PASS) - Mật khẩu đúng tại lượt #{success_at} đã bị từ chối / BỊ KHÓA sau {fail_count} lần sai liên tiếp.[/bold green]")
+            verdict = True
+        else:
+            console.print(f"[bold red][-] ĐÁNH GIÁ GĐ2: KHÔNG ĐẠT (FAIL) - SSH vẫn cho phép đăng nhập tại lượt #{success_at} sau {fail_count} lần sai.[/bold red]")
 
-    filters = [
-        ("Toàn bộ chuỗi gói tin vét cạn SSH", f"tcp.port == {port} && ssh"),
-        ("Các gói tin xác thực sai (Mã 51 SSH_MSG_USERAUTH_FAILURE)", f"tcp.port == {port} && ssh.message_code == 51"),
-        ("Gói tin xác thực thành công (Mã 52 SSH_MSG_USERAUTH_SUCCESS)", f"tcp.port == {port} && ssh.message_code == 52"),
-        ("Gói tin bị KHÓA / Drop / Reset kết nối", f"tcp.port == {port} && (tcp.flags.reset == 1 || tcp.flags.syn == 1)")
-    ]
-    display_wireshark_panel(
-        console,
-        GLOBAL_PCAP_FILE,
-        filters,
-        is_tls=False,
-        sort_tip="Click tiêu đề cột No. hoặc Time trong Wireshark để theo dõi chuỗi xác thực SSH.",
-        title=f"BẰNG CHỨNG GÓI TIN SSH AUDIT (CỔNG {port})"
-    )
     return verdict
 
 
@@ -269,6 +237,7 @@ def parse_arguments():
     parser.add_argument("--mode", choices=["custom", "1", "2", "3", "reset", "lockout", "all"], default="custom", help="Chế độ chạy")
     parser.add_argument("--fail-count", type=int, default=10, help="Số lần gửi sai liên tiếp (Mặc định: 10)")
     parser.add_argument("--success-at", type=int, default=11, help="Lượt chèn thử mật khẩu đúng (Mặc định: 11; 0=Không thử đúng)")
+    parser.add_argument("--stage", type=int, choices=[1, 2], default=None, help="Giai đoạn kiểm thử (1: Reset trước ngưỡng, 2: Khóa sau ngưỡng)")
     parser.add_argument("--rate", type=float, default=3.0, help="Tốc độ gửi kết nối mới/giây (Mặc định: 3.0 conn/s)")
     return parser.parse_args()
 
@@ -304,7 +273,8 @@ def main():
                 port=port,
                 fail_count=args.fail_count,
                 success_at=args.success_at,
-                rate_cps=args.rate
+                rate_cps=args.rate,
+                stage=args.stage
             )
     finally:
         stop_pcap_capture(pcap_proc)

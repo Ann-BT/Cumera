@@ -25,6 +25,13 @@ USER = _target_info["username"]
 CORRECT_PASS = _target_info["password"]
 GLOBAL_PCAP_FILE = ""
 
+if __name__ == '__main__' and ('-h' in sys.argv or '--help' in sys.argv):
+    import argparse
+    parser = argparse.ArgumentParser(description="Tool 9: Kiểm tra chống dò quét mật khẩu Brute-force & Khóa tài khoản (QCVN 11 Khoản 2.1.2)")
+    parser.add_argument("--test", choices=["1", "2", "3"], default=None, help="Chạy Test Case cụ thể (1: Khóa sau 5 lần, 2: Mở sau 5 phút, 3: Cả hai)")
+    parser.print_help()
+    sys.exit(0)
+
 def get_active_rtsp():
     for port in (RTSPS_PORT, RTSP_PORT, 322, 9554, 554):
         s = socket.socket()
@@ -278,4 +285,9 @@ def main():
         stop_pcap_capture(pcap_proc)
 
 if __name__ == '__main__':
+    if '-h' in sys.argv or '--help' in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(description="Tool 9: Kiểm tra chống dò quét mật khẩu Brute-force & Khóa tài khoản (QCVN 11 Khoản 2.1.2)")
+        parser.print_help()
+        sys.exit(0)
     main()

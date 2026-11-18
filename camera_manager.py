@@ -26,12 +26,15 @@ from rich.table import Table
 
 from toolkit_config import (
     CONF_PATH,
+    get_active_profile,
     get_service_ports,
     list_local_ipv4_interfaces,
+    list_profiles,
     load_config,
     make_console,
     parse_onvif_xaddr,
     save_config,
+    switch_profile,
 )
 
 console = make_console()
@@ -277,13 +280,64 @@ def show_camera_table(cameras: List[Dict[str, Any]], active_ip: str = ""):
     console.print(table)
 
 
+def show_profiles_table():
+    profiles = list_profiles()
+    active_id = get_active_profile()
+    table = Table(title="[bold cyan]DANH SÁCH PROFILES THIẾT BỊ ĐO KIỂM QCVN 11[/bold cyan]")
+    table.add_column("STT", style="bold yellow", justify="center")
+    table.add_column("Profile ID", style="bold green")
+    table.add_column("Tên thiết bị / Model", style="white")
+    table.add_column("Hãng sản xuất (Vendor)", style="cyan")
+    table.add_column("Firmware", style="blue")
+    table.add_column("IP Address", style="magenta")
+    table.add_column("Trạng thái", justify="center")
+
+    for idx, p in enumerate(profiles, start=1):
+        status = "[bold green][ACTIVE][/bold green]" if p["id"] == active_id else "[dim]Sẵn sàng[/dim]"
+        table.add_row(
+            str(idx),
+            p["id"],
+            p["name"],
+            p["vendor"],
+            p["firmware"] or "N/A",
+            p["ip"] or "N/A",
+            status,
+        )
+
+    console.print(table)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Camera Multi-Device Manager & Scanner")
     parser.add_argument("--scan", action="store_true", help="Quét nhanh toàn bộ camera trên subnet")
     parser.add_argument("--set-target", type=str, help="Chọn IP camera làm mục tiêu kiểm thử")
     parser.add_argument("--user", type=str, help="Username camera")
     parser.add_argument("--pwd", type=str, help="Password camera")
+    parser.add_argument("--list-profiles", action="store_true", help="Liệt kê toàn bộ camera profiles có sẵn")
+    parser.add_argument(
+        "--switch-profile",
+        type=str,
+        metavar="PROFILE_ID",
+        help="Chuyển active profile sang thiết bị tương ứng (ví dụ: axis_q1806_le, oryza_orz_b52z)",
+    )
     args = parser.parse_args()
+
+    if args.list_profiles:
+        show_profiles_table()
+        return
+
+    if args.switch_profile:
+        try:
+            cfg = switch_profile(args.switch_profile)
+            tc = cfg.get("target_camera", {})
+            console.print(
+                f"[bold green][OK] Đã chuyển đổi thành công sang Profile: [cyan]{args.switch_profile}[/cyan] "
+                f"({tc.get('model', 'Unknown')} - IP: {tc.get('ip', 'N/A')})[/bold green]"
+            )
+        except Exception as e:
+            console.print(f"[bold red][ERROR] Không thể chuyển profile: {e}[/bold red]")
+            sys.exit(1)
+        return
 
     cfg = load_config()
     current_ip = cfg.get("target_camera", {}).get("ip", "")

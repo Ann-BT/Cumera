@@ -23,6 +23,13 @@ RTSP_PATH = _sp["rtsp_path"]
 USER = _target_info["username"]
 CORRECT_PASS = _target_info["password"]
 
+if __name__ == '__main__' and ('-h' in sys.argv or '--help' in sys.argv):
+    import argparse
+    parser = argparse.ArgumentParser(description="Tool 12: Đo kiểm & Bóc tách chứng cứ gói tin xác thực RTSP/RTSPS (QCVN 11 Khoản 2.1.3)")
+    parser.add_argument("port", nargs="?", type=int, default=RTSPS_PORT, help=f"Cổng RTSP cần kiểm tra (mặc định: {RTSPS_PORT})")
+    parser.print_help()
+    sys.exit(0)
+
 def get_active_rtsp():
     if len(sys.argv) > 1 and sys.argv[1].isdigit():
         p = int(sys.argv[1])
@@ -186,4 +193,10 @@ def main():
     )
 
 if __name__ == '__main__':
+    if '-h' in sys.argv or '--help' in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(description=f"Tool 12: Đo kiểm & Bóc tách chứng cứ gói tin xác thực RTSP/RTSPS (QCVN 11 Khoản 2.1.3)")
+        parser.add_argument("port", nargs="?", type=int, default=ACTIVE_PORT, help=f"Cổng RTSP cần kiểm tra (mặc định: {ACTIVE_PORT})")
+        parser.print_help()
+        sys.exit(0)
     main()

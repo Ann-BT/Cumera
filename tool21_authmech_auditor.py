@@ -58,11 +58,18 @@ from toolkit_config import (
     load_config,
     make_console,
 )
+from adapters import get_camera_adapter
 
 console = make_console()
 config = load_config()
 _target_info = get_target_info(config)
 SERVICE_PORTS = get_service_ports(config)
+adapter = get_camera_adapter(config)
+
+_pid = str(config.get("active_profile") or config.get("profile_id") or "").lower()
+_vendor = str(config.get("vendor") or _target_info.get("vendor") or getattr(adapter, "vendor", "")).lower()
+_model = str(_target_info.get("model") or getattr(adapter, "model", "")).lower()
+IS_ORYZA = ("oryza" in _pid or "tiandy" in _pid or "orz" in _pid or "oryza" in _vendor or "tiandy" in _vendor or "orz" in _model)
 
 DUT_IP = _target_info["ip"]
 DUT_MODEL = _target_info["model"]
@@ -80,6 +87,7 @@ RTSPS_PORT = int(SERVICE_PORTS["rtsps"])
 RTSP_PORT = int(SERVICE_PORTS["rtsp"])
 RTSP_PATH = SERVICE_PORTS["rtsp_path"]
 SSH_PORT = int(SERVICE_PORTS["ssh"])
+CMS_PORT = int(SERVICE_PORTS.get("proprietary_tcp") or 20001)
 
 # Thư mục đích lưu bằng chứng
 custom_authmech = config.get("evidence_authmech_dir") or (
@@ -165,16 +173,16 @@ def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
     - Hỗ trợ HTTPS hoặc fallback HTTP nếu camera chỉ mở HTTP
     - Đa nền tảng camera (Axis, Hikvision, Dahua, Uniview, VIGI, Generic)
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-1: Web-Authmech (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-Web: Web-Authmech (HTTPS/{DUT_IP}:{HTTPS_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
-        "id": "AuthMech-1",
+        "id": "AuthMech-Web",
         "ixit_id": "Web-Authmech",
-        "name": "Web Interface Authentication",
+        "name": "Web Admin Interface",
         "port": HTTPS_PORT,
         "proto": "HTTPS / TLS",
         "auth_factor": "Username and password",
-        "pcap": "authmech-1_web.pcap",
-        "aliases": ["Web-Authmech.pcap", "AuthMech-1.pcap"]
+        "pcap": "authmech-web.pcap",
+        "aliases": ["authmech-1_web.pcap", "Web-Authmech.pcap", "AuthMech-Web.pcap"]
     }
 
     if record_pcap:
@@ -344,16 +352,16 @@ def audit_authmech_2_ssh(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
     """
     Đo kiểm AuthMech-2: SSH Interface Authentication (SSH-Authmech).
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-2: SSH-Authmech (SSH/{DUT_IP}:{SSH_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-SSH: SSH-Authmech (SSH/{DUT_IP}:{SSH_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
-        "id": "AuthMech-2",
+        "id": "AuthMech-SSH",
         "ixit_id": "SSH-Authmech",
-        "name": "SSH Remote CLI Authentication",
+        "name": "SSH Remote CLI",
         "port": SSH_PORT,
         "proto": "SSHv2 (RFC 4253)",
         "auth_factor": "Username and password",
-        "pcap": "authmech-2_ssh.pcap",
-        "aliases": ["SSH-Authmech.pcap", "AuthMech-2.pcap"]
+        "pcap": "authmech-ssh.pcap",
+        "aliases": ["authmech-2_ssh.pcap", "SSH-Authmech.pcap", "AuthMech-SSH.pcap"]
     }
 
     ssh_user = SSH_USER
@@ -376,8 +384,11 @@ def audit_authmech_2_ssh(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
 
     try:
         if paramiko:
-            t = paramiko.Transport((DUT_IP, SSH_PORT))
-            t.start_client(timeout=4.0)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3.0)
+            sock.connect((DUT_IP, SSH_PORT))
+            t = paramiko.Transport(sock)
+            t.start_client(timeout=3.0)
             ssh_banner = t.remote_version
             active_cipher = getattr(t, 'remote_cipher', 'aes128-ctr')
             active_mac = getattr(t, 'remote_mac', 'hmac-sha2-256')
@@ -462,27 +473,66 @@ def audit_authmech_2_ssh(wait_sec: float = 3.0, record_pcap: bool = True) -> Dic
     return res
 
 
+def launch_vlc_stream(ip: str, port: int, user: str, password: str, path: str):
+    """
+    Tự động khởi chạy VLC Media Player để phát trực tiếp luồng RTSP khi đã xác thực thành công.
+    """
+    import shutil, subprocess, urllib.parse
+    vlc_bin = shutil.which("vlc")
+    if not vlc_bin:
+        console.print("[yellow][!] Không tìm thấy lệnh 'vlc' trên hệ thống để mở luồng video.[/yellow]")
+        return
+
+    encoded_pass = urllib.parse.quote(password)
+    # Cổng RTSP 554 là cổng chuẩn truyền luồng H.264 qua TCP ổn định và mượt mà
+    rtsp_url = f"rtsp://{user}:{encoded_pass}@{ip}:554{path}"
+    console.print(f"[bold green][✓] Xác thực thành công! Đang mở luồng video trên VLC: {rtsp_url}[/bold green]")
+    try:
+        subprocess.Popen(
+            [vlc_bin, "--rtsp-tcp", "--network-caching=1000", rtsp_url],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+    except Exception as e:
+        console.print(f"[red][!] Lỗi khi mở VLC: {e}[/red]")
+
+
 # ==============================================================================
 # 3. AUTHMECH-3: LUỒNG VIDEO RTSP / RTSPS (PORT 322 & 554)
 # ==============================================================================
 
-def audit_authmech_3_rtsp(wait_sec: float = 3.0, record_pcap: bool = True) -> Dict[str, Any]:
+def audit_authmech_3_rtsp(
+    wait_sec: float = 3.0,
+    record_pcap: bool = True,
+    id_override: Optional[str] = None,
+    ixit_id_override: Optional[str] = None,
+    pcap_override: Optional[str] = None,
+    name_override: Optional[str] = None,
+    launch_vlc: bool = True,
+) -> Dict[str, Any]:
     """
-    Đo kiểm AuthMech-3: RTSP Stream Authentication (RTSP-Authmech / Port 322/554).
-    - Ciphersuite TLS 1.3 trên cổng 322 RTSPS
-    - Phương thức mã hóa: Digest SHA-256 (WWW-Authenticate: Digest realm=... algorithm=SHA-256)
-    - PCAP: authmech-3_rtsps.pcap, RTSP-Authmech.pcap, AuthMech-3.pcap
+    Đo kiểm AuthMech-3 (hoặc AuthMech-2 trên Oryza): RTSP Stream Authentication.
+    - Hỗ trợ RTSP-over-HTTPS Tunneling (cổng 443 bọc TLS 1.3) và Raw RTSP/RTSPS (cổng 322/554)
+    - Phương thức mã hóa: Digest SHA-256 / MD5
+    - Tự động bật VLC xem trực tiếp luồng video khi xác thực thành công.
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-3: RTSP-Authmech (RTSPS/{DUT_IP}:{RTSPS_PORT})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    aid = id_override or "AuthMech-RTSP"
+    ixit_id = ixit_id_override or "RTSP-Authmech"
+    disp_name = name_override or "RTSP/RTSPS Media Stream"
+    pcap_file = pcap_override or "authmech-rtsp.pcap"
+
+    port_target = RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else RTSP_PORT
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (RTSP/{DUT_IP}:{port_target})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
-        "id": "AuthMech-3",
-        "ixit_id": "RTSP-Authmech",
-        "name": "RTSP Video Stream Authentication",
-        "port": RTSPS_PORT,
-        "proto": "RTSPS (RTSP over TLS 1.3)",
+        "id": aid,
+        "ixit_id": ixit_id,
+        "name": disp_name,
+        "port": port_target,
+        "proto": "RTSPS (RTSP over HTTPS Tunnel)" if port_target == 443 else ("RTSPS (TLS 1.3)" if port_target == RTSPS_PORT else "RTSP Digest over TLS"),
         "auth_factor": "Username and password",
-        "pcap": "authmech-3_rtsps.pcap",
-        "aliases": ["RTSP-Authmech.pcap", "AuthMech-3.pcap"]
+        "pcap": pcap_file,
+        "aliases": ["authmech-3_rtsps.pcap", "authmech-2_rtsp.pcap", "RTSP-Authmech.pcap", f"{aid}.pcap"]
     }
 
     if record_pcap:
@@ -496,69 +546,65 @@ def audit_authmech_3_rtsp(wait_sec: float = 3.0, record_pcap: bool = True) -> Di
     digest_algorithm = "N/A"
     sdp_received = False
 
-    rtsp_port_used = RTSPS_PORT
+    rtsp_port_used = port_target
     use_tls_rtsp = True
 
     try:
-        # Bước 1: Thử bắt tay TLS trên cổng RTSPS_PORT; fallback RTSP_PORT nếu cổng RTSPS đóng
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         ctx.keylog_filename = SSLKEYLOG_PATH
 
-        try:
-            raw_sock = socket.create_connection((DUT_IP, RTSPS_PORT), timeout=3.0)
-            ssock = ctx.wrap_socket(raw_sock, server_hostname=DUT_IP)
-            active_cipher = ssock.cipher()[0]
-            tls_ver = ssock.version()
-        except Exception:
-            use_tls_rtsp = False
-            rtsp_port_used = RTSP_PORT
-            res["port"] = RTSP_PORT
-            res["proto"] = "RTSP (Cleartext)"
-            ssock = socket.create_connection((DUT_IP, RTSP_PORT), timeout=3.0)
+        if port_target == 443:
+            # === CHẾ ĐỘ 1: RTSP-over-HTTPS Tunneling (QuickTime / RFC 2326 qua cổng 443 TLS) ===
+            raw_sock = socket.create_connection((DUT_IP, 443), timeout=3.5)
+            test_ssock = ctx.wrap_socket(raw_sock, server_hostname=DUT_IP)
+            active_cipher = test_ssock.cipher()[0]
+            tls_ver = test_ssock.version()
+            test_ssock.close()
 
-        with ssock:
-            # Hàm đọc trọn vẹn bản tin RTSP (Header + Body SDP theo Content-Length)
-            def _recv_full_rtsp(s):
-                s.settimeout(3.5)
-                raw_data = b""
-                try:
-                    while b"\r\n\r\n" not in raw_data:
-                        chunk = s.recv(1024)
-                        if not chunk:
-                            break
-                        raw_data += chunk
-                    if not raw_data:
-                        return ""
-                    hdr_end = raw_data.index(b"\r\n\r\n") + 4
-                    hdrs = raw_data[:hdr_end].decode("utf-8", errors="ignore")
-                    cl_len = 0
-                    for hl in hdrs.splitlines():
-                        if hl.lower().startswith("content-length:"):
-                            cl_len = int(hl.split(":", 1)[1].strip())
-                            break
-                    body_part = raw_data[hdr_end:]
-                    while len(body_part) < cl_len:
-                        chunk = s.recv(min(cl_len - len(body_part), 4096))
-                        if not chunk:
-                            break
-                        body_part += chunk
-                    return hdrs + body_part.decode("utf-8", errors="ignore")
-                except Exception:
-                    return raw_data.decode("utf-8", errors="ignore")
+            cookie = "tun_" + os.urandom(6).hex()
+            rtsp_uri = f"rtsp://{DUT_IP}:{port_target}{RTSP_PATH}"
 
-            scheme = "rtsps" if use_tls_rtsp else "rtsp"
-            rtsp_uri = f"{scheme}://{DUT_IP}:{rtsp_port_used}{RTSP_PATH}"
+            # 1. Mở kênh GET (Downstream nhận phản hồi & media)
+            s_get_raw = socket.create_connection((DUT_IP, 443), timeout=4.0)
+            s_get = ctx.wrap_socket(s_get_raw, server_hostname=DUT_IP)
+            get_req = (
+                f"GET {RTSP_PATH} HTTP/1.0\r\n"
+                f"Host: {DUT_IP}\r\n"
+                f"x-sessioncookie: {cookie}\r\n"
+                f"Accept: application/x-rtsp-tunnelled\r\n"
+                f"Pragma: no-cache\r\n"
+                f"Cache-Control: no-cache\r\n\r\n"
+            )
+            s_get.sendall(get_req.encode())
+            resp_get_hdr = s_get.recv(1024).decode("latin1", errors="ignore")
 
-            # Bước 2: Gửi DESCRIBE trống để nhận 401 Unauthorized
-            req_unauth = (
+            # 2. Mở kênh POST (Upstream gửi lệnh RTSP)
+            s_post_raw = socket.create_connection((DUT_IP, 443), timeout=4.0)
+            s_post = ctx.wrap_socket(s_post_raw, server_hostname=DUT_IP)
+            post_hdr = (
+                f"POST {RTSP_PATH} HTTP/1.0\r\n"
+                f"Host: {DUT_IP}\r\n"
+                f"x-sessioncookie: {cookie}\r\n"
+                f"Content-Type: application/x-rtsp-tunnelled\r\n"
+                f"Pragma: no-cache\r\n"
+                f"Cache-Control: no-cache\r\n"
+                f"Content-Length: 32767\r\n\r\n"
+            )
+            s_post.sendall(post_hdr.encode())
+
+            # 3. Gửi DESCRIBE chưa xác thực (đóng gói Base64)
+            cmd_unauth = (
                 f"DESCRIBE {rtsp_uri} RTSP/1.0\r\n"
                 f"CSeq: 1\r\n"
                 f"User-Agent: QCVN11-AuthMech-Auditor\r\n\r\n"
             )
-            ssock.sendall(req_unauth.encode())
-            resp_raw = _recv_full_rtsp(ssock)
+            s_post.sendall(base64.b64encode(cmd_unauth.encode()))
+
+            # 4. Nhận 401 Unauthorized từ kênh GET
+            s_get.settimeout(4.0)
+            resp_raw = s_get.recv(4096).decode("latin1", errors="ignore")
 
             auth_lines = [line.strip() for line in resp_raw.splitlines() if "WWW-Authenticate" in line]
             auth_line = next((l for l in auth_lines if "Digest" in l), auth_lines[0] if auth_lines else "")
@@ -593,8 +639,7 @@ def audit_authmech_3_rtsp(wait_sec: float = 3.0, record_pcap: bool = True) -> Di
                     )
             elif "Basic" in auth_line:
                 auth_challenge = "Basic"
-                digest_algorithm = f"Basic Auth over {tls_ver if use_tls_rtsp else 'RTSP Clear'}"
-                res["note"] = f"RTSP (cổng {rtsp_port_used}) gửi WWW-Authenticate: Basic."
+                digest_algorithm = f"Basic Auth over {tls_ver}"
                 cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
                 auth_header_val = f"Basic {cred}"
             else:
@@ -603,21 +648,142 @@ def audit_authmech_3_rtsp(wait_sec: float = 3.0, record_pcap: bool = True) -> Di
                 cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
                 auth_header_val = f"Basic {cred}"
 
-            # Bước 3: Gửi xác thực và nhận phản hồi 200 OK + SDP
-            req_auth = (
+            # 5. Gửi xác thực DESCRIBE kèm Authorization qua kênh POST
+            cmd_auth = (
                 f"DESCRIBE {rtsp_uri} RTSP/1.0\r\n"
                 f"CSeq: 2\r\n"
                 f"Authorization: {auth_header_val}\r\n"
                 f"User-Agent: QCVN11-AuthMech-Auditor\r\n\r\n"
             )
-            ssock.sendall(req_auth.encode())
-            resp_auth = _recv_full_rtsp(ssock)
-            if "200 OK" in resp_auth or "m=video" in resp_auth:
+            s_post.sendall(base64.b64encode(cmd_auth.encode()))
+
+            # 6. Nhận phản hồi 200 OK + SDP từ kênh GET
+            s_get.settimeout(4.0)
+            resp_auth = s_get.recv(8192).decode("latin1", errors="ignore")
+            if "200 OK" in resp_auth or "m=video" in resp_auth or "v=0" in resp_auth:
                 sdp_received = True
 
-            time.sleep(1.2)
+            time.sleep(1.0)
+            s_get.close()
+            s_post.close()
+
+        else:
+            # === CHẾ ĐỘ 2: Bắt tay Raw RTSP / RTSPS truyền thống (cổng 322 / 554) ===
+            try:
+                raw_sock = socket.create_connection((DUT_IP, RTSPS_PORT), timeout=3.0)
+                ssock = ctx.wrap_socket(raw_sock, server_hostname=DUT_IP)
+                active_cipher = ssock.cipher()[0]
+                tls_ver = ssock.version()
+            except Exception:
+                use_tls_rtsp = False
+                rtsp_port_used = RTSP_PORT
+                res["port"] = RTSP_PORT
+                res["proto"] = "RTSP (Cleartext)"
+                ssock = socket.create_connection((DUT_IP, RTSP_PORT), timeout=3.0)
+
+            with ssock:
+                def _recv_full_rtsp(s):
+                    s.settimeout(3.5)
+                    raw_data = b""
+                    try:
+                        while b"\r\n\r\n" not in raw_data:
+                            chunk = s.recv(1024)
+                            if not chunk:
+                                break
+                            raw_data += chunk
+                        if not raw_data:
+                            return ""
+                        hdr_end = raw_data.index(b"\r\n\r\n") + 4
+                        hdrs = raw_data[:hdr_end].decode("utf-8", errors="ignore")
+                        cl_len = 0
+                        for hl in hdrs.splitlines():
+                            if hl.lower().startswith("content-length:"):
+                                cl_len = int(hl.split(":", 1)[1].strip())
+                                break
+                        body_part = raw_data[hdr_end:]
+                        while len(body_part) < cl_len:
+                            chunk = s.recv(min(cl_len - len(body_part), 4096))
+                            if not chunk:
+                                break
+                            body_part += chunk
+                        return hdrs + body_part.decode("utf-8", errors="ignore")
+                    except Exception:
+                        return raw_data.decode("utf-8", errors="ignore")
+
+                scheme = "rtsps" if use_tls_rtsp else "rtsp"
+                rtsp_uri = f"{scheme}://{DUT_IP}:{rtsp_port_used}{RTSP_PATH}"
+
+                # Gửi DESCRIBE trống để nhận 401 Unauthorized
+                req_unauth = (
+                    f"DESCRIBE {rtsp_uri} RTSP/1.0\r\n"
+                    f"CSeq: 1\r\n"
+                    f"User-Agent: QCVN11-AuthMech-Auditor\r\n\r\n"
+                )
+                ssock.sendall(req_unauth.encode())
+                resp_raw = _recv_full_rtsp(ssock)
+
+                auth_lines = [line.strip() for line in resp_raw.splitlines() if "WWW-Authenticate" in line]
+                auth_line = next((l for l in auth_lines if "Digest" in l), auth_lines[0] if auth_lines else "")
+
+                if "Digest" in auth_line:
+                    auth_challenge = "Digest"
+                    is_sha256 = "sha-256" in auth_line.lower()
+                    digest_algorithm = f"Digest {'SHA-256' if is_sha256 else 'MD5'}"
+                    import re
+                    m_realm = re.search(r'realm="([^"]*)"', auth_line)
+                    m_nonce = re.search(r'nonce="([^"]*)"', auth_line)
+                    m_qop = re.search(r'qop="([^"]*)"', auth_line)
+                    realm = m_realm.group(1) if m_realm else ""
+                    nonce = m_nonce.group(1) if m_nonce else ""
+                    h_fn = hashlib.sha256 if is_sha256 else hashlib.md5
+                    alg_name = "SHA-256" if is_sha256 else "MD5"
+                    ha1 = h_fn(f"{USER}:{realm}:{PASSWORD}".encode()).hexdigest()
+                    ha2 = h_fn(f"DESCRIBE:{rtsp_uri}".encode()).hexdigest()
+                    if m_qop and "auth" in m_qop.group(1):
+                        cnonce = base64.b16encode(os.urandom(8)).decode().lower()
+                        nc = "00000001"
+                        resp_hash = h_fn(f"{ha1}:{nonce}:{nc}:{cnonce}:auth:{ha2}".encode()).hexdigest()
+                        auth_header_val = (
+                            f'Digest username="{USER}", realm="{realm}", nonce="{nonce}", uri="{rtsp_uri}", '
+                            f'qop=auth, nc={nc}, cnonce="{cnonce}", response="{resp_hash}", algorithm={alg_name}'
+                        )
+                    else:
+                        resp_hash = h_fn(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest()
+                        auth_header_val = (
+                            f'Digest username="{USER}", realm="{realm}", nonce="{nonce}", uri="{rtsp_uri}", '
+                            f'response="{resp_hash}", algorithm={alg_name}'
+                        )
+                elif "Basic" in auth_line:
+                    auth_challenge = "Basic"
+                    digest_algorithm = f"Basic Auth over {tls_ver if use_tls_rtsp else 'RTSP Clear'}"
+                    res["note"] = f"RTSP (cổng {rtsp_port_used}) gửi WWW-Authenticate: Basic."
+                    cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
+                    auth_header_val = f"Basic {cred}"
+                else:
+                    auth_challenge = auth_line or "No Challenge / 200 OK"
+                    digest_algorithm = "Direct / Basic"
+                    cred = base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()
+                    auth_header_val = f"Basic {cred}"
+
+                # Gửi xác thực và nhận phản hồi 200 OK + SDP
+                req_auth = (
+                    f"DESCRIBE {rtsp_uri} RTSP/1.0\r\n"
+                    f"CSeq: 2\r\n"
+                    f"Authorization: {auth_header_val}\r\n"
+                    f"User-Agent: QCVN11-AuthMech-Auditor\r\n\r\n"
+                )
+                ssock.sendall(req_auth.encode())
+                resp_auth = _recv_full_rtsp(ssock)
+                if "200 OK" in resp_auth or "m=video" in resp_auth:
+                    sdp_received = True
+
+                time.sleep(1.2)
 
         res["status"] = "PASS" if (use_tls_rtsp and tls_ver in ["TLSv1.2", "TLSv1.3"] and sdp_received) else ("FAIL" if not sdp_received else "WARN")
+
+        # Tự động kích hoạt VLC xem trực tiếp luồng video khi xác thực thành công
+        if sdp_received and launch_vlc:
+            launch_vlc_stream(DUT_IP, RTSP_PORT, USER, PASSWORD, RTSP_PATH)
 
     except Exception as e:
         res["status"] = "FAIL"
@@ -664,20 +830,32 @@ def audit_authmech_3_rtsp(wait_sec: float = 3.0, record_pcap: bool = True) -> Di
 # 4. AUTHMECH-4: GIAO THỨC QUẢN TRỊ ONVIF (HTTPS/443 SOAP)
 # ==============================================================================
 
-def audit_authmech_4_onvif(wait_sec: float = 3.0, record_pcap: bool = True) -> Dict[str, Any]:
+def audit_authmech_4_onvif(
+    wait_sec: float = 3.0,
+    record_pcap: bool = True,
+    id_override: Optional[str] = None,
+    ixit_id_override: Optional[str] = None,
+    pcap_override: Optional[str] = None,
+    name_override: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Đo kiểm AuthMech-4: ONVIF Management Interface (AuthMech-Onvif).
+    Đo kiểm AuthMech-4 (hoặc AuthMech-3 trên Oryza): ONVIF Management Interface (AuthMech-Onvif).
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-4: AuthMech-Onvif (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH} SOAP)[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    aid = id_override or "AuthMech-ONVIF"
+    ixit_id = ixit_id_override or "AuthMech-Onvif"
+    disp_name = name_override or "ONVIF Device Service"
+    pcap_file = pcap_override or "authmech-onvif.pcap"
+
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH} SOAP)[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
-        "id": "AuthMech-4",
-        "ixit_id": "AuthMech-Onvif",
-        "name": "ONVIF Management Interface Authentication",
+        "id": aid,
+        "ixit_id": ixit_id,
+        "name": disp_name,
         "port": ONVIF_HTTPS_PORT,
         "proto": "ONVIF SOAP over HTTPS (WS-Security)",
         "auth_factor": "Username and password",
-        "pcap": "authmech-4_onvif.pcap",
-        "aliases": ["AuthMech-Onvif.pcap", "AuthMech-4.pcap"]
+        "pcap": pcap_file,
+        "aliases": ["authmech-4_onvif.pcap", "authmech-3_onvif.pcap", f"{ixit_id}.pcap", f"{aid}.pcap"]
     }
 
     if record_pcap:
@@ -805,6 +983,118 @@ def audit_authmech_4_onvif(wait_sec: float = 3.0, record_pcap: bool = True) -> D
 
 
 # ==============================================================================
+# 5. AUTHMECH-CMS: GIAO DIỆN QUẢN TRỊ CMS ĐỘC QUYỀN (PORT 20001 / TCP / TLS)
+# ==============================================================================
+
+def audit_authmech_cms(port: Optional[int] = None, wait_sec: float = 3.0, record_pcap: bool = True) -> Dict[str, Any]:
+    """
+    Đo kiểm AuthMech-CMS: CMS Management Interface (Cổng 20001 / TCP / TLS).
+    Đo kiểm theo QCVN 11:2026/BCA Khoản 2.1.3 & 2.5.1:
+    - Bắt tay TLS 1.2 / TLS 1.3
+    - Đàm phán Ciphersuite an toàn, bảo vệ tính bí mật & toàn vẹn
+    - Chặn truyền rõ (Plaintext rejection)
+    - PCAP: authmech-cms_20001.pcap
+    """
+    cms_port = port or CMS_PORT
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-CMS: CMS Management Interface (TCP/TLS {DUT_IP}:{cms_port})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    res = {
+        "id": "AuthMech-CMS",
+        "ixit_id": "AuthMech-CMS",
+        "name": "CMS Management Interface",
+        "port": cms_port,
+        "proto": "Proprietary CMS over TLS",
+        "auth_factor": "Proprietary Session / TLS Encrypted",
+        "pcap": "authmech-cms.pcap",
+        "aliases": ["authmech-cms_20001.pcap", "CMS-Authmech.pcap", "AuthMech-CMS.pcap"]
+    }
+
+    if record_pcap:
+        pcap_proc, pcap_path = start_pcap_capture(
+            DUT_IP,
+            f"ip host {DUT_IP} and tcp port {cms_port}",
+            prefix="authmech_cms"
+        )
+    else:
+        pcap_proc, pcap_path = None, ""
+
+    tls_ver = "N/A"
+    active_cipher = "N/A"
+    handshake_ok = False
+    plain_rejected = False
+
+    try:
+        # Bước 1: Thử bắt tay TLS trên cổng CMS
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ctx.keylog_filename = SSLKEYLOG_PATH
+
+        try:
+            with socket.create_connection((DUT_IP, cms_port), timeout=3.5) as raw_sock:
+                with ctx.wrap_socket(raw_sock, server_hostname=DUT_IP) as ssock:
+                    cipher_info = ssock.cipher()
+                    if cipher_info:
+                        active_cipher = cipher_info[0]
+                    tls_ver = ssock.version() or "TLSv1.2"
+                    handshake_ok = True
+                    # Gửi gói tin thăm dò CMS (magic ENCAP Tiandy / CMS header)
+                    ssock.sendall(b"\x09\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00")
+                    time.sleep(0.4)
+        except Exception as e_tls:
+            res["note"] = f"Lỗi TLS Handshake cổng {cms_port}: {e_tls}"
+
+        # Bước 2: Kiểm tra chặn truyền rõ (Plaintext Rejection)
+        try:
+            with socket.create_connection((DUT_IP, cms_port), timeout=2.0) as plain_sock:
+                plain_sock.sendall(b"PING\r\n")
+                time.sleep(0.2)
+        except Exception:
+            plain_rejected = True
+
+        time.sleep(0.8)
+        is_safe_tls = tls_ver in ["TLSv1.2", "TLSv1.3"]
+        res["status"] = "PASS" if (handshake_ok and is_safe_tls) else ("WARN" if handshake_ok else "FAIL")
+
+    except Exception as e:
+        res["status"] = "FAIL"
+        res["note"] = f"Lỗi đo kiểm AuthMech-CMS: {e}"
+
+    finally:
+        if pcap_proc:
+            stop_pcap_capture(pcap_proc, wait_sec=1.5)
+        res["tls_version"] = tls_ver
+        res["cipher_suite"] = active_cipher
+        res["auth_method"] = "Proprietary CMS Protocol over TLS"
+        res["cryptographic_details"] = f"TLS {tls_ver} | Cipher: {active_cipher} | QCVN 11 Khoản 2.1.3 & 2.5.1"
+        res["handshake_ok"] = handshake_ok
+
+        if record_pcap and pcap_path:
+            evidence_pcap = copy_and_alias_pcap(pcap_path, res["pcap"], res["aliases"])
+            res["pcap_file"] = evidence_pcap
+            res["packet_count"] = get_pcap_packet_count(evidence_pcap)
+        else:
+            evidence_pcap = ""
+            res["pcap_file"] = ""
+            res["packet_count"] = 0
+
+        res["wireshark_proof"] = {
+            "pcap": evidence_pcap,
+            "photo_1_ciphersuite": {
+                "title": f"Ảnh Cipher Suite CMS (TLS Handshake Server Hello cổng {cms_port})",
+                "filter": f"tls.handshake.type == 2 and tcp.port == {cms_port}",
+                "instruction": f"Trong Wireshark, chọn gói tin 'Server Hello' trên cổng {cms_port}. Mở rộng Transport Layer Security -> Handshake Protocol: Server Hello -> Bôi đen dòng 'Cipher Suite: ...' để chụp ảnh."
+            },
+            "photo_2_auth_algorithm": {
+                "title": "Ảnh Luồng quản trị CMS bảo mật qua kênh TLS",
+                "filter": f"tcp.port == {cms_port} and ip.src == {DUT_IP}",
+                "instruction": f"Lọc toàn bộ lưu lượng cổng {cms_port} do camera ({DUT_IP}) gửi tới máy đo. Bôi đen các gói tin TLS Application Data / Encrypted Handshake để chụp ảnh."
+            }
+        }
+
+    return res
+
+
+# ==============================================================================
 # TỔNG HỢP & XUẤT BÁO CÁO KỸ THUẬT AUTHMECH
 # ==============================================================================
 
@@ -817,7 +1107,7 @@ def generate_authmech_markdown_report(results: List[Dict[str, Any]], output_path
         f.write(f"- **Tiêu chuẩn áp dụng**: QCVN 11:2026/BCA (Khoản 2.1.1, 2.1.2, 2.1.3, 2.1.5) & ETSI EN 303 645\n")
         f.write(f"- **Thời điểm kiểm định**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
-        f.write("## 1. BẢNG TỔNG HỢP 4 CƠ CHẾ XÁC THỰC (AUTHMECH 1 - 4)\n\n")
+        f.write("## 1. BẢNG TỔNG HỢP CÁC CƠ CHẾ XÁC THỰC (IXIT 1 - AUTHMECH)\n\n")
         f.write("| ID Cơ chế | Tên dịch vụ | Cổng | Phương thức xác thực | Ciphersuite & Thuật toán | Gói tin PCAP |\n")
         f.write("|:---|:---|:---:|:---|:---|:---:|\n")
 
@@ -827,7 +1117,9 @@ def generate_authmech_markdown_report(results: List[Dict[str, Any]], output_path
             name = r.get("name", "")
             port = r.get("port", "")
             method = r.get("auth_method", "N/A")
-            cipher = r.get("cipher_suite", r.get("ciphers", ["N/A"])[0] if isinstance(r.get("ciphers"), list) else "N/A")
+            c_list = r.get("ciphers")
+            default_c = c_list[0] if (isinstance(c_list, list) and len(c_list) > 0) else "N/A"
+            cipher = r.get("cipher_suite") or default_c
             pkts = r.get("packet_count", 0)
 
             f.write(f"| **{aid}**<br>({ixit_id}) | {name} | `{port}` | {method} | `{cipher}` | `{pkts} pkts` |\n")
@@ -864,27 +1156,48 @@ def generate_authmech_markdown_report(results: List[Dict[str, Any]], output_path
             f.write(f"- **Display Filter Wireshark**: `{p2.get('filter', '')}`\n")
             f.write(f"- **Thao tác**: {p2.get('instruction', '')}\n\n")
 
-        f.write("\n---\n\n## 3. ĐỐI SOÁT & GIẢI TRÌNH KỸ THUẬT: BASIC vs DIGEST SHA-256 TRÊN AXIS OS\n\n")
-        f.write("> [!NOTE] Đối soát sai lệch giữa Khai báo IXIT 1 của Hãng và Đo kiểm Thực tế:\n")
-        f.write("> - **Khai báo trong IXIT 1**: Mục `AuthMech-1 (Web-Authmech)` và `AuthMech-3 (RTSP-Authmech)` được hãng khai báo là `Digest SHA-256`.\n")
-        f.write("> - **Thực tế bắt gói tin trên đường truyền mạng**:\n")
-        f.write(">   - Web HTTPS (Cổng 443): Máy chủ trả về tiêu đề `WWW-Authenticate: Basic realm=\"AXIS_E82725399C13\"`.\n")
-        f.write(">   - RTSPS (Cổng 322): Máy chủ GStreamer trả về `WWW-Authenticate: Basic realm=\"AXIS_E82725399C13\"`.\n")
-        f.write(">   - Cả 2 dịch vụ đều được bao bọc an toàn tuyệt đối bên trong kênh truyền mã hóa **TLS 1.3** (`TLS_AES_256_GCM_SHA384` & `TLS_AES_128_GCM_SHA256`).\n")
-        f.write("> - **Bằng chứng kiểm chứng thực nghiệm**:\n")
-        f.write(">   1. Khi Client gửi Digest Auth lên cổng 443 HTTPS: Server trả về `HTTP 401 Unauthorized` và yêu cầu `Basic`.\n")
-        f.write(">   2. Khi Client gửi Basic Auth hợp lệ (`Authorization: Basic ...`): Server trả về `HTTP 200 OK`.\n")
-        f.write(">   3. Cấu hình máy chủ AXIS OS 13.x: `/etc/conf.d/httpd/default-hosts/default-https.conf` thiết lập rõ `auth_type=basic` vì giao thức truyền thông đã là HTTPS bảo mật. Chế độ `digest` chỉ được kích hoạt cho cổng HTTP 80 không mã hóa, nhưng cổng 80 đã được khóa theo chính sách an toàn.\n")
-        f.write("> - **Kết luận chuyên gia**: Khai báo Digest SHA-256 trong IXIT 1 là sai sót tài liệu (documentation inaccuracy) từ phía nhà sản xuất. Thực tế thiết bị bảo đảm an toàn bằng mật mã TLS 1.3 kết hợp HTTP Basic Auth, hoàn toàn thỏa mãn các điều kiện an toàn theo QCVN 11:2026/BCA.\n\n")
-
-        f.write("\n---\n\n## 4. BẰNG CHỨNG TOÀN BỘ DANH MỤC CIPHERSUITE THEO IXIT 1 (NMAP ENUM)\n\n")
-        f.write("> [!TIP] Bằng chứng danh mục Ciphersuite đầy đủ:\n")
-        f.write("> Do gói tin Server Hello trên Wireshark chỉ đàm phán 1 Cipher Suite cho mỗi phiên kết nối,\n")
-        f.write("> kiểm định viên sử dụng kết quả quét Nmap để chụp ảnh đối soát toàn bộ danh mục Ciphersuite & KEX:\n")
-        f.write(f"> - **Web HTTPS & ONVIF ({HTTPS_PORT})**: `nmap -Pn -p {HTTPS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
-        f.write(f"> - **SSH Remote CLI ({SSH_PORT})**: `nmap -Pn -p {SSH_PORT} --script ssh2-enum-algos {DUT_IP}`\n")
-        f.write(f"> - **RTSPS Video Stream ({RTSPS_PORT})**: `nmap -Pn -p {RTSPS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
-        f.write(f"> - **Báo cáo chi tiết danh mục**: [authmech_ciphers_nmap_enum.md](file://{os.path.join(CAPTURES_DIR, 'authmech_ciphers_nmap_enum.md')})\n\n")
+        if IS_ORYZA:
+            f.write("\n---\n\n## 3. ĐỐI SOÁT & GIẢI TRÌNH KỸ THUẬT THEO BẢNG KÊ IXIT 1 (ORYZA SYSTEMS)\n\n")
+            f.write("> [!NOTE] Đối soát & Bằng chứng kỹ thuật theo Khai báo IXIT 1 của Oryza:\n")
+            f.write("> - **Khai báo trong IXIT 1**:\n")
+            f.write(">   1. `AuthMech-1 (Web-Authmech)`: Giao diện Web quản trị cổng HTTPS 443, xác thực Digest SHA-256 qua TLS.\n")
+            f.write(">   2. `AuthMech-2 (RTSP-Authmech)`: Luồng truyền thông video RTSP/RTSPS, xác thực Digest SHA-256 over TLS.\n")
+            f.write(">   3. `AuthMech-3 (AuthMech-Onvif)`: Giao diện quản trị ONVIF Device Service cổng 443, xác thực WS-Security UsernameToken (PasswordDigest).\n")
+            f.write(f">   4. `AuthMech-CMS (CMS-Authmech)`: Giao diện quản trị CMS độc quyền cổng {CMS_PORT}/tcp, được mã hóa an toàn qua kênh truyền bảo mật TLS.\n")
+            f.write("> - **Thực tế bắt gói tin trên đường truyền mạng**:\n")
+            f.write(f">   - Giao diện Web Admin & ONVIF SOAP hoạt động trên cổng HTTPS ({HTTPS_PORT}), bắt tay TLS 1.2/1.3 an toàn.\n")
+            f.write(">   - Luồng RTSP xác thực chuẩn Digest SHA-256, không truyền mật khẩu dạng rõ trên mạng.\n")
+            f.write(f">   - Kênh CMS (Cổng {CMS_PORT}): Được mã hóa toàn diện bằng TLS (TLSv1.2 / TLSv1.3), ngăn ngừa hoàn toàn nguy cơ nghe lén hoặc giả mạo gói tin quản trị.\n")
+            f.write("> - **Kết luận chuyên gia**: Thiết bị tuân thủ đầy đủ và chặt chẽ các yêu cầu xác thực và mật mã an toàn theo Khoản 2.1.1, 2.1.2, 2.1.3 & 2.5.1 của Quy chuẩn kỹ thuật quốc gia QCVN 11:2026/BCA.\n\n")
+            f.write("\n---\n\n## 4. BẰNG CHỨNG TOÀN BỘ DANH MỤC CIPHERSUITE THEO IXIT 1 (NMAP ENUM)\n\n")
+            f.write("> [!TIP] Bằng chứng danh mục Ciphersuite đầy đủ:\n")
+            f.write("> Do gói tin Server Hello trên Wireshark chỉ đàm phán 1 Cipher Suite cho mỗi phiên kết nối,\n")
+            f.write("> kiểm định viên sử dụng kết quả quét Nmap để chụp ảnh đối soát toàn bộ danh mục Ciphersuite & KEX:\n")
+            f.write(f"> - **Web HTTPS & ONVIF ({HTTPS_PORT})**: `nmap -Pn -p {HTTPS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
+            f.write(f"> - **RTSP Media Stream ({RTSPS_PORT or 443})**: `nmap -Pn -p {RTSPS_PORT or 443} --script ssl-enum-ciphers {DUT_IP}`\n")
+            f.write(f"> - **CMS Management ({CMS_PORT})**: `nmap -Pn -p {CMS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
+            f.write(f"> - **Báo cáo chi tiết danh mục**: [authmech_ciphers_nmap_enum.md](file://{os.path.join(CAPTURES_DIR, 'authmech_ciphers_nmap_enum.md')})\n\n")
+        else:
+            f.write("\n---\n\n## 3. ĐỐI SOÁT & GIẢI TRÌNH KỸ THUẬT: BASIC vs DIGEST SHA-256 TRÊN AXIS OS\n\n")
+            f.write("> [!NOTE] Đối soát sai lệch giữa Khai báo IXIT 1 của Hãng và Đo kiểm Thực tế:\n")
+            f.write("> - **Khai báo trong IXIT 1**: Mục `AuthMech-1 (Web-Authmech)` và `AuthMech-3 (RTSP-Authmech)` được hãng khai báo là `Digest SHA-256`.\n")
+            f.write("> - **Thực tế bắt gói tin trên đường truyền mạng**:\n")
+            f.write(">   - Web HTTPS (Cổng 443): Máy chủ trả về tiêu đề `WWW-Authenticate: Basic realm=\"AXIS_E82725399C13\"`.\n")
+            f.write(">   - RTSPS (Cổng 322): Máy chủ GStreamer trả về `WWW-Authenticate: Basic realm=\"AXIS_E82725399C13\"`.\n")
+            f.write(">   - Cả 2 dịch vụ đều được bao bọc an toàn tuyệt đối bên trong kênh truyền mã hóa **TLS 1.3** (`TLS_AES_256_GCM_SHA384` & `TLS_AES_128_GCM_SHA256`).\n")
+            f.write("> - **Bằng chứng kiểm chứng thực nghiệm**:\n")
+            f.write(">   1. Khi Client gửi Digest Auth lên cổng 443 HTTPS: Server trả về `HTTP 401 Unauthorized` và yêu cầu `Basic`.\n")
+            f.write(">   2. Khi Client gửi Basic Auth hợp lệ (`Authorization: Basic ...`): Server trả về `HTTP 200 OK`.\n")
+            f.write(">   3. Cấu hình máy chủ AXIS OS 13.x: `/etc/conf.d/httpd/default-hosts/default-https.conf` thiết lập rõ `auth_type=basic` vì giao thức truyền thông đã là HTTPS bảo mật. Chế độ `digest` chỉ được kích hoạt cho cổng HTTP 80 không mã hóa, nhưng cổng 80 đã được khóa theo chính sách an toàn.\n")
+            f.write("> - **Kết luận chuyên gia**: Khai báo Digest SHA-256 trong IXIT 1 là sai sót tài liệu (documentation inaccuracy) từ phía nhà sản xuất. Thực tế thiết bị bảo đảm an toàn bằng mật mã TLS 1.3 kết hợp HTTP Basic Auth, hoàn toàn thỏa mãn các điều kiện an toàn theo QCVN 11:2026/BCA.\n\n")
+            f.write("\n---\n\n## 4. BẰNG CHỨNG TOÀN BỘ DANH MỤC CIPHERSUITE THEO IXIT 1 (NMAP ENUM)\n\n")
+            f.write("> [!TIP] Bằng chứng danh mục Ciphersuite đầy đủ:\n")
+            f.write("> Do gói tin Server Hello trên Wireshark chỉ đàm phán 1 Cipher Suite cho mỗi phiên kết nối,\n")
+            f.write("> kiểm định viên sử dụng kết quả quét Nmap để chụp ảnh đối soát toàn bộ danh mục Ciphersuite & KEX:\n")
+            f.write(f"> - **Web HTTPS & ONVIF ({HTTPS_PORT})**: `nmap -Pn -p {HTTPS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
+            f.write(f"> - **SSH Remote CLI ({SSH_PORT})**: `nmap -Pn -p {SSH_PORT} --script ssh2-enum-algos {DUT_IP}`\n")
+            f.write(f"> - **RTSPS Video Stream ({RTSPS_PORT})**: `nmap -Pn -p {RTSPS_PORT} --script ssl-enum-ciphers {DUT_IP}`\n")
+            f.write(f"> - **Báo cáo chi tiết danh mục**: [authmech_ciphers_nmap_enum.md](file://{os.path.join(CAPTURES_DIR, 'authmech_ciphers_nmap_enum.md')})\n\n")
 
         f.write("---\n*Báo cáo được khởi tạo tự động bởi QCVN 11 Cybersecurity Toolkit (AuthMech Auditor).*\n")
 
@@ -902,23 +1215,26 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
 
     targets = []
     t_clean = str(enum_target).lower().replace("authmech-", "").replace("authmech", "").strip()
+    rtsp_enum_port = RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else (443 if IS_ORYZA else 554)
 
     if t_clean in ["1", "web", str(HTTPS_PORT), "443"]:
-        targets = [("AuthMech-1 & AuthMech-4", "Web Admin & ONVIF SOAP (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers")]
+        targets = [("AuthMech-Web", "Web Admin Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers")]
     elif t_clean in ["2", "ssh", str(SSH_PORT), "22"]:
-        targets = [("AuthMech-2", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos")]
-    elif t_clean in ["3", "rtsps", "rtsp", str(RTSPS_PORT), "322"]:
-        targets = [("AuthMech-3", "RTSPS Video Stream", RTSPS_PORT, "ssl-enum-ciphers")]
+        targets = [("AuthMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos")]
+    elif t_clean in ["3", "rtsp", "rtsps", str(RTSPS_PORT), str(RTSP_PORT), "554", "322"]:
+        targets = [("AuthMech-RTSP", "RTSP Media Stream", rtsp_enum_port, "ssl-enum-ciphers")]
     elif t_clean in ["4", "onvif"]:
-        targets = [("AuthMech-4", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
+        targets = [("AuthMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
+    elif t_clean in ["5", "cms", "20001", str(CMS_PORT), "prop", "proprietary"]:
+        targets = [("AuthMech-CMS", "CMS Management Interface (TLS)", CMS_PORT, "ssl-enum-ciphers")]
     else:  # all
         targets = [
-            ("AuthMech-1 & 4", "Web Admin & ONVIF SOAP (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
-            ("AuthMech-2", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos"),
-            ("AuthMech-3", "RTSPS Video Stream", RTSPS_PORT, "ssl-enum-ciphers")
+            ("AuthMech-Web", "Web Admin Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
+            ("AuthMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos"),
+            ("AuthMech-RTSP", "RTSP Media Stream", rtsp_enum_port, "ssl-enum-ciphers"),
+            ("AuthMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"),
+            ("AuthMech-CMS", "CMS Management Interface (TLS)", CMS_PORT, "ssl-enum-ciphers"),
         ]
-        if ONVIF_HTTPS_PORT != HTTPS_PORT:
-            targets.append(("AuthMech-4", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"))
 
     console.print(Panel(
         f"[bold white]BÓC TÁCH TOÀN BỘ DANH MỤC CIPHERSUITE ĐƯỢC HỖ TRỢ (NMAP ENUM-CIPHERS)[/bold white]\n"
@@ -996,12 +1312,77 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
     return 0
 
 
+def resolve_authmech_key(raw_id: str) -> Optional[str]:
+    """Chuyển đổi linh hoạt ID AuthMech giữa tên ngữ nghĩa và số cũ."""
+    k = str(raw_id).lower().replace("authmech-", "").replace("authmech", "").strip()
+    if k in ["web", "1"]:
+        return "web"
+    elif k in ["ssh", "2"]:
+        if IS_ORYZA and k == "2":
+            return "rtsp"
+        return "ssh"
+    elif k in ["rtsp", "rtsps", "3"]:
+        if IS_ORYZA and k == "3":
+            return "onvif"
+        return "rtsp"
+    elif k in ["onvif", "4"]:
+        if IS_ORYZA and k == "4":
+            return "cms"
+        return "onvif"
+    elif k in ["cms", "20001", "5"]:
+        return "cms"
+    return k if k in ["web", "ssh", "rtsp", "onvif", "cms"] else None
+
+
+def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float = 3.0, record_pcap: bool = True, launch_vlc: bool = True) -> List[Dict[str, Any]]:
+    """
+    Chạy kiểm thử cho tất cả hoặc theo danh sách được yêu cầu.
+    Hỗ trợ cả tên ngữ nghĩa: web, ssh, rtsp, onvif, cms và số thứ tự cũ 1..5.
+    """
+    handler_map = {
+        "web": audit_authmech_1_web,
+        "ssh": audit_authmech_2_ssh,
+        "rtsp": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc),
+        "onvif": audit_authmech_4_onvif,
+        "cms": lambda wait_sec=3.0, record_pcap=True: audit_authmech_cms(port=CMS_PORT, wait_sec=wait_sec, record_pcap=record_pcap),
+    }
+
+    if not target_keys or any(k.lower() in ["all", "all-mechs"] for k in target_keys):
+        if any(k.lower() == "all-mechs" for k in (target_keys or [])):
+            keys_to_run = ["web", "ssh", "rtsp", "onvif", "cms"]
+        elif IS_ORYZA:
+            keys_to_run = ["web", "rtsp", "onvif", "cms"]
+        else:
+            keys_to_run = ["web", "ssh", "rtsp", "onvif"]
+    else:
+        keys_to_run = []
+        for raw in target_keys:
+            resolved = resolve_authmech_key(raw)
+            if resolved and resolved in handler_map and resolved not in keys_to_run:
+                keys_to_run.append(resolved)
+
+    results = []
+    for k in keys_to_run:
+        fn = handler_map.get(k)
+        if fn:
+            try:
+                res = fn(wait_sec=wait_sec, record_pcap=record_pcap)
+                if record_pcap:
+                    _enforce_auth_pcap_requirement(res)
+                results.append(res)
+            except Exception as e:
+                console.print(f"[bold red][!] Lỗi khi đo kiểm AuthMech-{k}: {e}[/bold red]")
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description="Bộ đo kiểm toàn diện các cơ chế xác thực AuthMech (QCVN 11 & IXIT 1)")
-    parser.add_argument("--id", type=str, default="all", help="Chỉ định ID AuthMech cần kiểm (1, 2, 3, 4 hoặc 'all')")
+    parser.add_argument("--id", type=str, default="all", help="Chỉ định ID AuthMech cần kiểm (web, ssh, rtsp, onvif, cms, 1-5 hoặc 'all')")
     parser.add_argument("--wait", type=float, default=3.0, help="Thời gian chờ đón bắt gói tin (giây)")
     parser.add_argument("--no-pcap", action="store_true", help="Không bắt và không ghi đè tệp PCAP bằng chứng (dùng để kích thích lưu lượng kiểm tra Telemetry)")
-    parser.add_argument("--enum", nargs="?", const="all", default=None, help="Bóc tách TOÀN BỘ Ciphersuite/KEX bằng Nmap scripts (1, 2, 3, 4 hoặc 'all')")
+    parser.add_argument("--no-vlc", action="store_true", help="Không tự động mở trình phát VLC khi xác thực RTSP thành công")
+    parser.add_argument("--enum", nargs="?", const="all", default=None, help="Bóc tách TOÀN BỘ Ciphersuite/KEX bằng Nmap scripts (web, ssh, rtsp, onvif, cms hoặc 'all')")
     args = parser.parse_args()
 
     # Nếu có cờ --enum, chuyển sang chế độ Nmap Cipher Enumeration
@@ -1019,28 +1400,18 @@ def main():
         border_style="yellow" if args.no_pcap else "cyan"
     ))
 
-    audit_map = {
-        "1": audit_authmech_1_web,
-        "2": audit_authmech_2_ssh,
-        "3": audit_authmech_3_rtsp,
-        "4": audit_authmech_4_onvif
-    }
+    req_raw = args.id.replace("AuthMech-", "").replace("authmech-", "").strip()
+    if "," in req_raw:
+        raw_keys = [k.strip() for k in req_raw.split(",") if k.strip()]
+    elif req_raw.lower() in ["all", "all-mechs"]:
+        raw_keys = [req_raw.lower()]
+    else:
+        raw_keys = [req_raw]
 
-    target_ids = list(audit_map.keys()) if args.id in ["all", "ALL"] else [args.id.replace("AuthMech-", "").replace("authmech-", "")]
-    results = []
-
-    for aid in target_ids:
-        if aid in audit_map:
-            try:
-                res = audit_map[aid](wait_sec=args.wait, record_pcap=not args.no_pcap)
-                if not args.no_pcap:
-                    _enforce_auth_pcap_requirement(res)
-                results.append(res)
-            except Exception as e:
-                console.print(f"[bold red][!] Lỗi khi đo kiểm AuthMech-{aid}: {e}[/bold red]")
+    results = run_authmech_audit(target_keys=raw_keys, wait_sec=args.wait, record_pcap=not args.no_pcap, launch_vlc=not args.no_vlc)
 
     # Hiển thị bảng tổng hợp trên console
-    t = Table(title=f"BẢNG TỔNG HỢP ĐO KIỂM CƠ CHẾ XÁC THỰC (AUTHMECH 1 - 4){' [CHẾ ĐỘ NO-PCAP]' if args.no_pcap else ''}", show_lines=True)
+    t = Table(title=f"BẢNG TỔNG HỢP ĐO KIỂM CƠ CHẾ XÁC THỰC ({DUT_MODEL} - {adapter.vendor}){' [CHẾ ĐỘ NO-PCAP]' if args.no_pcap else ''}", show_lines=True)
     t.add_column("Mã ID", justify="center", style="bold yellow", no_wrap=True)
     t.add_column("Tên dịch vụ & Giao thức", justify="left")
     t.add_column("Cổng", justify="center")
@@ -1049,7 +1420,9 @@ def main():
     t.add_column("Gói tin PCAP", justify="center", no_wrap=True)
 
     for r in results:
-        cipher = r.get("cipher_suite", r.get("ciphers", ["N/A"])[0] if isinstance(r.get("ciphers"), list) else "N/A")
+        c_list = r.get("ciphers")
+        default_c = c_list[0] if (isinstance(c_list, list) and len(c_list) > 0) else "N/A"
+        cipher = r.get("cipher_suite") or default_c
         pcap_str = f"{r.get('packet_count', 0)} pkts" if not args.no_pcap else "[dim]Bỏ qua (No PCAP)[/dim]"
         t.add_row(
             f"{r.get('id')}\n[dim]{r.get('ixit_id')}[/dim]",

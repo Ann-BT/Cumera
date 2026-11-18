@@ -46,9 +46,11 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_recorder import start_pcap_capture, stop_pcap_capture, display_wireshark_panel
 from toolkit_config import get_service_ports, get_target_info, is_tls_port, load_config, make_console
+from adapters import get_camera_adapter
 
 console = make_console()
 config = load_config()
+adapter = get_camera_adapter(config)
 _target_info = get_target_info(config)
 SERVICE_PORTS = get_service_ports(config)
 
@@ -63,19 +65,14 @@ GLOBAL_PCAP_FILE = ""
 
 
 def _resolve_csrf_target(ip: str, port: int, custom_endpoint: Optional[str] = None) -> Tuple[str, str, str]:
-    """Resolve scheme (http/https), responsive config endpoint, and baseline query URL."""
+    """Resolve scheme (http/https), responsive config endpoint, and baseline query URL via adapter."""
     scheme = "https" if is_tls_port(ip, port) else "http"
     if custom_endpoint:
         ep = custom_endpoint if custom_endpoint.startswith("/") else "/" + custom_endpoint
         return scheme, ep, f"{scheme}://{ip}:{port}{ep}"
-    candidates = [
-        ("/axis-cgi/param.cgi", "/axis-cgi/param.cgi?action=list&group=root.Brand"),
-        ("/ISAPI/Security/adminAccesses", "/ISAPI/System/deviceInfo"),
-        ("/cgi-bin/configManager.cgi", "/cgi-bin/magicBox.cgi?action=getSystemInfo"),
-        ("/LAPI/V1.0/System/DeviceBasicInfo", "/LAPI/V1.0/System/DeviceBasicInfo"),
-        ("/api/system/information", "/api/system/information"),
-        ("/", "/"),
-    ]
+    candidates = list(adapter.get_csrf_endpoints())
+    if ("/", "/") not in candidates:
+        candidates.append(("/", "/"))
     for cfg_ep, base_ep in candidates:
         try:
             r = requests.get(f"{scheme}://{ip}:{port}{base_ep}", verify=False, timeout=2.0)
