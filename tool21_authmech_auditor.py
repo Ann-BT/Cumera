@@ -541,9 +541,21 @@ def launch_vlc_stream(ip: str, port: int, user: str, password: str, path: str):
     # Cổng RTSP 554 là cổng chuẩn truyền luồng H.264 qua TCP ổn định và mượt mà
     rtsp_url = f"rtsp://{user}:{encoded_pass}@{ip}:554{path}"
     console.print(f"[bold green][✓] Xác thực thành công! Đang mở luồng video trên VLC: {rtsp_url}[/bold green]")
+    sudo_user = os.environ.get("SUDO_USER")
+    env = os.environ.copy()
+    if not env.get("DISPLAY"):
+        env["DISPLAY"] = ":0"
+    if sudo_user and not env.get("XAUTHORITY"):
+        env["XAUTHORITY"] = f"/home/{sudo_user}/.Xauthority"
+
     try:
+        if sudo_user and os.getuid() == 0:
+            cmd = ["sudo", "-u", sudo_user, "-E", vlc_bin, "--rtsp-tcp", "--network-caching=1000", rtsp_url]
+        else:
+            cmd = [vlc_bin, "--rtsp-tcp", "--network-caching=1000", rtsp_url]
         subprocess.Popen(
-            [vlc_bin, "--rtsp-tcp", "--network-caching=1000", rtsp_url],
+            cmd,
+            env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
