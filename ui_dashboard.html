@@ -1522,17 +1522,33 @@
               <button onclick="runFullWebInputSuite()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-center transition group card-interactive">
                 <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Trọn bộ Web Suite</div>
               </button>
-              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-sky-900/60 text-center transition group card-interactive">
+              <button onclick="runLoginAuditor('sqli')" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-sky-900/60 text-center transition group card-interactive">
                 <div class="font-semibold text-xs text-sky-300 group-hover:text-sky-200">SQL Injection</div>
               </button>
-              <button onclick="runLoginAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-purple-900/60 text-center transition group card-interactive">
+              <button onclick="runLoginAuditor('xss')" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-purple-900/60 text-center transition group card-interactive">
                 <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Cross-Site Scripting</div>
               </button>
               <button onclick="runCsrfAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-emerald-900/60 text-center transition group card-interactive">
                 <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF &amp; Token</div>
               </button>
-              <button onclick="openCsrfPoc()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-amber-300 group-hover:text-amber-200">Mở PoC CSRF</div>
+              <button onclick="runLoginPortalScan()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive" title="Tự động dò quét phát hiện trang đăng nhập ban đầu và cơ chế xác thực">
+                <div class="font-semibold text-xs text-teal-300 group-hover:text-teal-200">Quét Trang Login</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Detected Login Portal Banner -->
+          <div id="iv_detected_portal_box" class="bg-[#10141f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-2 shadow-sm text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-[#848c9e]">Trang Đăng Nhập Ban Đầu:</span>
+              <span id="iv_detected_portal_url" class="font-mono text-cyan-300 font-semibold">https://192.168.99.84/index.html</span>
+              <span id="iv_detected_portal_type" class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">Tự động nhận diện</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="runLoginPortalScan()" class="text-[11px] px-2 py-0.5 rounded bg-[#162030] hover:bg-blue-600 text-blue-300 hover:text-white border border-[#263750] transition flex items-center gap-1" title="Quét nhận diện bề mặt đăng nhập">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Dò quét Portal</span>
               </button>
             </div>
           </div>
@@ -1566,12 +1582,12 @@
                   <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
                   <div class="text-sky-300">Auth Bypass (' OR 1=1--)</div>
                   <div class="text-[#cbd5e1]">Blind Boolean / Time-based</div>
-                  <div class="text-[#cbd5e1]">Web SPA, /axis-cgi/login.cgi, Session</div>
+                  <div id="iv_sqli_target_desc" class="text-[#cbd5e1] truncate">Web SPA / Portal, Web Auth API, Session</div>
                 </div>
               </div>
 
               <div class="flex items-center gap-2 pt-1">
-                <button onclick="runLoginAuditor()" class="flex-1 bg-[#0284c7] hover:bg-[#0369a1] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-sky-400 shadow-md">
+                <button onclick="runLoginAuditor('sqli')" class="flex-1 bg-[#0284c7] hover:bg-[#0369a1] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-sky-400 shadow-md">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   <span>Chạy SQLi</span>
                 </button>
@@ -1607,7 +1623,7 @@
               </div>
 
               <div class="flex items-center gap-2 pt-1">
-                <button onclick="runLoginAuditor()" class="flex-1 bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-purple-400 shadow-md">
+                <button onclick="runLoginAuditor('xss')" class="flex-1 bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-purple-400 shadow-md">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   <span>Chạy XSS</span>
                 </button>
@@ -1643,7 +1659,7 @@
                   <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
                   <div class="text-emerald-300">Origin / Referer Spoofing</div>
                   <div class="text-[#cbd5e1]">Forged Anti-CSRF Token Rejection</div>
-                  <div class="text-[#cbd5e1]">VAPIX / REST Config Modification</div>
+                  <div id="iv_csrf_target_desc" class="text-[#cbd5e1] truncate">Đổi Cấu hình &amp; API Quản trị</div>
                 </div>
               </div>
 
@@ -3277,11 +3293,18 @@
       window.open('/captures/csrf_poc_interactive.html', '_blank');
     }
 
-    function runLoginAuditor() {
+    function runLoginAuditor(mode = 'all') {
       const port = document.getElementById('login_audit_port')?.value || '443';
       const delay = document.getElementById('login_audit_delay')?.value || '0.4';
-      const cmd = `python tool22_login_input_validation.py --port ${port} --delay ${delay}`;
-      runCommand(cmd, `Đo kiểm Xác thực Đầu vào Form Login: SQLi & XSS 3.10.1.3 (Cổng ${port})`);
+      const cmd = `python tool22_login_input_validation.py --port ${port} --delay ${delay} --mode ${mode}`;
+      const title = mode === 'sqli' ? 'Kiểm thử SQL Injection' : (mode === 'xss' ? 'Kiểm thử Cross-Site Scripting (XSS)' : 'Đo kiểm Xác thực Đầu vào Form Login: SQLi & XSS');
+      runCommand(cmd, `${title} (Cổng ${port})`);
+    }
+
+    function runLoginPortalScan() {
+      const port = document.getElementById('login_audit_port')?.value || '443';
+      const cmd = `python tool22_login_input_validation.py --port ${port} --mode scan`;
+      runCommand(cmd, `Quét & Nhận diện Bề mặt Trang Đăng nhập (Cổng ${port})`);
     }
 
     function openLoginEvidence() {
@@ -3292,7 +3315,7 @@
       const port = document.getElementById('login_audit_port')?.value || '443';
       const delay = document.getElementById('login_audit_delay')?.value || '0.4';
       const csrfPort = document.getElementById('csrf_audit_port')?.value || '443';
-      const cmd = `python tool22_login_input_validation.py --port ${port} --delay ${delay} && python tool19_csrf_token_auditor.py --port ${csrfPort}`;
+      const cmd = `python tool22_login_input_validation.py --port ${port} --delay ${delay} --mode all && python tool19_csrf_token_auditor.py --port ${csrfPort}`;
       runCommand(cmd, `Trọn bộ Xác thực Đầu vào Web (SQLi, XSS, CSRF Cổng ${port})`);
     }
 
@@ -4332,6 +4355,32 @@
       if (loginPortEl && cfg && cfg.service_ports) loginPortEl.value = pHttps;
       if (csrfPortEl && cfg && cfg.service_ports) csrfPortEl.value = pHttps;
       syncDynamicPortsFromUi();
+
+      // Dynamic profile adaptation for Input Validation
+      const isOryza = (tc.model || '').toLowerCase().includes('orz') || (cfg && cfg.active_profile === 'oryza_orz_b52z');
+      const isAxis = (tc.model || '').toLowerCase().includes('axis') || (cfg && cfg.active_profile === 'axis_q1806_le');
+
+      const sqliDescEl = document.getElementById('iv_sqli_target_desc');
+      const csrfDescEl = document.getElementById('iv_csrf_target_desc');
+      const portalUrlEl = document.getElementById('iv_detected_portal_url');
+      const portalTypeEl = document.getElementById('iv_detected_portal_type');
+
+      if (isOryza) {
+        if (sqliDescEl) sqliDescEl.textContent = 'Web SPA (/index.html), WEB_JsonAjax, Session';
+        if (csrfDescEl) csrfDescEl.textContent = 'WEB_JsonAjax / REST Mutation';
+        if (portalUrlEl) portalUrlEl.textContent = `https://${ip}:${pHttps}/index.html`;
+        if (portalTypeEl) portalTypeEl.textContent = 'Web SPA (Oryza)';
+      } else if (isAxis) {
+        if (sqliDescEl) sqliDescEl.textContent = 'Web SPA, /axis-cgi/login.cgi, Session';
+        if (csrfDescEl) csrfDescEl.textContent = 'VAPIX / REST Config Modification';
+        if (portalUrlEl) portalUrlEl.textContent = `https://${ip}:${pHttps}/camera/index.html`;
+        if (portalTypeEl) portalTypeEl.textContent = 'Web SPA (Axis)';
+      } else {
+        if (sqliDescEl) sqliDescEl.textContent = 'Web Portal, HTTP Auth / REST API, Session';
+        if (csrfDescEl) csrfDescEl.textContent = 'REST API / Config Mutation';
+        if (portalUrlEl) portalUrlEl.textContent = `https://${ip}:${pHttps}/index.html`;
+        if (portalTypeEl) portalTypeEl.textContent = 'Auto Discovery';
+      }
 
       // API Scan tab
       const fuzzSel = document.getElementById('rtsp_fuzz_port');

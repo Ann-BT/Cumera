@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple
 class BaseCameraAdapter(ABC):
     """Abstract Base Class for vendor-specific camera adapters."""
 
+    web_auth_endpoint: str = "/"
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         if config is None:
             try:

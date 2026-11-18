@@ -20,6 +20,8 @@ ENCAP_MAGIC = b"\x09\x00\x00\x01"
 class OryzaCameraAdapter(BaseCameraAdapter):
     """Adapter for Oryza / Tiandy cameras."""
 
+    web_auth_endpoint: str = "/action/WEB_JsonAjax"
+
     def get_web_auth_endpoints(self) -> List[str]:
         return [
             "/action/WEB_JsonAjax",
@@ -165,7 +167,8 @@ class OryzaCameraAdapter(BaseCameraAdapter):
         onvif_ep = self.onvif_path or "/onvif/device_service"
         return [
             (onvif_ep, onvif_ep),
-            ("/web/index.html", "/web/index.html"),
+            ("/action/WEB_JsonAjax", "/index.html"),
+            ("/index.html", "/index.html"),
             ("/", "/"),
         ]
 
@@ -367,10 +370,10 @@ class OryzaCameraAdapter(BaseCameraAdapter):
     def get_login_surfaces(self, host: Optional[str] = None, port: Optional[int] = None) -> List[Dict[str, Any]]:
         cms_port = int(self.service_ports.get("proprietary_tcp") or 20001)
         return [
-            {"id": "SURF-01", "name": "Trang chủ Web Portal", "path": "/", "method": "GET", "expected_type": "Web UI Entry"},
-            {"id": "SURF-02", "name": "Trang đăng nhập Web (Oryza/Tiandy)", "path": "/index.html", "method": "GET", "expected_type": "Web UI Login Portal"},
-            {"id": "SURF-03", "name": "Cổng Web Client (Oryza)", "path": "/web/index.html", "method": "GET", "expected_type": "Web SPA Login Portal"},
-            {"id": "SURF-04", "name": "Dịch vụ ONVIF SOAP", "path": self.onvif_path, "method": "POST", "expected_type": "WS-Security SOAP"},
+            {"id": "SURF-01", "name": "Trang chủ Web Portal", "path": "/index.html", "method": "GET", "expected_type": "Web UI Entry"},
+            {"id": "SURF-02", "name": "API Xác thực Web (Tiandy/Oryza)", "path": "/action/WEB_JsonAjax", "method": "POST", "expected_type": "XDigest SHA-256 API"},
+            {"id": "SURF-03", "name": "Cổng Web Client (Oryza)", "path": "/index.html", "method": "GET", "expected_type": "Web SPA Login Portal"},
+            {"id": "SURF-04", "name": "Dịch vụ ONVIF SOAP", "path": self.onvif_path or "/onvif/device_service", "method": "POST", "expected_type": "WS-Security SOAP"},
             {"id": "SURF-05", "name": "Cổng CMS Độc quyền", "path": f":{cms_port}", "method": "TCP/TLS", "expected_type": "Proprietary CMS Gateway"},
         ]
 

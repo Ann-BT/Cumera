@@ -143,6 +143,8 @@ class _SourceAddressAdapter(HTTPAdapter):
 class AxisCameraAdapter(BaseCameraAdapter):
     """Adapter for Axis Communications cameras (Axis OS / VAPIX)."""
 
+    web_auth_endpoint: str = "/axis-cgi/login.cgi"
+
     def get_web_auth_endpoints(self) -> List[str]:
         return [
             "/axis-cgi/param.cgi?action=list&group=root.Brand",
