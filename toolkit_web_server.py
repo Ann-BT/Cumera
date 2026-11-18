@@ -1026,6 +1026,17 @@ async def perform_update():
                 zip_sha = (zf.comment or b"").decode("utf-8", errors="ignore").strip()
                 if len(zip_sha) == 40:
                     COMMIT_STAMP_FILE.write_text(zip_sha, encoding="utf-8")
+                else:
+                    # Query commit SHA mới nhất từ API để lưu stamp
+                    try:
+                        c_req = urllib.request.Request(f"{GITHUB_REPO_API}/commits/main", headers={"User-Agent": "Cumera-App-Updater"})
+                        with urllib.request.urlopen(c_req, timeout=5) as c_resp:
+                            if c_resp.status == 200:
+                                c_data = json.loads(c_resp.read().decode())
+                                if c_data.get("sha"):
+                                    COMMIT_STAMP_FILE.write_text(c_data["sha"], encoding="utf-8")
+                    except Exception:
+                        pass
             logs.append("[OK] Đã tải và cập nhật toàn bộ tệp mới nhất từ GitHub.")
         except Exception as e:
             return {"status": "error", "message": f"Lỗi tải cập nhật: {e}"}
