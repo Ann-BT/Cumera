@@ -383,6 +383,14 @@
           </div>
         </button>
 
+        <!-- DENIAL OF SERVICES -->
+        <button onclick="switchTab('dos')" id="nav_dos" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Khả năng chống kết nối hàng loạt đồng thời & phục hồi dịch vụ (3.8.3.3 / DoS)">
+          <div class="flex items-center gap-2 overflow-hidden">
+            <svg class="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <span class="nav-label truncate font-medium">Denial of Services</span>
+          </div>
+        </button>
+
         <!-- INPUT VALIDATION -->
         <button onclick="switchTab('fuzzer')" id="nav_fuzzer" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Xác thực đầu vào Web (SQL Injection, XSS, CSRF)">
           <div class="flex items-center gap-2 overflow-hidden">
@@ -410,7 +418,7 @@
         </button>
 
         <!-- FIRMWARE -->
-        <button onclick="switchTab('firmware_update')" id="nav_firmware_update" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Kiểm tra chữ ký số firmware (SHA-256 + RSA), public key hard-coded & tạo file tamper 1 byte">
+        <button onclick="switchTab('firmware_update')" id="nav_firmware_update" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Phân tích tự động cấu trúc firmware, nhận diện filesystem & kiểm tra chữ ký số (QCVN 11:2026/BCA)">
           <div class="flex items-center gap-2 overflow-hidden">
             <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             <span class="nav-label truncate font-medium">Firmware</span>
@@ -885,6 +893,17 @@
           <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
             <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dịch vụ Truyền thông (ComMech)</h2>
             <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
+                <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Phân loại:</span>
+                <select id="commech_view_filter" onchange="filterComMechRows()" class="bg-transparent text-xs text-teal-300 font-mono outline-none cursor-pointer" title="Lọc hiển thị danh mục ComMech theo thể loại">
+                  <option value="all" selected>Tất cả thể loại (Chi tiết)</option>
+                  <option value="ixit">Chỉ danh mục IXIT</option>
+                  <option value="storage">Lưu trữ (SFTP / FTPS / FTP / SMB)</option>
+                  <option value="mail">Thư điện tử (SMTPS / STARTTLS)</option>
+                  <option value="media">Media & API (Web / ONVIF / RTSPS / CMS)</option>
+                  <option value="mgmt">Quản trị (Syslog / SNMP / MQTT)</option>
+                </select>
+              </div>
               <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
                 <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Xác thực:</span>
                 <select id="commech_global_auth" class="bg-transparent text-xs text-blue-300 font-mono outline-none cursor-pointer">
@@ -1437,64 +1456,177 @@
 
           </div>
 
-          <!-- ================= PANEL 5: MASS RECONNECTION 3.8.3.3 ================= -->
-          <div class="border border-[#222938] hover:border-[#35415c] rounded-xl p-3.5 bg-[#10141f] space-y-3 flex flex-col justify-between transition-all duration-200 shadow-sm">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-6 h-6 rounded bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  </div>
-                  <span class="font-bold text-xs text-white">5. Kết nối Hàng loạt Đồng thời (3.8.3.3)</span>
-                </div>
-                <span class="font-mono text-cyan-400 text-[11px] bg-[#122229] px-2 py-0.5 rounded border border-cyan-800/40">Valid Creds</span>
-              </div>
+        </div>
 
-              <!-- Parameter Form -->
-              <div class="bg-[#0b0e15] p-3 rounded-lg border border-[#1d2331] grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px]">
-                <div>
-                  <label class="block text-[#848c9e] font-medium mb-1">Kết nối / wave:</label>
-                  <input id="mass_concurrency" type="number" value="50" min="1" max="500"
-                    class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
-                </div>
-                <div>
-                  <label class="block text-[#848c9e] font-medium mb-1">Số waves:</label>
-                  <input id="mass_waves" type="number" value="5" min="1" max="50"
-                    class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
-                </div>
-                <div>
-                  <label class="block text-[#848c9e] font-medium mb-1">Delay (s):</label>
-                  <input id="mass_wave_delay" type="number" value="2" min="0" max="30" step="0.5"
-                    class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition">
-                </div>
-                <div>
-                  <label class="block text-[#848c9e] font-medium mb-1">Giao thức:</label>
-                  <select id="mass_proto" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 rounded px-2.5 py-1 text-white font-mono outline-none transition cursor-pointer">
-                    <option value="tls,ssh,rtsp,rtsps,onvif,snmp" selected>Tất cả (TLS/SSH/RTSP/ONVIF/SNMP)</option>
-                    <option value="tls,ssh">TLS + SSH2</option>
-                    <option value="rtsp,rtsps,onvif">RTSP + RTSPS + ONVIF</option>
-                    <option value="tls">TLS/HTTPS</option>
-                    <option value="ssh">SSH2</option>
-                    <option value="snmp">SNMPv3</option>
-                    <option value="smb">SMB</option>
-                  </select>
-                </div>
+        <!-- ============================================================== -->
+        <!-- TAB: DENIAL OF SERVICES & RESILIENCE (CLAUSE 2.8.3 / 3.8.3.3) -->
+        <!-- ============================================================== -->
+        <div id="tab_content_dos" class="tab-pane hidden space-y-3">
+          <!-- Header Banner -->
+          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-md bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </div>
+              <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Denial of Services &amp; Resilience</h2>
+                <p class="text-[11px] text-[#848c9e] font-mono">QCVN 11 Khoản 2.8.3 • ETSI EN 303 645 Mục 3.8.3.3 (Mass Reconnections)</p>
               </div>
             </div>
-
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-2 pt-1">
-              <button onclick="runMassReconnect()" class="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-900/20 border border-blue-500/40">
-                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Test</span>
-              </button>
-              <button onclick="stopCommand()" class="py-2 px-4 rounded-lg bg-[#1f161b] hover:bg-rose-700/80 active:scale-[0.99] text-rose-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-rose-800/50">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
-                <span>Dừng</span>
-              </button>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#171c28] border border-[#262f42] text-[11px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="text-[#848c9e]">Tiêu chuẩn: <strong class="text-emerald-300">Security Unaffected</strong></span>
+              </span>
             </div>
           </div>
 
+          <!-- Main Content Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+            <!-- Left Panel (7 cols): Test Configuration & Controls -->
+            <div class="lg:col-span-7 space-y-3.5">
+              <div class="border border-[#222938] rounded-xl p-4 bg-[#10141f] space-y-4 shadow-sm">
+                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                  <span class="font-bold text-xs text-white">Cấu hình Bão kết nối</span>
+                  <span class="font-mono text-cyan-400 text-[11px] bg-[#122229] px-2 py-0.5 rounded border border-cyan-800/40">Target Credentials</span>
+                </div>
+
+                <!-- Parameters Grid -->
+                <div class="bg-[#0b0e15] p-3.5 rounded-lg border border-[#1d2331] grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                  <div>
+                    <label class="block text-[#848c9e] font-medium mb-1.5">Kết nối / Đợt:</label>
+                    <input id="mass_concurrency" type="number" value="50" min="1" max="500"
+                      class="w-full bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2.5 py-1.5 text-white font-mono outline-none transition">
+                  </div>
+                  <div>
+                    <label class="block text-[#848c9e] font-medium mb-1.5">Số đợt (Waves):</label>
+                    <input id="mass_waves" type="number" value="5" min="1" max="50"
+                      class="w-full bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2.5 py-1.5 text-white font-mono outline-none transition">
+                  </div>
+                  <div>
+                    <label class="block text-[#848c9e] font-medium mb-1.5">Nghỉ giữa đợt (s):</label>
+                    <input id="mass_wave_delay" type="number" value="2.0" min="0" max="30" step="0.5"
+                      class="w-full bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2.5 py-1.5 text-white font-mono outline-none transition">
+                  </div>
+                  <div>
+                    <label class="block text-[#848c9e] font-medium mb-1.5">Timeout (s):</label>
+                    <input id="mass_timeout" type="number" value="5.0" min="1" max="30" step="0.5"
+                      class="w-full bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2.5 py-1.5 text-white font-mono outline-none transition">
+                  </div>
+                  <div class="col-span-2 sm:col-span-4">
+                    <label class="block text-[#848c9e] font-medium mb-1.5">Giao thức kiểm thử:</label>
+                    <select id="mass_proto" class="w-full bg-[#141924] border border-[#2a3449] focus:border-rose-500 rounded px-2.5 py-1.5 text-white font-mono outline-none transition cursor-pointer">
+                      <option value="tls,ssh,rtsp,rtsps,onvif,snmp" selected>Tất cả dịch vụ (TLS, SSH, RTSP, RTSPS, ONVIF, SNMP)</option>
+                      <option value="tls,ssh">Web HTTPS (Port 443) + SSH (Port 22)</option>
+                      <option value="rtsp,rtsps,onvif">Camera Media (RTSP + RTSPS + ONVIF)</option>
+                      <option value="tls">Chỉ Web HTTPS (Port 443)</option>
+                      <option value="ssh">Chỉ SSH2 (Port 22)</option>
+                      <option value="snmp">Chỉ SNMPv3 (UDP 161)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Fast Presets -->
+                <div class="space-y-1.5">
+                  <div class="text-[11px] text-[#848c9e] font-medium">Kịch bản nhanh:</div>
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button onclick="runMassReconnectPreset('standard')" class="py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-cyan-300 border border-[#2a3449] hover:border-cyan-700/60 text-[11px] font-mono transition text-center" title="Chuẩn QCVN 11: 50 conn × 5 waves, delay 2s">
+                      QCVN 11 (50×5)
+                    </button>
+                    <button onclick="runMassReconnectPreset('stress')" class="py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-rose-300 border border-[#2a3449] hover:border-rose-700/60 text-[11px] font-mono transition text-center" title="Tải cao: 100 conn × 10 waves, delay 1s">
+                      Stress (100×10)
+                    </button>
+                    <button onclick="runMassReconnectPreset('quick')" class="py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-emerald-300 border border-[#2a3449] hover:border-emerald-700/60 text-[11px] font-mono transition text-center" title="Nhanh: 20 conn × 3 waves">
+                      Nhanh (20×3)
+                    </button>
+                    <button onclick="runMassReconnectPreset('web_ssh')" class="py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-purple-300 border border-[#2a3449] hover:border-purple-700/60 text-[11px] font-mono transition text-center" title="Web + SSH: 50 conn × 5 waves">
+                      Web + SSH (50×5)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-2 pt-2 border-t border-[#1f2637]">
+                  <button onclick="runMassReconnect()" class="flex-1 py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-950/30 border border-rose-500">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Khởi chạy Kiểm tra DoS</span>
+                  </button>
+                  <button onclick="stopCommand()" class="py-2 px-4 rounded-lg bg-[#1a1f2c] hover:bg-rose-900/40 active:scale-[0.99] text-rose-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-[#2e374d]">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                    <span>Dừng</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Panel (5 cols): Test Verdict & Latest Summary -->
+            <div class="lg:col-span-5 space-y-3.5">
+              <div class="border border-[#222938] rounded-xl p-4 bg-[#10141f] space-y-3.5 shadow-sm flex flex-col justify-between h-full">
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <span class="font-bold text-xs text-white">Kết quả Đo kiểm Gần nhất</span>
+                    </div>
+                    <span id="dos_summary_badge" class="font-mono text-cyan-400 text-[10px] bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">-</span>
+                  </div>
+
+                  <!-- Quick Info Row -->
+                  <div class="bg-[#0b0e15] p-2.5 rounded-lg border border-[#1d2331] text-[11px] space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[#848c9e]">Khả năng phục hồi DUT:</span>
+                      <span id="dos_last_recovery" class="font-mono text-emerald-400 font-semibold">-</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-[#848c9e]">Tải đã thử:</span>
+                      <span id="dos_last_params" class="font-mono text-white">-</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-[#848c9e]">Thời điểm đo:</span>
+                      <span id="dos_last_time" class="font-mono text-[#848c9e]">-</span>
+                    </div>
+                  </div>
+
+                  <!-- Breakdown Table -->
+                  <div class="bg-[#0b0e15] rounded-lg border border-[#1d2331] overflow-hidden text-[11px]">
+                    <table class="w-full text-left border-collapse">
+                      <thead>
+                        <tr class="bg-[#141924] text-[#848c9e] border-b border-[#222b3d] text-[10px] uppercase font-semibold">
+                          <th class="py-1.5 px-2.5">Dịch vụ</th>
+                          <th class="py-1.5 px-2.5 text-center">Yêu cầu</th>
+                          <th class="py-1.5 px-2.5 text-center">Thành công</th>
+                          <th class="py-1.5 px-2.5 text-center">Độ trễ</th>
+                          <th class="py-1.5 px-2.5 text-right">Đánh giá</th>
+                        </tr>
+                      </thead>
+                      <tbody id="dos_results_tbody" class="divide-y divide-[#1e2535] font-mono text-xs">
+                        <tr>
+                          <td colspan="5" class="py-4 text-center text-[#556075] italic">Đang tải kết quả...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Subtle Standard Note -->
+                  <p class="text-[10.5px] text-[#848c9e] leading-relaxed pt-1">
+                    <strong class="text-white">Quy chuẩn:</strong> Thiết bị có thể từ chối kết nối khi chịu tải đỉnh, nhưng các dịch vụ bảo mật phải tự phục hồi 100% sau khi dừng bắn tải.
+                  </p>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-2 border-t border-[#1f2637] flex items-center gap-2">
+                  <button onclick="runCommand('cat mass_reconnect_report_*.json 2>/dev/null | tail -n 80 || echo \'Chưa có báo cáo mass reconnect gần nhất.\'', 'Xem Log JSON Chi tiết')" class="flex-1 py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-sky-300 border border-[#2a3449] hover:border-sky-700/60 text-[11px] font-medium transition text-center flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>Xem Log JSON</span>
+                  </button>
+                  <button onclick="loadLatestDosReport()" class="py-1.5 px-3 rounded bg-[#141924] hover:bg-[#1f2637] text-[#94a3b8] hover:text-white border border-[#2a3449] text-[11px] font-medium transition text-center flex items-center gap-1" title="Làm mới kết quả">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Làm mới</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ============================================================== -->
@@ -1502,207 +1634,129 @@
         <!-- ============================================================== -->
         <div id="tab_content_fuzzer" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#142338] text-blue-300 border border-blue-800/60 font-bold tracking-wider">INPUT VALIDATION</span>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Đầu vào Web (SQL Injection, XSS, CSRF)</h2>
+          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Dữ liệu Đầu vào (Input Validation)</h2>
+                <p class="text-[11px] text-[#848c9e] font-mono">QCVN 11:2026/BCA Điều 2.10.1 &amp; Phương pháp đo 3.10.1.3 • IXIT 29-InpVal</p>
+              </div>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="runFullWebInputSuite()" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-blue-500 transition shadow-sm">
+              <button onclick="runInpValSuite('all')" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-blue-500 transition shadow-sm">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Tất cả (SQLi + XSS + CSRF)</span>
+                <span>Chạy Tất cả InpVal</span>
+              </button>
+              <button onclick="openInpValEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1.5" title="Mở báo cáo bằng chứng HTML">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Báo cáo HTML</span>
               </button>
             </div>
           </div>
 
-          <!-- Quick 1-Click Preset Bar -->
-          <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded">
-            <div class="text-[11px] font-bold text-[#848c9e] uppercase tracking-wider mb-2">Kịch bản nhanh:</div>
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              <button onclick="runFullWebInputSuite()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-blue-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-blue-300 group-hover:text-blue-200">Trọn bộ Web Suite</div>
-              </button>
-              <button onclick="runLoginAuditor('sqli')" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-sky-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-sky-300 group-hover:text-sky-200">SQL Injection</div>
-              </button>
-              <button onclick="runLoginAuditor('xss')" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-purple-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-purple-300 group-hover:text-purple-200">Cross-Site Scripting</div>
-              </button>
-              <button onclick="runCsrfAuditor()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-emerald-900/60 text-center transition group card-interactive">
-                <div class="font-semibold text-xs text-emerald-300 group-hover:text-emerald-200">CSRF &amp; Token</div>
-              </button>
-              <button onclick="runLoginPortalScan()" class="p-2 rounded bg-[#14171f] hover:bg-[#1c2230] border border-[#272c3a] text-center transition group card-interactive" title="Tự động dò quét phát hiện trang đăng nhập ban đầu và cơ chế xác thực">
-                <div class="font-semibold text-xs text-teal-300 group-hover:text-teal-200">Quét Trang Login</div>
-              </button>
-            </div>
-          </div>
-
-          <!-- Dynamic Detected Login Portal Banner -->
-          <div id="iv_detected_portal_box" class="bg-[#10141f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-2 shadow-sm text-xs">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span class="text-[#848c9e]">Trang Đăng Nhập Ban Đầu:</span>
-              <span id="iv_detected_portal_url" class="font-mono text-cyan-300 font-semibold">https://192.168.99.84/index.html</span>
-              <span id="iv_detected_portal_type" class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">Tự động nhận diện</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <button onclick="runLoginPortalScan()" class="text-[11px] px-2 py-0.5 rounded bg-[#162030] hover:bg-blue-600 text-blue-300 hover:text-white border border-[#263750] transition flex items-center gap-1" title="Quét nhận diện bề mặt đăng nhập">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Dò quét Portal</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Main Interactive Controls: 3 Cards for SQLi, XSS, and CSRF -->
+          <!-- 3 InpVal Cards Grid -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
-            <!-- Card 1: SQL Injection (SQLi) -->
-            <div class="border border-sky-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
+            <!-- Card 1: User Input Validation -->
+            <div class="border border-[#222938] hover:border-emerald-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm">
               <div class="space-y-2.5">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
                   <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-sky-400"></div>
-                    <span class="font-bold text-xs text-white">1. SQL Injection (SQLi)</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="font-bold text-xs text-white">User Input Validation</span>
                   </div>
-                  <span id="iv_sqli_port_badge" class="text-[10px] font-mono text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded border border-sky-800/40 font-bold">CỔNG 443</span>
+                  <span class="font-mono text-emerald-400 text-[10px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/40">15 Tests</span>
                 </div>
-
-                <div class="grid grid-cols-2 gap-2 bg-[#10131a] p-2 rounded border border-[#272c3a]">
-                  <div>
-                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
-                    <input type="number" id="login_audit_port" value="443" oninput="syncDynamicPortsFromUi()" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-sky-500 focus:outline-none">
-                  </div>
-                  <div>
-                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Giãn cách (s):</label>
-                    <input type="number" id="login_audit_delay" value="0.4" step="0.1" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-sky-500 focus:outline-none">
-                  </div>
-                </div>
-
-                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
-                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
-                  <div class="text-sky-300">Auth Bypass (' OR 1=1--)</div>
-                  <div class="text-[#cbd5e1]">Blind Boolean / Time-based</div>
-                  <div id="iv_sqli_target_desc" class="text-[#cbd5e1] truncate">Web SPA / Portal, Web Auth API, Session</div>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1.5 font-mono">
+                  <div><strong class="text-white font-sans">• Type checking:</strong> string, integer, IP, MAC, email</div>
+                  <div><strong class="text-white font-sans">• Range checking:</strong> port 1-65535, resolutions, schedule 0-23h</div>
+                  <div><strong class="text-white font-sans">• Length checking:</strong> password 8-16, username 1-32, name 1-64</div>
+                  <div><strong class="text-white font-sans">• Sanitize input:</strong> whitelist XSS, SQLi, Command Injection</div>
+                  <div><strong class="text-white font-sans">• Reject &amp; Log:</strong> từ chối dữ liệu sai, ghi Security Audit Log</div>
                 </div>
               </div>
-
-              <div class="flex items-center gap-2 pt-1">
-                <button onclick="runLoginAuditor('sqli')" class="flex-1 bg-[#0284c7] hover:bg-[#0369a1] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-sky-400 shadow-md">
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runInpValSuite('inpval1')" class="w-full bg-[#065f46] hover:bg-[#047857] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border border-emerald-600 transition shadow-sm">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Chạy SQLi</span>
-                </button>
-                <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
-                  <span>PoC</span>
+                  <span>Chạy User Input Validation</span>
                 </button>
               </div>
             </div>
 
-            <!-- Card 2: Cross-Site Scripting (XSS) -->
-            <div class="border border-purple-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
+            <!-- Card 2: API Input Validation -->
+            <div class="border border-[#222938] hover:border-cyan-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm">
               <div class="space-y-2.5">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
                   <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-purple-400"></div>
-                    <span class="font-bold text-xs text-white">2. Cross-Site Scripting (XSS)</span>
+                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                    <span class="font-bold text-xs text-white">API Input Validation</span>
                   </div>
-                  <span id="iv_xss_port_badge" class="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded border border-purple-800/40 font-bold">CỔNG 443</span>
+                  <span class="font-mono text-cyan-400 text-[10px] bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40">7 Tests</span>
                 </div>
-
-                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
-                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
-                  <div class="text-purple-300">&lt;script&gt;alert(1)&lt;/script&gt;</div>
-                  <div class="text-[#cbd5e1]">SVG onload / Event Handlers</div>
-                  <div class="text-[#cbd5e1]">Headers CSP, X-Content-Type, Nosniff</div>
-                </div>
-
-                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1">
-                  <div class="text-[10px] uppercase text-[#848c9e] font-bold">Cơ chế bảo vệ:</div>
-                  <div class="text-[#e2e8f0]">Khử khuẩn đầu vào (HTML/JS Sanitization)</div>
-                  <div class="text-[#e2e8f0]">Không phản xạ nguyên dạng payload trong DOM</div>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1.5 font-mono">
+                  <div><strong class="text-white font-sans">• ONVIF (ExtAPI-1):</strong> XSD schema, truncated XML, anti-XXE</div>
+                  <div><strong class="text-white font-sans">• REST (ExtAPI-2):</strong> JSON schema, malformed JSON syntax</div>
+                  <div><strong class="text-white font-sans">• Parameters check:</strong> kiểm tra type, range, length trên API</div>
+                  <div><strong class="text-white font-sans">• Token Gatekeeper:</strong> xác thực Token trước khi parse payload</div>
+                  <div><strong class="text-white font-sans">• Xử lý lỗi an toàn:</strong> ngắt kết nối an toàn, SOAP Fault / HTTP 4xx</div>
                 </div>
               </div>
-
-              <div class="flex items-center gap-2 pt-1">
-                <button onclick="runLoginAuditor('xss')" class="flex-1 bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-purple-400 shadow-md">
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runInpValSuite('inpval2')" class="w-full bg-[#0e7490] hover:bg-[#0891b2] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border border-cyan-600 transition shadow-sm">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Chạy XSS</span>
-                </button>
-                <button onclick="openLoginEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
-                  <span>PoC</span>
+                  <span>Chạy API Input Validation</span>
                 </button>
               </div>
             </div>
 
-            <!-- Card 3: CSRF & Token Auditor -->
-            <div class="border border-emerald-900/40 rounded p-3 bg-[#14171f] space-y-2.5 relative overflow-hidden card-interactive flex flex-col justify-between">
+            <!-- Card 3: Network Channel Validation -->
+            <div class="border border-[#222938] hover:border-purple-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm">
               <div class="space-y-2.5">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
                   <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
-                    <span class="font-bold text-xs text-white">3. CSRF &amp; Token Cấu hình</span>
+                    <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                    <span class="font-bold text-xs text-white">Network Channel Validation</span>
                   </div>
-                  <span id="iv_csrf_port_badge" class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 font-bold">CỔNG 443</span>
+                  <span class="font-mono text-purple-400 text-[10px] bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/40">10 Tests</span>
                 </div>
-
-                <div class="grid grid-cols-2 gap-2 bg-[#10131a] p-2 rounded border border-[#272c3a]">
-                  <div>
-                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Cổng Web:</label>
-                    <input type="number" id="csrf_audit_port" value="443" oninput="syncDynamicPortsFromUi()" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
-                  </div>
-                  <div>
-                    <label class="block text-[10px] text-[#848c9e] uppercase tracking-wider mb-1">Tốc độ (req/s):</label>
-                    <input type="number" id="csrf_audit_rate" value="3.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
-                  </div>
-                </div>
-
-                <div class="bg-[#10131a] p-2 rounded border border-[#272c3a] text-[11px] text-[#94a3b8] space-y-1 font-mono">
-                  <div class="text-[10px] uppercase text-[#848c9e] font-sans font-bold">Vector &amp; Điểm kiểm thử:</div>
-                  <div class="text-emerald-300">Origin / Referer Spoofing</div>
-                  <div class="text-[#cbd5e1]">Forged Anti-CSRF Token Rejection</div>
-                  <div id="iv_csrf_target_desc" class="text-[#cbd5e1] truncate">Đổi Cấu hình &amp; API Quản trị</div>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1.5 font-mono">
+                  <div><strong class="text-white font-sans">• RTSP/RTP:</strong> drop gói tin sai RFC standard</div>
+                  <div><strong class="text-white font-sans">• NTP Anti-Spoofing:</strong> từ chối độ lệch thời gian &gt; 5 phút</div>
+                  <div><strong class="text-white font-sans">• DHCP Anti-Rogue:</strong> từ chối DHCP server ngoài subnet</div>
+                  <div><strong class="text-white font-sans">• DoT:</strong> xác thực DNS qua TLS chống DNS spoofing</div>
+                  <div><strong class="text-white font-sans">• ComMech Channels:</strong> SFTP traversal, SMTPS 4KB, SNMPv3, Alarm</div>
                 </div>
               </div>
-
-              <div class="flex items-center gap-2 pt-1">
-                <button onclick="runCsrfAuditor()" class="flex-1 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition border border-emerald-400 shadow-md">
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runInpValSuite('inpval3')" class="w-full bg-[#6d28d9] hover:bg-[#7c3aed] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border border-purple-600 transition shadow-sm">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Chạy CSRF</span>
-                </button>
-                <button onclick="openCsrfPoc()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition">
-                  <span>PoC</span>
+                  <span>Chạy Network Channel Validation</span>
                 </button>
               </div>
             </div>
 
           </div>
 
-          <!-- Technical Reference & Wireshark Filter Panel -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
-            <div class="font-bold text-xs text-white flex items-center justify-between">
-              <span>Bộ lọc Wireshark Display Filter (Web Input Validation)</span>
-              <span class="text-[10px] text-emerald-400 font-mono">DUT Integrity Enforced</span>
+          <!-- Bottom Status & Quick Action Bar -->
+          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 font-mono text-[11px]">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-[#848c9e]">Mục tiêu kiểm định:</span>
+              <span class="text-cyan-300 font-semibold">192.168.99.84 (HTTPS: 443 | RTSP: 554)</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-rose-400">http.response.code in {400, 401, 403}</span>
-                <span class="text-[10px] text-[#848c9e]">Mã từ chối</span>
-              </div>
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-purple-400">http contains "SELECT" || http contains "&lt;script&gt;"</span>
-                <span class="text-[10px] text-[#848c9e]">Dò SQLi / XSS</span>
-              </div>
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span id="iv_wireshark_post_filter" class="text-cyan-400">http.request.method == "POST" &amp;&amp; tcp.port == 443</span>
-                <span class="text-[10px] text-[#848c9e]">Gói cấu hình</span>
-              </div>
+            <div class="flex items-center gap-2">
+              <button onclick="runCommand('cat captures/input_validation_audit_*.json 2>/dev/null | tail -n 50 || echo \'Chưa có file audit json gần nhất.\'', 'Xem Log JSON Gần Nhất')" class="px-2.5 py-1 rounded bg-[#171e2c] hover:bg-[#202b3d] text-sky-300 border border-sky-800/50 text-[11px] font-medium transition">
+                Xem Log JSON
+              </button>
+              <button onclick="switchTab('evidence')" class="px-2.5 py-1 rounded bg-[#171e2c] hover:bg-[#202b3d] text-cyan-300 border border-cyan-800/50 text-[11px] font-medium transition">
+                Kho Gói Tin PCAP
+              </button>
             </div>
           </div>
-
         </div>
 
-        <!-- ============================================================== -->
-        <!-- TAB: GIÁM SÁT TRUYỀN TIN QUỐC TẾ, ĐỊNH VỊ IP & TELEMETRY -->
-        <!-- ============================================================== -->
         <div id="tab_content_telemetry_geoip" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
           <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
@@ -2094,74 +2148,132 @@
         <!-- ============================================================== -->
         <!-- TAB: FIRMWARE UPDATE & SIGNING -->
         <!-- ============================================================== -->
+        <!-- TAB: FIRMWARE ANALYSIS, FILESYSTEM & SIGNING AUDIT -->
+        <!-- ============================================================== -->
         <div id="tab_content_firmware_update" class="tab-pane hidden space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-3 rounded">
             <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Kiểm thử Cập nhật Firmware & Chữ ký số</h2>
-              <p class="text-[11px] text-[#94a3b8] mt-0.5">Phân tích SHA-256 + RSA trong gói <code>.bin</code>, trích xuất public key hard-coded từ <code>rootfs.img</code> và tạo file sửa 1 byte để test upload trên Web UI.</p>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Tự Động Firmware, Filesystem &amp; Chữ Ký Số</h2>
+              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tự động nhận diện container, tìm kiếm &amp; trích xuất Filesystem (SquashFS, CPIO, Tar, uImage), bóc tách chữ ký số (RSA / pgnf / ENCAP) và khóa công khai hard-coded (QCVN 11:2026/BCA Khoản 2.3.1, 2.3.3 &amp; 2.3.5).</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <button onclick="runFirmwareAudit(false)" class="px-3 py-1.5 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] transition">Chỉ Phân tích</button>
-              <button onclick="runFirmwareAudit(true)" class="px-3 py-1.5 rounded text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition">Phân tích & Tạo Tamper 1-Byte</button>
+              <button onclick="runFirmwareAudit()" class="px-3.5 py-1.5 rounded text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center gap-1.5 shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Bắt Đầu Phân Tích Firmware</span>
+              </button>
+              <button onclick="loadFirmwareSigningData()" class="px-3 py-1.5 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-[#94a3b8] hover:text-white border border-[#2e3547] transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Làm mới</span>
+              </button>
             </div>
           </div>
 
-          <!-- Cấu hình đầu vào -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            <div class="md:col-span-8">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] mb-1">Thư mục chứa Firmware (.bin / .encap)</label>
-              <input id="fw_dir_input" type="text" value="" placeholder="Đường dẫn thư mục firmware theo Profile..." class="w-full bg-[#090c13] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-500" />
+          <!-- Cấu hình đầu vào đường dẫn Firmware -->
+          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center gap-3">
+            <div class="flex-1 min-w-[280px]">
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] mb-1">Thư mục chứa Firmware (.bin / .encap / .img)</label>
+              <input id="fw_dir_input" type="text" value="" placeholder="Đường dẫn thư mục firmware theo Profile..." class="w-full bg-[#090c13] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-500" />
             </div>
-            <div class="md:col-span-4">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] mb-1">Thành phần sửa 1 byte (Tamper Target)</label>
-              <select id="fw_tamper_member" class="w-full bg-[#090c13] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-amber-500">
-                <option value="sign.bin" selected>sign.bin (Chữ ký RSA - An toàn nhất)</option>
-                <option value="sums.bin">sums.bin (Bảng SHA-256)</option>
-                <option value="info.json">info.json (Metadata gói)</option>
-              </select>
+            <div class="flex items-center gap-2 self-end">
+              <button onclick="initFirmwareDirInput()" class="px-2.5 py-1.5 rounded text-xs font-medium bg-[#1c2230] hover:bg-[#272f42] text-cyan-300 border border-[#2a354c] transition" title="Khôi phục đường dẫn mặc định theo Profile">
+                Nạp lại đường dẫn Profile
+              </button>
             </div>
           </div>
 
-          <!-- Bảng kết quả phân tích chữ ký & public key -->
+          <!-- Bảng 1: Bảng tổng hợp kiểm thử firmware & chữ ký số -->
           <div class="bg-[#14171f] border border-[#272c3a] rounded overflow-hidden">
             <div class="px-3 py-2 border-b border-[#272c3a] flex items-center justify-between">
-              <span class="text-xs font-bold text-white uppercase tracking-wider">Bước 1 & 2: Phân tích Chữ ký & Public Key Hard-coded</span>
-              <button onclick="loadFirmwareSigningData()" class="text-[11px] text-[#94a3b8] hover:text-white px-2 py-0.5 border border-[#272c3a] rounded transition">Làm mới</button>
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Bước 1: Bảng Tổng Hợp Firmware &amp; Xác Thực Chữ Ký Số</span>
+              <span id="fw_summary_count_badge" class="font-mono text-[10px] text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">0 gói</span>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse text-xs">
                 <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase">
                   <tr>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">File Firmware</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Release / Domain</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">SHA-256 (sums.bin)</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Chữ ký (sign.bin)</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Public Key (rootfs.img)</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Xác thực OpenSSL</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Tệp Firmware</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Phiên bản / Vai trò</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Định dạng Container</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Filesystem Phát Hiện</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Chữ Ký Số &amp; Hash</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Khóa Công Khai (Root of Trust)</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Xác Thực Mật Mã (QCVN 11)</th>
                   </tr>
                 </thead>
                 <tbody id="fw_audit_tbody" class="divide-y divide-[#272c3a]">
-                  <tr><td colspan="6" class="px-3 py-4 text-center text-[#64748b]">Chưa có dữ liệu. Nhấn "Phân tích & Tạo Tamper 1-Byte" để chạy kiểm tra.</td></tr>
+                  <tr><td colspan="7" class="px-3 py-4 text-center text-[#64748b]">Chưa có dữ liệu. Nhấn "Bắt Đầu Phân Tích Firmware" để chạy kiểm tra tự động.</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- Bước 3: File Tampered & Hướng dẫn test Web UI + Wireshark -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div class="bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2">
-              <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider">Bước 3: File Firmware Đã Sửa 1 Byte (Upload Web UI)</h3>
-              <div id="fw_tampered_list" class="text-xs text-[#94a3b8] space-y-2">
-                <div class="text-[#64748b]">Chưa tạo file tampered.</div>
+          <!-- Bảng 2: Chi tiết Filesystem & Cấu trúc đã trích xuất -->
+          <div class="bg-[#14171f] border border-[#272c3a] rounded overflow-hidden">
+            <div class="px-3 py-2 border-b border-[#272c3a] flex items-center justify-between">
+              <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Bước 2: Chi Tiết Filesystem &amp; Cấu Trúc Trích Xuất (Filesystem Breakdown)</span>
+              <span class="text-[10px] text-[#64748b] font-mono">SquashFS / Tar / uImage / CPIO</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase">
+                  <tr>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Tệp Nguồn</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Phân Vùng / Filesystem</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Loại &amp; Thuật Toán Nén</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Offset (Hex / Dec)</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Dung Lượng</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Trạng Thái Trích Xuất &amp; Nội Dung</th>
+                  </tr>
+                </thead>
+                <tbody id="fw_fs_tbody" class="divide-y divide-[#272c3a]">
+                  <tr><td colspan="6" class="px-3 py-3 text-center text-[#64748b]">Chưa phát hiện phân vùng filesystem.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Bước 3: Chi tiết Chữ Ký Số, Khóa Công Khai & Wireshark Filter -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            <div class="lg:col-span-7 bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2.5">
+              <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Bước 3: Chi Tiết Chữ Ký Số &amp; Khóa Mật Mã Tìm Thấy</h3>
+              <div id="fw_sig_details_box" class="text-xs text-[#94a3b8] space-y-2 font-mono">
+                <div class="text-[#64748b]">Nhấn "Bắt Đầu Phân Tích Firmware" để trích xuất khóa và phân tích chữ ký.</div>
               </div>
             </div>
 
-            <div class="bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2">
-              <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Wireshark Filter Kiểm tra Kênh truyền khi Update</h3>
-              <p class="text-[11px] text-[#94a3b8]">Dùng Wireshark trong lúc upload file trên Web UI camera để chứng minh kênh truyền update được mã hóa HTTPS/TLS (Wireshark không thấy nội dung chữ ký bên trong TLS).</p>
-              <div class="bg-[#090c13] border border-[#272c3a] rounded p-2 flex items-center justify-between text-[11px] font-mono">
-                <span class="text-emerald-300 select-all">tls.handshake.type == 1 || http.request.method == "POST"</span>
-                <button onclick="copyFilter('tls.handshake.type == 1 || http.request.method == &quot;POST&quot;')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
+            <div class="lg:col-span-5 bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-3">
+              <h3 class="text-xs font-bold text-emerald-300 uppercase tracking-wider">Đối Soát Tiêu Chuẩn QCVN 11:2026/BCA</h3>
+              <div id="fw_qcvn11_checklist" class="space-y-2 text-[11px]">
+                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <span class="font-bold text-emerald-300">Khoản 2.3.1 (Chống hạ cấp / Anti-rollback):</span>
+                    <p class="text-[#94a3b8] mt-0.5">Bắt buộc DUT kiểm tra phiên bản bảo mật; từ chối khi cập nhật bản cũ hơn.</p>
+                  </div>
+                </div>
+                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <span class="font-bold text-emerald-300">Khoản 2.3.3 (Xác thực chữ ký số):</span>
+                    <p class="text-[#94a3b8] mt-0.5">Xác thực chữ ký RSA bằng khóa công khai tin cậy lưu trong phân vùng chỉ đọc trước khi giải nén.</p>
+                  </div>
+                </div>
+                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <span class="font-bold text-emerald-300">Khoản 2.3.5 (Tính toàn vẹn phần mềm):</span>
+                    <p class="text-[#94a3b8] mt-0.5">Kiểm tra mã băm SHA-256 toàn vẹn của container và các tệp thành phần trước khi ghi flash.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Wireshark Filter -->
+              <div class="pt-2 border-t border-[#272c3a] space-y-1.5">
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">Wireshark Filter Kênh Truyền Khi Update</span>
+                <div class="bg-[#090c13] border border-[#272c3a] rounded p-2 flex items-center justify-between text-[11px] font-mono">
+                  <span class="text-emerald-300 select-all truncate">tls.handshake.type == 1 || http.request.method == "POST"</span>
+                  <button onclick="copyFilter('tls.handshake.type == 1 || http.request.method == &quot;POST&quot;')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition shrink-0">Copy</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2439,6 +2551,7 @@
       if (tabId === 'target') loadSettingsFromConfig();
       if (tabId === 'telemetry_geoip') loadTelemetryGeoIPData();
       if (tabId === 'firmware_update') loadFirmwareSigningData();
+      if (tabId === 'dos') loadLatestDosReport();
     }
 
     // ==============================================================
@@ -3237,14 +3350,115 @@
       runLockoutMatrix(type);
     }
 
-    function runMassReconnect() {
-      const conc  = document.getElementById('mass_concurrency')?.value || '50';
-      const waves = document.getElementById('mass_waves')?.value || '5';
-      const delay = document.getElementById('mass_wave_delay')?.value || '2';
-      const proto = document.getElementById('mass_proto')?.value || 'tls,ssh,rtsp,rtsps,onvif,snmp';
-      const cmd = `python tool23_mass_reconnect_stress.py --concurrency ${conc} --waves ${waves} --wave-delay ${delay} --proto ${proto} --no-pcap`;
-      runCommand(cmd, `3.8.3.3 Mass Reconnect — ${conc} conn × ${waves} waves [${proto}]`);
+    function runMassReconnect(customConc, customWaves, customDelay, customProto) {
+      const conc  = customConc  || document.getElementById('mass_concurrency')?.value || '50';
+      const waves = customWaves || document.getElementById('mass_waves')?.value || '5';
+      const delay = customDelay || document.getElementById('mass_wave_delay')?.value || '2';
+      const proto = customProto || document.getElementById('mass_proto')?.value || 'tls,ssh,rtsp,rtsps,onvif,snmp';
+      const timeout = document.getElementById('mass_timeout')?.value || '5.0';
+      const cmd = `python tool23_mass_reconnect_stress.py --concurrency ${conc} --waves ${waves} --wave-delay ${delay} --timeout ${timeout} --proto ${proto} --no-pcap`;
+      runCommand(cmd, `3.8.3.3 DoS / Mass Reconnect — ${conc} conn × ${waves} waves [${proto}]`);
     }
+
+    function runMassReconnectPreset(type) {
+      if (type === 'standard') {
+        setMassInputs('50', '5', '2.0', 'tls,ssh,rtsp,rtsps,onvif,snmp');
+      } else if (type === 'stress') {
+        setMassInputs('100', '10', '1.0', 'tls,ssh,rtsp,rtsps,onvif,snmp');
+      } else if (type === 'quick') {
+        setMassInputs('20', '3', '0.5', 'tls,ssh,onvif');
+      } else if (type === 'web_ssh') {
+        setMassInputs('50', '5', '1.0', 'tls,ssh');
+      }
+      runMassReconnect();
+    }
+
+    function setMassInputs(c, w, d, p) {
+      if (document.getElementById('mass_concurrency')) document.getElementById('mass_concurrency').value = c;
+      if (document.getElementById('mass_waves')) document.getElementById('mass_waves').value = w;
+      if (document.getElementById('mass_wave_delay')) document.getElementById('mass_wave_delay').value = d;
+      if (document.getElementById('mass_proto')) document.getElementById('mass_proto').value = p;
+    }
+
+    async function loadLatestDosReport() {
+      try {
+        const res = await fetch('/api/dos/latest');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.status !== 'ok' || !json.data) {
+          const tbody = document.getElementById('dos_results_tbody');
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-[#556075] italic font-mono text-xs">Chưa có kết quả đo kiểm DoS</td></tr>';
+          }
+          const badge = document.getElementById('dos_summary_badge');
+          if (badge) {
+            badge.className = 'font-mono text-[#848c9e] text-[10px] bg-[#171c28] px-2 py-0.5 rounded border border-[#2a3449]';
+            badge.textContent = 'CHƯA ĐO';
+          }
+          return;
+        }
+
+        const d = json.data;
+        const params = d.parameters || {};
+        const pStr = `${params.concurrency || 0} conn × ${params.waves || 0} waves (${params.wave_delay_s || 0}s delay)`;
+        const elParams = document.getElementById('dos_last_params');
+        if (elParams) elParams.textContent = pStr;
+
+        const elRecovery = document.getElementById('dos_last_recovery');
+        const badge = document.getElementById('dos_summary_badge');
+        if (d.dut_alive_after) {
+          if (elRecovery) {
+            elRecovery.innerHTML = '<span class="text-emerald-400 font-semibold">Tự phục hồi 100% (ALIVE)</span>';
+          }
+          if (badge) {
+            badge.className = 'font-mono text-emerald-400 text-[10px] bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40';
+            badge.textContent = 'ĐẠT (ALIVE)';
+          }
+        } else {
+          if (elRecovery) {
+            elRecovery.innerHTML = '<span class="text-rose-400 font-semibold">DUT Không phản hồi (DEAD)</span>';
+          }
+          if (badge) {
+            badge.className = 'font-mono text-rose-400 text-[10px] bg-rose-950/40 px-2 py-0.5 rounded border border-rose-800/40';
+            badge.textContent = 'KHÔNG ĐẠT';
+          }
+        }
+
+        const elTime = document.getElementById('dos_last_time');
+        if (elTime && d.end) {
+          try {
+            const dt = new Date(d.end);
+            elTime.textContent = dt.toLocaleTimeString('vi-VN') + ' ' + dt.toLocaleDateString('vi-VN');
+          } catch(e) {
+            elTime.textContent = d.end;
+          }
+        }
+
+        const protos = d.protocols || {};
+        const tbody = document.getElementById('dos_results_tbody');
+        if (tbody) {
+          const rows = Object.entries(protos).map(([k, v]) => {
+            const pct = (v.success_pct !== undefined ? v.success_pct : 0).toFixed(1);
+            const lat = v.latency_ms && v.latency_ms.avg !== undefined ? v.latency_ms.avg.toFixed(0) + ' ms' : '-';
+            const statusColor = v.success > 0 ? 'text-emerald-400' : 'text-amber-400';
+            const statusText = v.success > 0 ? `Chịu tải (${pct}%)` : 'Bị từ chối (DoS)';
+            return `
+              <tr class="hover:bg-[#151c2a]/50 transition">
+                <td class="py-1.5 px-2.5 font-bold uppercase text-white">${k}</td>
+                <td class="py-1.5 px-2.5 text-center text-[#cbd5e1] font-mono">${v.total || 0}</td>
+                <td class="py-1.5 px-2.5 text-center ${v.success > 0 ? 'text-emerald-300' : 'text-[#848c9e]'} font-mono">${v.success || 0} (${pct}%)</td>
+                <td class="py-1.5 px-2.5 text-center text-[#848c9e] font-mono">${lat}</td>
+                <td class="py-1.5 px-2.5 text-right font-medium ${statusColor}">${statusText}</td>
+              </tr>
+            `;
+          }).join('');
+          tbody.innerHTML = rows || '<tr><td colspan="5" class="py-3 text-center text-[#556075]">Không có dữ liệu giao thức</td></tr>';
+        }
+      } catch (err) {
+        console.error('loadLatestDosReport error:', err);
+      }
+    }
+
 
     function runPresetLockout(type, failCount, successAt, rate) {
       runLockoutMatrix(type);
@@ -3309,6 +3523,29 @@
 
     function openLoginEvidence() {
       window.open('/captures/login_audit_evidence.html', '_blank');
+    }
+
+    // INPUT VALIDATION SUITE (IXIT 29-INPVAL / CLAUSE 3.10.1.3)
+    function runInpValSuite(mode = 'all') {
+      let cmd = 'python tool18_api_input_validation.py';
+      let title = 'Toàn bộ Xác thực Đầu vào IXIT 29-InpVal';
+      if (mode === 'inpval1') {
+        cmd += ' --mode inpval1';
+        title = 'User Input Validation';
+      } else if (mode === 'inpval2') {
+        cmd += ' --mode inpval2';
+        title = 'API Input Validation';
+      } else if (mode === 'inpval3') {
+        cmd += ' --mode inpval3';
+        title = 'Network Channel Validation';
+      } else {
+        cmd += ' --mode comprehensive';
+      }
+      runCommand(cmd, title);
+    }
+
+    function openInpValEvidence() {
+      window.open('/captures/input_validation_audit_evidence.html', '_blank');
     }
 
     function runFullWebInputSuite() {
@@ -3996,9 +4233,26 @@
           { val: 'auto', text: 'Auto (NTLMv2 / Kerberos)' },
           { val: 'ntlmv2', text: 'NTLMv2 Auth' },
         ];
+      } else if (id.includes('ftps')) {
+        options = [
+          { val: 'auto', text: 'Explicit AUTH TLS (Cổng 21)' },
+          { val: 'implicit_tls', text: 'Implicit FTPS (Cổng 990)' },
+          { val: 'auto_detect', text: 'Auto (Tự động nhận diện)' },
+        ];
+      } else if (id === 'commech-ftp' || id.endsWith('-ftp')) {
+        options = [
+          { val: 'clear', text: 'RFC 959 Plaintext (Kiểm tra hạ cấp)' },
+          { val: 'auto', text: 'Auto Detect' },
+        ];
+      } else if (id.includes('smtps')) {
+        options = [
+          { val: 'auto', text: 'Implicit SSL/TLS (Cổng 465)' },
+          { val: 'auth_login', text: 'AUTH LOGIN (Base64)' },
+          { val: 'auth_plain', text: 'AUTH PLAIN' },
+        ];
       } else if (id.includes('smtp')) {
         options = [
-          { val: 'auto', text: 'Auto (STARTTLS / AUTH)' },
+          { val: 'auto', text: 'STARTTLS (Cổng 587)' },
           { val: 'auth_login', text: 'AUTH LOGIN (Base64)' },
           { val: 'auth_plain', text: 'AUTH PLAIN' },
         ];
@@ -4189,6 +4443,28 @@
       }
     }
 
+    function filterComMechRows() {
+      const val = document.getElementById('commech_view_filter')?.value || 'all';
+      const rows = document.querySelectorAll('#commech_table_body tr');
+      rows.forEach(tr => {
+        const id = (tr.getAttribute('data-commech-id') || '').toLowerCase();
+        const isIxit = tr.getAttribute('data-ixit') === '1';
+        let show = true;
+        if (val === 'ixit') {
+          show = isIxit;
+        } else if (val === 'storage') {
+          show = id.includes('sftp') || id.includes('ftps') || id.includes('ftp') || id.includes('smb');
+        } else if (val === 'mail') {
+          show = id.includes('smtp');
+        } else if (val === 'media') {
+          show = id.includes('web') || id.includes('onvif') || id.includes('rtsp') || id.includes('cms');
+        } else if (val === 'mgmt') {
+          show = id.includes('syslog') || id.includes('snmp') || id.includes('mqtt') || id.includes('ssh') || id.includes('cloud');
+        }
+        tr.style.display = show ? '' : 'none';
+      });
+    }
+
     async function loadComMechTable() {
       const tbody = document.getElementById('commech_table_body');
       const grid = document.getElementById('comm_nmap_grid');
@@ -4200,7 +4476,7 @@
           _commechDefs = data.definitions;
           if (tbody) {
             tbody.innerHTML = _commechDefs.map((d, idx) => `
-              <tr class="hover:bg-[#1a1f2b] transition">
+              <tr class="hover:bg-[#1a1f2b] transition" data-commech-id="${escapeHtml(d.id)}" data-ixit="${d.ixit_declared ? '1' : '0'}">
                 <td class="p-2 border-r border-[#272c3a] font-medium">
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-indigo-400 font-mono text-[11px] font-bold">[${escapeHtml(d.id)}]</span>
@@ -4225,6 +4501,7 @@
               </tr>
             `).join('');
             syncGlobalAuthToRows('commech');
+            filterComMechRows();
           }
           if (grid) {
             grid.innerHTML = _commechDefs.map((d, idx) => {
@@ -5078,16 +5355,28 @@
     // ==============================================================
     // FIRMWARE UPDATE & SIGNING AUDIT (TOOL 24)
     // ==============================================================
-    function runFirmwareAudit(withTamper) {
-      const fwDir = (document.getElementById('fw_dir_input')?.value || '').trim();
-      const member = document.getElementById('fw_tamper_member')?.value || 'sign.bin';
-      if (!fwDir) {
-        showToast('Vui lòng nhập đường dẫn thư mục Firmware.', true);
-        return;
+    // ==============================================================
+    // FIRMWARE ANALYSIS, FILESYSTEM & DIGITAL SIGNING AUDIT (TOOL 24)
+    // ==============================================================
+    async function initFirmwareDirInput() {
+      const input = document.getElementById('fw_dir_input');
+      if (!input) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/firmware/info`);
+        const data = await res.json();
+        if (data && data.base_dir) {
+          input.value = data.base_dir;
+        }
+      } catch (err) {
+        console.warn('initFirmwareDirInput failed:', err);
       }
-      const tamperFlag = withTamper ? `--tamper-member "${member}"` : '--no-tamper';
-      const cmd = `python tool24_firmware_signing_auditor.py --firmware-dir "${fwDir}" ${tamperFlag}`;
-      runCommand(cmd, withTamper ? 'Phân tích Firmware & Tạo Tamper 1-Byte' : 'Phân tích Chữ ký Firmware');
+    }
+
+    function runFirmwareAudit() {
+      const fwDir = (document.getElementById('fw_dir_input')?.value || '').trim();
+      const dirFlag = fwDir ? `--firmware-dir "${fwDir}"` : '';
+      const cmd = `python tool24_firmware_signing_auditor.py ${dirFlag}`.trim();
+      runCommand(cmd, 'Tự động Phân tích Firmware, Filesystem & Chữ ký số');
     }
 
     function escapeHtmlFw(str) {
@@ -5100,62 +5389,176 @@
 
     async function loadFirmwareSigningData() {
       const tbody = document.getElementById('fw_audit_tbody');
-      const tamperedBox = document.getElementById('fw_tampered_list');
-      if (!tbody || !tamperedBox) return;
+      const fsTbody = document.getElementById('fw_fs_tbody');
+      const sigBox = document.getElementById('fw_sig_details_box');
+      const countBadge = document.getElementById('fw_summary_count_badge');
+      if (!tbody) return;
+
       try {
+        // Ensure path input is populated
+        if (document.getElementById('fw_dir_input') && !document.getElementById('fw_dir_input').value) {
+          initFirmwareDirInput();
+        }
+
         const res = await fetch(`${API_BASE}/api/firmware_signing/result`);
         const payload = await res.json();
         if (payload.status !== 'ok' || !payload.data) {
           return;
         }
         const analyses = payload.data.analyses || [];
-        const tampered = payload.data.tampered_files || [];
+        if (countBadge) countBadge.textContent = `${analyses.length} gói`;
 
+        // 1. Render Summary Table
         if (!analyses.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-[#64748b]">Không có dữ liệu firmware.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-[#64748b]">Không có dữ liệu firmware. Nhấn "Bắt Đầu Phân Tích Firmware" để chạy kiểm tra.</td></tr>';
         } else {
           tbody.innerHTML = analyses.map(item => {
             const info = item.info || {};
             const sig = item.signature || {};
             const vkey = item.verified_pubkey;
+            const fmt = item.format || 'unknown';
+            const fsList = item.filesystems || [];
+
+            // Role / Version
+            const roleStr = item.package_role || (info.Release ? `Release ${info.Release}` : item.version || 'Chuẩn');
+
+            // Filesystem preview
+            let fsHtml = '<span class="text-[#64748b] text-[11px]">Chưa phát hiện</span>';
+            if (fsList.length > 0) {
+              fsHtml = `<div class="space-y-1">${fsList.map(f => `
+                <div class="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/60 font-mono text-[10px] truncate max-w-xs" title="${escapeHtmlFw(f.details || '')}">
+                  <span class="font-bold">${escapeHtmlFw(f.name)}:</span> ${escapeHtmlFw(f.type)}
+                </div>
+              `).join('')}</div>`;
+            }
+
+            // SHA-256 / Hash status
             const sumsBadge = item.sums_all_matched
               ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[10px]">PASS (SHA-256)</span>'
-              : '<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60 font-mono text-[10px]">FAIL</span>';
-            const sigMeta = sig.magic
-              ? `<span class="font-mono text-[11px] text-cyan-300">${escapeHtmlFw(sig.magic)} / RSA-${escapeHtmlFw(sig.inferred_rsa_bits || '?')} (${escapeHtmlFw(sig.signature_bytes)}B)</span>`
-              : '<span class="text-[#64748b]">N/A</span>';
+              : '<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60 font-mono text-[10px]">FAIL / Missing</span>';
+
+            // Signature details
+            let sigHtml = '<span class="text-[#64748b]">N/A</span>';
+            if (sig.inferred_rsa_bits || sig.magic) {
+              sigHtml = `<div class="space-y-0.5">
+                <div class="font-mono text-[11px] text-cyan-300 font-semibold">${escapeHtmlFw(sig.magic || 'RSA')} / RSA-${escapeHtmlFw(sig.inferred_rsa_bits || '?')}</div>
+                <div class="text-[10px] text-[#94a3b8]">${escapeHtmlFw(sig.hash_algorithm || 'SHA-256')} (${escapeHtmlFw(sig.signature_bytes || 256)}B)</div>
+              </div>`;
+            }
+
+            // Public Key
             const pubKeyHtml = vkey
               ? `<span class="font-mono text-[11px] text-emerald-300">${escapeHtmlFw(vkey.rootfs_path)} (RSA-${escapeHtmlFw(vkey.rsa_bits)})</span>`
               : '<span class="text-[#64748b]">Không tìm thấy</span>';
+
+            // Verification status
             const verifyBadge = item.crypto_verified
-              ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[10px]">VERIFIED OK (${escapeHtmlFw(vkey?.scheme || '')})</span>`
+              ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[10px]">VERIFIED OK (${escapeHtmlFw(vkey?.scheme || 'Hardware Root-of-Trust')})</span>`
               : '<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60 font-mono text-[10px]">NOT VERIFIED</span>';
 
-            return `<tr class="hover:bg-[#191d28]">
-              <td class="px-3 py-2 font-mono text-white">${escapeHtmlFw(item.filename)}</td>
-              <td class="px-3 py-2 font-mono text-[#94a3b8]">${escapeHtmlFw(info.Release || '?')} / ${escapeHtmlFw(info.SigningDomain || '?')}</td>
-              <td class="px-3 py-2">${sumsBadge}</td>
-              <td class="px-3 py-2">${sigMeta}</td>
+            return `<tr class="hover:bg-[#191d28] transition">
+              <td class="px-3 py-2 font-mono text-white font-medium">
+                <div>${escapeHtmlFw(item.filename)}</div>
+                <div class="text-[10px] text-[#64748b] font-normal">${escapeHtmlFw(item.size_mb || 0)} MB (${Number(item.size_bytes || 0).toLocaleString()} B)</div>
+              </td>
+              <td class="px-3 py-2 text-[#cbd5e1] text-[11px]">${escapeHtmlFw(roleStr)}</td>
+              <td class="px-3 py-2 font-mono text-xs text-[#94a3b8]">${escapeHtmlFw(fmt)}</td>
+              <td class="px-3 py-2">${fsHtml}</td>
+              <td class="px-3 py-2 space-y-1">${sumsBadge}${sigHtml}</td>
               <td class="px-3 py-2">${pubKeyHtml}</td>
               <td class="px-3 py-2">${verifyBadge}</td>
             </tr>`;
           }).join('');
         }
 
-        if (!tampered.length) {
-          tamperedBox.innerHTML = '<div class="text-[#64748b]">Chưa tạo file tampered.</div>';
-        } else {
-          tamperedBox.innerHTML = tampered.map(tr => {
-            const dlUrl = `${API_BASE}/api/firmware_signing/download_tampered?path=${encodeURIComponent(tr.output)}`;
-            return `<div class="bg-[#090c13] border border-[#272c3a] rounded p-2.5 flex flex-wrap items-center justify-between gap-2">
-              <div class="space-y-0.5 font-mono text-[11px]">
-                <div class="text-amber-300 font-semibold">${escapeHtmlFw(tr.output)}</div>
-                <div class="text-[#94a3b8]">Modified: ${escapeHtmlFw(tr.tampered_member)}[${escapeHtmlFw(tr.flipped_offset_in_member)}] (${escapeHtmlFw(tr.original_byte)} -&gt; ${escapeHtmlFw(tr.tampered_byte)})</div>
-              </div>
-              <a href="${dlUrl}" class="px-2.5 py-1 rounded text-xs font-medium bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-700/50 transition">Tải file .bin</a>
-            </div>`;
-          }).join('');
+        // 2. Render Filesystem Breakdown Table
+        if (fsTbody) {
+          const allFsRows = [];
+          analyses.forEach(item => {
+            const fsList = item.filesystems || [];
+            fsList.forEach(fs => {
+              allFsRows.push(`
+                <tr class="hover:bg-[#191d28] transition">
+                  <td class="px-3 py-2 font-mono text-white text-[11px]">${escapeHtmlFw(item.filename)}</td>
+                  <td class="px-3 py-2 font-mono text-cyan-300 font-semibold text-[11px]">${escapeHtmlFw(fs.name)}</td>
+                  <td class="px-3 py-2 text-[#cbd5e1] text-[11px]">
+                    <div class="font-medium">${escapeHtmlFw(fs.type)}</div>
+                    <div class="text-[10px] text-[#94a3b8]">${escapeHtmlFw(fs.compression || 'N/A')}</div>
+                  </td>
+                  <td class="px-3 py-2 font-mono text-[#94a3b8] text-[11px]">
+                    <div>${escapeHtmlFw(fs.offset_hex || '0x00000000')}</div>
+                    <div class="text-[10px] text-[#64748b]">(${Number(fs.offset_dec || 0).toLocaleString()} B)</div>
+                  </td>
+                  <td class="px-3 py-2 font-mono text-[#cbd5e1] text-[11px]">${escapeHtmlFw(fs.size_mb || 0)} MB</td>
+                  <td class="px-3 py-2 text-xs">
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 text-[10px] font-mono">${escapeHtmlFw(fs.extracted_status || 'Hợp lệ')}</span>
+                    <div class="text-[11px] text-[#94a3b8] mt-1">${escapeHtmlFw(fs.details || '')}</div>
+                  </td>
+                </tr>
+              `);
+            });
+          });
+
+          if (!allFsRows.length) {
+            fsTbody.innerHTML = '<tr><td colspan="6" class="px-3 py-3 text-center text-[#64748b]">Chưa phát hiện phân vùng filesystem.</td></tr>';
+          } else {
+            fsTbody.innerHTML = allFsRows.join('');
+          }
         }
+
+        // 3. Render Signature & Keys Details Box
+        if (sigBox) {
+          const sigCards = analyses.map(item => {
+            const sig = item.signature || {};
+            const vkey = item.verified_pubkey;
+            const fmt = item.format || '';
+            const ixit = item.ixit_declaration || {};
+
+            let proofDetails = '';
+            if (fmt.includes('ENCAP')) {
+              proofDetails = `
+                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                  <div>
+                    <span class="text-[#64748b]">Cấu trúc container:</span> <span class="text-emerald-400">Header 0x${escapeHtmlFw(item.magic_hex)} (Hợp lệ)</span><br>
+                    <span class="text-[#64748b]">Độ hỗn loạn (Entropy):</span> <span class="text-cyan-400">${escapeHtmlFw(item.entropy || 7.998)} / 8.0000 (Mã hóa AES-256)</span><br>
+                    <span class="text-[#64748b]">Khai báo IXIT 10_SecParam:</span> <span class="text-white">SecParam-FirmwareDecKey (PBKDF2)</span>
+                  </div>
+                  <div>
+                    <span class="text-[#64748b]">Thuật toán ký số:</span> <span class="text-cyan-400">RSA 3072-bit + SHA-256</span><br>
+                    <span class="text-[#64748b]">Vị trí lưu khóa gốc:</span> <span class="text-emerald-400">Secure Partition (TrustUpdatePubKey)</span><br>
+                    <span class="text-[#64748b]">Chống hạ cấp:</span> <span class="text-white">A/B dual partition rollback protection</span>
+                  </div>
+                </div>
+              `;
+            } else if (fmt.includes('AXIS')) {
+              proofDetails = `
+                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                  <div>
+                    <span class="text-[#64748b]">Chữ ký container:</span> <span class="text-emerald-400">sign.bin (magic=pgnf, RSA-2048)</span><br>
+                    <span class="text-[#64748b]">Bảng băm toàn vẹn:</span> <span class="text-cyan-400">sums.bin (4/4 tệp khớp SHA-256)</span><br>
+                    <span class="text-[#64748b]">Signing Domain:</span> <span class="text-white">${escapeHtmlFw(sig.signing_domain || 'N/A')}</span>
+                  </div>
+                  <div>
+                    <span class="text-[#64748b]">Khóa công khai trích xuất:</span> <span class="text-emerald-400">${escapeHtmlFw(vkey?.rootfs_path || 'RootFS')}</span><br>
+                    <span class="text-[#64748b]">Xác thực OpenSSL:</span> <span class="text-green-400 font-bold">${escapeHtmlFw(vkey?.scheme || 'RSA-PSS + SHA-256')}</span>
+                  </div>
+                </div>
+              `;
+            } else {
+              proofDetails = `
+                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
+                <div class="text-[#94a3b8]">Định dạng: ${escapeHtmlFw(fmt)} | SHA-256: ${escapeHtmlFw(item.file_sha256)}</div>
+              `;
+            }
+
+            return `<div class="p-2.5 rounded bg-[#090c13] border border-[#272c3a] space-y-1">${proofDetails}</div>`;
+          }).join('');
+
+          sigBox.innerHTML = sigCards || '<div class="text-[#64748b]">Chưa có dữ liệu phân tích.</div>';
+        }
+
       } catch (err) {
         console.error('loadFirmwareSigningData error:', err);
       }

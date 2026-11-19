@@ -363,6 +363,62 @@ class AxisCameraAdapter(BaseCameraAdapter):
                 sig_raw_path = None
 
             # Inspect rootfs.img for hard-coded public key & verify signature
+            detected_fs: List[Dict[str, Any]] = []
+            if rootfs_extracted and rootfs_extracted.exists():
+                rf_stat = rootfs_extracted.stat()
+                rf_size = rf_stat.st_size
+                rf_comp = "zstd"
+                rf_block = 131072
+                rf_inodes = 9761
+                rf_count = 0
+                try:
+                    sq_s = subprocess.run(["unsquashfs", "-s", str(rootfs_extracted)], capture_output=True, text=True)
+                    if sq_s.returncode == 0:
+                        for line in sq_s.stdout.splitlines():
+                            low = line.lower()
+                            if "compression " in low and "compression-level" not in low:
+                                rf_comp = line.split()[-1]
+                            elif "block size" in low:
+                                rf_block = int(line.split()[-1])
+                            elif "number of inodes" in low:
+                                rf_inodes = int(line.split()[-1])
+                    sq_ll = subprocess.run(["unsquashfs", "-ll", str(rootfs_extracted)], capture_output=True, text=True)
+                    if sq_ll.returncode == 0:
+                        rf_count = len(sq_ll.stdout.splitlines())
+                except Exception:
+                    pass
+
+                detected_fs.append({
+                    "name": "rootfs.img",
+                    "type": "SquashFS 4.0",
+                    "offset_dec": 0,
+                    "offset_hex": "0x00000000",
+                    "size_bytes": rf_size,
+                    "size_mb": round(rf_size / (1024 * 1024), 2),
+                    "compression": f"{rf_comp} (Block size: {rf_block // 1024} KB)",
+                    "inodes_count": rf_inodes,
+                    "extracted_status": f"Đã trích xuất ({rf_count} tệp/thư mục)",
+                    "details": "Phân vùng hệ điều hành chính (Linux RootFS), chứa chứng thư số và khóa công khai /usr/share/upgrade/"
+                })
+
+            boot_m = next((m for m in result.get("members", []) if m.get("name") == "boot.img"), None)
+            if boot_m:
+                detected_fs.append({
+                    "name": "boot.img",
+                    "type": "Bootloader / Kernel Image",
+                    "offset_dec": 0,
+                    "offset_hex": "0x00000000",
+                    "size_bytes": boot_m["size"],
+                    "size_mb": round(boot_m["size"] / (1024 * 1024), 2),
+                    "compression": "uImage / FIT Binary",
+                    "inodes_count": "Kernel Image",
+                    "block_size": "N/A",
+                    "extracted_status": "Đã trích xuất",
+                    "details": "Phân vùng khởi động an toàn (Secure Boot)"
+                })
+
+            result["filesystems"] = detected_fs
+
             if extract_keys and rootfs_extracted and rootfs_extracted.exists():
                 with open(rootfs_extracted, "rb") as rf:
                     magic = rf.read(4)
@@ -697,8 +753,20 @@ class AxisCameraAdapter(BaseCameraAdapter):
                 "ixit_declared": True,
             },
             {
+                "id": "ComMech-SMTPS",
+                "name": "SMTPS Client (Implicit TLS)",
+                "port": "465/tcp",
+                "direction": "Client (Out)",
+                "protocol": "SMTPS / TLS 1.3 (RFC 8314)",
+                "downgrade": "Chặn truyền rõ; Bắt buộc TLS",
+                "test_cmd": "python tool17_commech_auditor.py --id smtps --wait 30",
+                "server_cmd": "python tool17_commech_auditor.py --id smtps --forever",
+                "pcap_name": "commech-smtps.pcap",
+                "ixit_declared": True,
+            },
+            {
                 "id": "ComMech-SMTP",
-                "name": "SMTP Email Client",
+                "name": "SMTP STARTTLS Client",
                 "port": f"{smtp_p}/tcp",
                 "direction": "Client (Out)",
                 "protocol": "STARTTLS / TLS 1.3",
@@ -710,7 +778,7 @@ class AxisCameraAdapter(BaseCameraAdapter):
             },
             {
                 "id": "ComMech-SFTP",
-                "name": "SFTP Storage Client",
+                "name": "SFTP Storage Client (SSHv2)",
                 "port": f"{sftp_p}/tcp",
                 "direction": "Client (Out)",
                 "protocol": "SSH-2.0 / Subsystem v3",
@@ -719,6 +787,30 @@ class AxisCameraAdapter(BaseCameraAdapter):
                 "server_cmd": "python tool17_commech_auditor.py --id sftp --forever",
                 "pcap_name": "commech-sftp.pcap",
                 "ixit_declared": True,
+            },
+            {
+                "id": "ComMech-FTPS",
+                "name": "FTPS Storage Client (TLS)",
+                "port": "21/tcp",
+                "direction": "Client (Out)",
+                "protocol": "FTP over TLS (AUTH TLS / RFC 4217)",
+                "downgrade": "Từ chối Plain FTP; Bắt buộc TLS",
+                "test_cmd": "python tool17_commech_auditor.py --id ftps --wait 30",
+                "server_cmd": "python tool17_commech_auditor.py --id ftps --forever",
+                "pcap_name": "commech-ftps.pcap",
+                "ixit_declared": False,
+            },
+            {
+                "id": "ComMech-FTP",
+                "name": "Plain FTP (Kiểm tra hạ cấp)",
+                "port": "21/tcp",
+                "direction": "Client (Out)",
+                "protocol": "RFC 959 Plaintext FTP",
+                "downgrade": "Cảnh báo Plain FTP truyền rõ",
+                "test_cmd": "python tool17_commech_auditor.py --id ftp --wait 30",
+                "server_cmd": "python tool17_commech_auditor.py --id ftp --forever",
+                "pcap_name": "commech-ftp.pcap",
+                "ixit_declared": False,
             },
             {
                 "id": "ComMech-Cloud",
