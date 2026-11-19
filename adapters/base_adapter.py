@@ -130,27 +130,46 @@ class BaseCameraAdapter(ABC):
         ]
 
     def get_authmech_definitions(self) -> List[Dict[str, Any]]:
-        """Return unified list of 5 AuthMech test definitions (Web, SSH, RTSP, ONVIF, CMS)."""
+        """Return unified list of AuthMech test definitions (Web, Web-HTTP, SSH, RTSP, RTSPS, ONVIF-HTTPS, ONVIF-HTTP, CMS)."""
+        http_p = int(self.service_ports.get("http") or self.http_port or 80)
+        https_p = int(self.service_ports.get("https") or self.https_port or 443)
         ssh_p = int(self.service_ports.get("ssh") or 22)
-        onvif_p = int(self.service_ports.get("onvif_https") or self.https_port or 443)
-        rtsp_p = int(self.service_ports.get("rtsps") or self.service_ports.get("rtsp") or 554)
+        onvif_https_p = int(self.service_ports.get("onvif_https") or self.https_port or 443)
+        onvif_http_p = int(self.service_ports.get("onvif_http") or self.http_port or 80)
+        rtsp_p = int(self.service_ports.get("rtsp") or 554)
+        rtsps_p = int(self.service_ports.get("rtsps") or self.rtsps_port or 443)
         cms_p = int(self.service_ports.get("proprietary_tcp") or 20001)
 
         return [
             {
                 "id": "AuthMech-Web",
                 "ixit_id": "Web-Authmech",
-                "name": "Web Admin Interface",
-                "port": self.https_port,
+                "name": "Web Admin Interface (HTTPS)",
+                "port": https_p,
                 "protocol": "HTTPS / TLS 1.2/1.3",
                 "auth_factor": "Username and password",
-                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {self.https_port}",
+                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {https_p}",
                 "filter_auth": "http.response.code == 401 or http.authorization",
                 "sort_hint": "No.: Server Hello → 401 → Auth → 200",
                 "test_cmd": "python tool21_authmech_auditor.py --id web",
-                "enum_cmd": f"nmap -Pn -p {self.https_port} --script ssl-enum-ciphers {self.ip}",
+                "enum_cmd": f"nmap -Pn -p {https_p} --script ssl-enum-ciphers {self.ip}",
                 "pcap_name": "authmech-web.pcap",
                 "ixit_declared": True,
+            },
+            {
+                "id": "AuthMech-Web-HTTP",
+                "ixit_id": "Web-HTTP-Authmech",
+                "name": "Web Admin Interface (HTTP)",
+                "port": http_p,
+                "protocol": "HTTP Cleartext (RFC 7235)",
+                "auth_factor": "Username and password",
+                "filter_cipher": f"tcp.port == {http_p}",
+                "filter_auth": "http.response.code == 401 or http.authorization",
+                "sort_hint": "No.: GET / → 401 Unauthorized → Auth → 200",
+                "test_cmd": "python tool21_authmech_auditor.py --id web_http",
+                "enum_cmd": f"nmap -Pn -p {http_p} --script http-auth {self.ip}",
+                "pcap_name": "authmech-web_http.pcap",
+                "ixit_declared": False,
             },
             {
                 "id": "AuthMech-SSH",
@@ -170,32 +189,62 @@ class BaseCameraAdapter(ABC):
             {
                 "id": "AuthMech-RTSP",
                 "ixit_id": "RTSP-Authmech",
-                "name": "RTSP/RTSPS Media Stream",
+                "name": "RTSP Streaming (RFC 2326)",
                 "port": rtsp_p,
-                "protocol": "RTSPS / RTSP over TLS",
+                "protocol": "RTSP Cleartext / Digest Auth",
                 "auth_factor": "Username and password (Digest)",
-                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {rtsp_p}",
+                "filter_cipher": f"tcp.port == {rtsp_p}",
                 "filter_auth": "rtsp.authchallenge or rtsp.status == 401 or rtsp.authorization",
                 "sort_hint": "No.: DESCRIBE → 401 Challenge → Auth → 200 OK",
                 "test_cmd": "python tool21_authmech_auditor.py --id rtsp",
-                "enum_cmd": f"nmap -Pn -p {rtsp_p} --script ssl-enum-ciphers {self.ip}",
+                "enum_cmd": f"nmap -Pn -p {rtsp_p} --script rtsp-methods {self.ip}",
+                "pcap_name": "authmech-rtsp 554.pcap",
+                "ixit_declared": True,
+            },
+            {
+                "id": "AuthMech-RTSPS",
+                "ixit_id": "RTSPS-Authmech",
+                "name": "RTSPS Media Stream",
+                "port": rtsps_p,
+                "protocol": "RTSPS / RTSP over TLS",
+                "auth_factor": "Username and password (Digest)",
+                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {rtsps_p}",
+                "filter_auth": "rtsp.authchallenge or rtsp.status == 401 or rtsp.authorization",
+                "sort_hint": "No.: Server Hello → DESCRIBE → 401 Challenge → 200 OK",
+                "test_cmd": "python tool21_authmech_auditor.py --id rtsps",
+                "enum_cmd": f"nmap -Pn -p {rtsps_p} --script ssl-enum-ciphers {self.ip}",
                 "pcap_name": "authmech-rtsp.pcap",
                 "ixit_declared": True,
             },
             {
-                "id": "AuthMech-ONVIF",
-                "ixit_id": "AuthMech-Onvif",
-                "name": "ONVIF Device Service",
-                "port": onvif_p,
-                "protocol": "HTTPS SOAP (WS-Security)",
+                "id": "AuthMech-ONVIF-HTTPS",
+                "ixit_id": "AuthMech-Onvif-HTTPS",
+                "name": "ONVIF Device Service (HTTPS)",
+                "port": onvif_https_p,
+                "protocol": "HTTPS SOAP (WS-Security over TLS)",
                 "auth_factor": "UsernameToken (PasswordDigest/Text)",
-                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {onvif_p}",
+                "filter_cipher": f"tls.handshake.type == 2 and tcp.port == {onvif_https_p}",
                 "filter_auth": 'http contains "UsernameToken" or http contains "PasswordDigest"',
                 "sort_hint": "No.: Server Hello → SOAP POST → 200 OK",
-                "test_cmd": "python tool21_authmech_auditor.py --id onvif",
-                "enum_cmd": f"nmap -Pn -p {onvif_p} --script ssl-enum-ciphers {self.ip}",
+                "test_cmd": "python tool21_authmech_auditor.py --id onvif_https",
+                "enum_cmd": f"nmap -Pn -p {onvif_https_p} --script ssl-enum-ciphers {self.ip}",
                 "pcap_name": "authmech-onvif.pcap",
                 "ixit_declared": True,
+            },
+            {
+                "id": "AuthMech-ONVIF-HTTP",
+                "ixit_id": "AuthMech-Onvif-HTTP",
+                "name": "ONVIF Device Service (HTTP)",
+                "port": onvif_http_p,
+                "protocol": "HTTP SOAP (WS-Security)",
+                "auth_factor": "UsernameToken (PasswordDigest/Text)",
+                "filter_cipher": f"tcp.port == {onvif_http_p}",
+                "filter_auth": 'http contains "UsernameToken" or http contains "PasswordDigest"',
+                "sort_hint": "No.: SOAP POST GetSystemDateAndTime → SOAP POST UsernameToken → 200 OK",
+                "test_cmd": "python tool21_authmech_auditor.py --id onvif_http",
+                "enum_cmd": f"nmap -Pn -p {onvif_http_p} --script http-auth {self.ip}",
+                "pcap_name": "authmech-onvif_http.pcap",
+                "ixit_declared": False,
             },
             {
                 "id": "AuthMech-CMS",

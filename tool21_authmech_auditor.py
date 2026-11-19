@@ -177,30 +177,49 @@ def copy_and_alias_pcap(src_pcap: str, base_name: str, aliases: Optional[List[st
 # 1. AUTHMECH-1: GIAO DIỆN WEB QUẢN TRỊ (HTTPS/443)
 # ==============================================================================
 
-def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True, auth_type: str = "auto") -> Dict[str, Any]:
+def audit_authmech_1_web(
+    wait_sec: float = 3.0,
+    record_pcap: bool = True,
+    auth_type: str = "auto",
+    port_override: Optional[int] = None,
+    scheme_override: Optional[str] = None,
+    id_override: Optional[str] = None,
+    ixit_id_override: Optional[str] = None,
+    name_override: Optional[str] = None,
+    pcap_override: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Đo kiểm AuthMech-1: Web Interface Authentication (Web-Authmech).
-    - Hỗ trợ HTTPS hoặc fallback HTTP nếu camera chỉ mở HTTP
+    - Hỗ trợ HTTPS hoặc HTTP theo cấu hình/chỉ định
     - Đa nền tảng camera (Axis, Hikvision, Dahua, Uniview, VIGI, Generic)
     - Tùy chọn cơ chế xác thực ép buộc hoặc auto: auto, basic, digest, digest-md5, digest-sha256, adapter
     """
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]AuthMech-Web: Web-Authmech (HTTPS/{DUT_IP}:{HTTPS_PORT}) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    target_port = port_override or (HTTP_PORT if scheme_override == "http" else HTTPS_PORT)
+    web_scheme = scheme_override or ("http" if target_port == HTTP_PORT else "https")
+    web_port = target_port
+
+    aid = id_override or ("AuthMech-Web-HTTP" if web_scheme == "http" else "AuthMech-Web")
+    ixit_id = ixit_id_override or ("Web-HTTP-Authmech" if web_scheme == "http" else "Web-Authmech")
+    disp_name = name_override or ("Web Admin Interface (HTTP)" if web_scheme == "http" else "Web Admin Interface (HTTPS)")
+    pcap_file = pcap_override or ("authmech-web_http.pcap" if web_scheme == "http" else "authmech-web.pcap")
+
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} ({web_scheme.upper()}/{DUT_IP}:{web_port}) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
-        "id": "AuthMech-Web",
-        "ixit_id": "Web-Authmech",
-        "name": "Web Admin Interface",
-        "port": HTTPS_PORT,
-        "proto": "HTTPS / TLS",
+        "id": aid,
+        "ixit_id": ixit_id,
+        "name": disp_name,
+        "port": web_port,
+        "proto": f"{web_scheme.upper()} / TLS" if web_scheme == "https" else "HTTP Cleartext (RFC 7235)",
         "auth_factor": "Username and password",
         "auth_mode_selected": auth_type,
-        "pcap": "authmech-web.pcap",
-        "aliases": ["authmech-1_web.pcap", "Web-Authmech.pcap", "AuthMech-Web.pcap"]
+        "pcap": pcap_file,
+        "aliases": ["authmech-1_web.pcap", "Web-Authmech.pcap", "AuthMech-Web.pcap", f"{aid}.pcap"]
     }
 
     if record_pcap:
         pcap_proc, pcap_path = start_pcap_capture(
             DUT_IP,
-            f"ip host {DUT_IP} and (tcp port {HTTPS_PORT} or tcp port {HTTP_PORT})",
+            f"ip host {DUT_IP} and tcp port {web_port}",
             prefix="authmech1_web"
         )
     else:
@@ -212,26 +231,29 @@ def audit_authmech_1_web(wait_sec: float = 3.0, record_pcap: bool = True, auth_t
     digest_algorithm = "N/A"
     auth_success = False
     auth_wrong_rejected = False
-    web_scheme = "https"
-    web_port = HTTPS_PORT
 
     try:
-        # Bước 1: Bắt tay TLS trên HTTPS_PORT (fallback sang HTTP_PORT nếu HTTPS đóng)
-        try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            ctx.keylog_filename = SSLKEYLOG_PATH
+        # Bước 1: Bắt tay TLS nếu là HTTPS (hoặc bỏ qua nếu là HTTP)
+        if web_scheme == "https":
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                ctx.keylog_filename = SSLKEYLOG_PATH
 
-            with socket.create_connection((DUT_IP, HTTPS_PORT), timeout=3.0) as sock:
-                with ctx.wrap_socket(sock, server_hostname=DUT_IP) as ssock:
-                    active_cipher = ssock.cipher()[0]
-                    tls_ver = ssock.version()
-        except Exception:
-            web_scheme = "http"
-            web_port = HTTP_PORT
-            res["port"] = HTTP_PORT
-            res["proto"] = "HTTP (Cleartext)"
+                with socket.create_connection((DUT_IP, web_port), timeout=3.0) as sock:
+                    with ctx.wrap_socket(sock, server_hostname=DUT_IP) as ssock:
+                        active_cipher = ssock.cipher()[0]
+                        tls_ver = ssock.version()
+            except Exception:
+                if not scheme_override:
+                    web_scheme = "http"
+                    web_port = HTTP_PORT
+                    res["port"] = HTTP_PORT
+                    res["proto"] = "HTTP (Cleartext)"
+        else:
+            tls_ver = "N/A (Cleartext)"
+            active_cipher = "None"
 
         time.sleep(0.3)
 
@@ -577,6 +599,7 @@ def audit_authmech_3_rtsp(
     name_override: Optional[str] = None,
     launch_vlc: bool = True,
     auth_type: str = "auto",
+    port_override: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Đo kiểm AuthMech-3 (hoặc AuthMech-2 trên Oryza): RTSP Stream Authentication.
@@ -584,26 +607,26 @@ def audit_authmech_3_rtsp(
     - Phương thức mã hóa: Digest SHA-256 / MD5
     - Tự động bật VLC xem trực tiếp luồng video khi xác thực thành công.
     """
-    aid = id_override or "AuthMech-RTSP"
-    ixit_id = ixit_id_override or "RTSP-Authmech"
-    disp_name = name_override or "RTSP/RTSPS Media Stream"
-    pcap_file = pcap_override or "authmech-rtsp.pcap"
+    port_target = port_override or (RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else RTSP_PORT)
+    aid = id_override or ("AuthMech-RTSPS" if port_target == 443 else "AuthMech-RTSP")
+    ixit_id = ixit_id_override or ("RTSPS-Authmech" if port_target == 443 else "RTSP-Authmech")
+    disp_name = name_override or ("RTSPS Media Stream" if port_target == 443 else "RTSP Streaming (RFC 2326)")
+    pcap_file = pcap_override or ("authmech-rtsp 443.pcap" if port_target == 443 else "authmech-rtsp 554.pcap")
 
-    port_target = RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else RTSP_PORT
     console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (RTSP/{DUT_IP}:{port_target})[/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
         "id": aid,
         "ixit_id": ixit_id,
         "name": disp_name,
         "port": port_target,
-        "proto": "RTSPS (RTSP over HTTPS Tunnel)" if port_target == 443 else ("RTSPS (TLS 1.3)" if port_target == RTSPS_PORT else "RTSP Digest over TLS"),
+        "proto": "RTSPS (RTSP over HTTPS Tunnel)" if port_target == 443 else ("RTSPS (TLS 1.3)" if (port_target == RTSPS_PORT and port_target != 554) else "RTSP Cleartext / Digest"),
         "auth_factor": "Username and password",
         "pcap": pcap_file,
-        "aliases": ["authmech-3_rtsps.pcap", "authmech-2_rtsp.pcap", "RTSP-Authmech.pcap", f"{aid}.pcap"]
+        "aliases": ["authmech-3_rtsps.pcap", "authmech-2_rtsp.pcap", "RTSP-Authmech.pcap", "authmech-rtsp.pcap", "authmech-rtsp 554.pcap", "authmech-rtsp 443.pcap", f"{aid}.pcap"]
     }
 
     if record_pcap:
-        pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and (tcp port {RTSPS_PORT} or tcp port {RTSP_PORT})", prefix="authmech3_rtsps")
+        pcap_proc, pcap_path = start_pcap_capture(DUT_IP, f"ip host {DUT_IP} and tcp port {port_target}", prefix="authmech3_rtsp")
     else:
         pcap_proc, pcap_path = None, ""
 
@@ -614,7 +637,7 @@ def audit_authmech_3_rtsp(
     sdp_received = False
 
     rtsp_port_used = port_target
-    use_tls_rtsp = True
+    use_tls_rtsp = (port_target == 443 or (port_target == RTSPS_PORT and port_target != 554))
 
     try:
         ctx = ssl.create_default_context()
@@ -741,17 +764,24 @@ def audit_authmech_3_rtsp(
 
         else:
             # === CHẾ ĐỘ 2: Bắt tay Raw RTSP / RTSPS truyền thống (cổng 322 / 554) ===
-            try:
-                raw_sock = socket.create_connection((DUT_IP, RTSPS_PORT), timeout=3.0)
-                ssock = ctx.wrap_socket(raw_sock, server_hostname=DUT_IP)
-                active_cipher = ssock.cipher()[0]
-                tls_ver = ssock.version()
-            except Exception:
+            if port_target == RTSP_PORT or port_target == 554:
                 use_tls_rtsp = False
-                rtsp_port_used = RTSP_PORT
-                res["port"] = RTSP_PORT
-                res["proto"] = "RTSP (Cleartext)"
-                ssock = socket.create_connection((DUT_IP, RTSP_PORT), timeout=3.0)
+                rtsp_port_used = port_target
+                res["port"] = port_target
+                res["proto"] = "RTSP (RFC 2326 Cleartext)"
+                ssock = socket.create_connection((DUT_IP, port_target), timeout=3.0)
+            else:
+                try:
+                    raw_sock = socket.create_connection((DUT_IP, port_target), timeout=3.0)
+                    ssock = ctx.wrap_socket(raw_sock, server_hostname=DUT_IP)
+                    active_cipher = ssock.cipher()[0]
+                    tls_ver = ssock.version()
+                except Exception:
+                    use_tls_rtsp = False
+                    rtsp_port_used = port_target
+                    res["port"] = port_target
+                    res["proto"] = "RTSP (Cleartext)"
+                    ssock = socket.create_connection((DUT_IP, port_target), timeout=3.0)
 
             with ssock:
                 def _recv_full_rtsp(s):
@@ -857,11 +887,14 @@ def audit_authmech_3_rtsp(
 
                 time.sleep(1.2)
 
-        res["status"] = "PASS" if (use_tls_rtsp and tls_ver in ["TLSv1.2", "TLSv1.3"] and sdp_received) else ("FAIL" if not sdp_received else "WARN")
+        if use_tls_rtsp:
+            res["status"] = "PASS" if (tls_ver in ["TLSv1.2", "TLSv1.3"] and sdp_received) else ("FAIL" if not sdp_received else "WARN")
+        else:
+            res["status"] = "PASS" if sdp_received else "FAIL"
 
         # Tự động kích hoạt VLC xem trực tiếp luồng video khi xác thực thành công
         if sdp_received and launch_vlc:
-            launch_vlc_stream(DUT_IP, RTSP_PORT, USER, PASSWORD, RTSP_PATH)
+            launch_vlc_stream(DUT_IP, rtsp_port_used, USER, PASSWORD, RTSP_PATH)
 
     except Exception as e:
         res["status"] = "FAIL"
@@ -916,32 +949,40 @@ def audit_authmech_4_onvif(
     pcap_override: Optional[str] = None,
     name_override: Optional[str] = None,
     auth_type: str = "auto",
+    port_override: Optional[int] = None,
+    scheme_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Đo kiểm AuthMech-4 (hoặc AuthMech-3 trên Oryza): ONVIF Management Interface (AuthMech-Onvif).
+    Đo kiểm AuthMech-4: ONVIF Management Interface (AuthMech-Onvif).
+    - Hỗ trợ cả ONVIF over HTTPS (cổng 443) và ONVIF over HTTP (cổng 80)
+    - Xác thực WS-Security UsernameToken (PasswordDigest SHA-1 / PasswordText)
     """
-    aid = id_override or "AuthMech-ONVIF"
-    ixit_id = ixit_id_override or "AuthMech-Onvif"
-    disp_name = name_override or "ONVIF Device Service"
-    pcap_file = pcap_override or "authmech-onvif.pcap"
+    target_port = port_override or (ONVIF_HTTP_PORT if scheme_override == "http" else ONVIF_HTTPS_PORT)
+    onvif_scheme = scheme_override or ("http" if target_port == ONVIF_HTTP_PORT else "https")
+    onvif_port = target_port
 
-    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} (HTTPS/{DUT_IP}:{ONVIF_HTTPS_PORT}{ONVIF_PATH} SOAP) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
+    aid = id_override or ("AuthMech-ONVIF-HTTP" if onvif_scheme == "http" else "AuthMech-ONVIF-HTTPS")
+    ixit_id = ixit_id_override or ("AuthMech-Onvif-HTTP" if onvif_scheme == "http" else "AuthMech-Onvif-HTTPS")
+    disp_name = name_override or ("ONVIF Device Service (HTTP)" if onvif_scheme == "http" else "ONVIF Device Service (HTTPS)")
+    pcap_file = pcap_override or ("authmech-onvif_http.pcap" if onvif_scheme == "http" else "authmech-onvif.pcap")
+
+    console.print(f"\n[*] Đang đo kiểm [bold cyan]{aid}: {ixit_id} ({onvif_scheme.upper()}/{DUT_IP}:{onvif_port}{ONVIF_PATH} SOAP) [Cơ chế: {auth_type}][/bold cyan]{' [chế độ NO-PCAP]' if not record_pcap else ''}...")
     res = {
         "id": aid,
         "ixit_id": ixit_id,
         "name": disp_name,
-        "port": ONVIF_HTTPS_PORT,
-        "proto": "ONVIF SOAP over HTTPS (WS-Security)",
+        "port": onvif_port,
+        "proto": f"ONVIF SOAP over {onvif_scheme.upper()} (WS-Security)",
         "auth_factor": "Username and password",
         "auth_mode_selected": auth_type,
         "pcap": pcap_file,
-        "aliases": ["authmech-4_onvif.pcap", "authmech-3_onvif.pcap", f"{ixit_id}.pcap", f"{aid}.pcap"]
+        "aliases": ["authmech-4_onvif.pcap", "authmech-3_onvif.pcap", "authmech-onvif.pcap", "authmech-onvif_http.pcap", f"{ixit_id}.pcap", f"{aid}.pcap"]
     }
 
     if record_pcap:
         pcap_proc, pcap_path = start_pcap_capture(
             DUT_IP,
-            f"ip host {DUT_IP} and (tcp port {ONVIF_HTTPS_PORT} or tcp port {ONVIF_HTTP_PORT})",
+            f"ip host {DUT_IP} and tcp port {onvif_port}",
             prefix="authmech4_onvif"
         )
     else:
@@ -951,26 +992,29 @@ def audit_authmech_4_onvif(
     active_cipher = "N/A"
     wsse_auth_ok = False
     fault_received_on_bad = False
-    onvif_scheme = "https"
-    onvif_port = ONVIF_HTTPS_PORT
 
     try:
-        # Bước 1: Trích xuất TLS Ciphersuite trên ONVIF_HTTPS_PORT (fallback sang HTTP nếu chỉ mở HTTP)
-        try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            ctx.keylog_filename = SSLKEYLOG_PATH
+        # Bước 1: Trích xuất TLS Ciphersuite nếu là HTTPS
+        if onvif_scheme == "https":
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                ctx.keylog_filename = SSLKEYLOG_PATH
 
-            with socket.create_connection((DUT_IP, ONVIF_HTTPS_PORT), timeout=3.0) as sock:
-                with ctx.wrap_socket(sock, server_hostname=DUT_IP) as ssock:
-                    active_cipher = ssock.cipher()[0]
-                    tls_ver = ssock.version()
-        except Exception:
-            onvif_scheme = "http"
-            onvif_port = ONVIF_HTTP_PORT
-            res["port"] = ONVIF_HTTP_PORT
-            res["proto"] = "ONVIF SOAP over HTTP (WS-Security)"
+                with socket.create_connection((DUT_IP, onvif_port), timeout=3.0) as sock:
+                    with ctx.wrap_socket(sock, server_hostname=DUT_IP) as ssock:
+                        active_cipher = ssock.cipher()[0]
+                        tls_ver = ssock.version()
+            except Exception:
+                if not scheme_override:
+                    onvif_scheme = "http"
+                    onvif_port = ONVIF_HTTP_PORT
+                    res["port"] = ONVIF_HTTP_PORT
+                    res["proto"] = "ONVIF SOAP over HTTP (WS-Security)"
+        else:
+            tls_ver = "N/A (Cleartext)"
+            active_cipher = "None"
 
         time.sleep(0.3)
 
@@ -985,9 +1029,14 @@ def audit_authmech_4_onvif(
         ok_bad, status_bad, _, _ = send_onvif_request(onvif_url, USER, "WrongPass#999Bad", auth_type=effective_mode, timeout=3.5)
         fault_received_on_bad = not ok_bad
 
-        res["status"] = "PASS" if (tls_ver in ["TLSv1.2", "TLSv1.3"] and wsse_auth_ok and fault_received_on_bad) else ("FAIL" if not wsse_auth_ok else "WARN")
+        if onvif_scheme == "https":
+            res["status"] = "PASS" if (tls_ver in ["TLSv1.2", "TLSv1.3"] and wsse_auth_ok and fault_received_on_bad) else ("FAIL" if not wsse_auth_ok else "WARN")
+            res["cryptographic_details"] = f"Chế độ xác thực: {effective_mode.upper()} qua TLS {tls_ver}"
+        else:
+            res["status"] = "PASS" if (wsse_auth_ok and fault_received_on_bad) else ("FAIL" if not wsse_auth_ok else "WARN")
+            res["cryptographic_details"] = f"Chế độ xác thực: {effective_mode.upper()} qua HTTP rõ (Cổng {onvif_port})"
+
         res["auth_method"] = f"ONVIF ({effective_mode})"
-        res["cryptographic_details"] = f"Chế độ xác thực: {effective_mode.upper()} qua TLS {tls_ver}"
 
     except Exception as e:
         res["status"] = "FAIL"
@@ -1262,22 +1311,29 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
     t_clean = str(enum_target).lower().replace("authmech-", "").replace("authmech", "").strip()
     rtsp_enum_port = RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else (443 if IS_ORYZA else 554)
 
-    if t_clean in ["1", "web", str(HTTPS_PORT), "443"]:
+    if t_clean in ["1", "web", "web_https", str(HTTPS_PORT), "443"]:
         targets = [("AuthMech-Web", "Web Admin Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers")]
-    elif t_clean in ["2", "ssh", str(SSH_PORT), "22"]:
+    elif t_clean in ["web_http", "http", str(HTTP_PORT), "80"]:
+        targets = [("AuthMech-Web-HTTP", "Web Admin Interface (HTTP)", HTTP_PORT, "http-auth")]
+    elif t_clean in ["ssh", str(SSH_PORT), "22"] or (not IS_ORYZA and t_clean == "2"):
         targets = [("AuthMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos")]
-    elif t_clean in ["3", "rtsp", "rtsps", str(RTSPS_PORT), str(RTSP_PORT), "554", "322"]:
-        targets = [("AuthMech-RTSP", "RTSP Media Stream", rtsp_enum_port, "ssl-enum-ciphers")]
-    elif t_clean in ["4", "onvif"]:
-        targets = [("AuthMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
-    elif t_clean in ["5", "cms", "20001", str(CMS_PORT), "prop", "proprietary"]:
+    elif t_clean in ["rtsp", "rtsp_554", str(RTSP_PORT), "554"] or (IS_ORYZA and t_clean == "2"):
+        targets = [("AuthMech-RTSP", "RTSP Streaming (RFC 2326)", RTSP_PORT, "rtsp-methods")]
+    elif t_clean in ["rtsps", "rtsp_443", str(RTSPS_PORT), "322"]:
+        targets = [("AuthMech-RTSPS", "RTSPS Media Stream", rtsp_enum_port, "ssl-enum-ciphers")]
+    elif t_clean in ["onvif", "onvif_https", str(ONVIF_HTTPS_PORT)] or (IS_ORYZA and t_clean == "3") or (not IS_ORYZA and t_clean == "4"):
+        targets = [("AuthMech-ONVIF-HTTPS", "ONVIF Management Interface (HTTPS)", ONVIF_HTTPS_PORT, "ssl-enum-ciphers")]
+    elif t_clean in ["onvif_http", str(ONVIF_HTTP_PORT)]:
+        targets = [("AuthMech-ONVIF-HTTP", "ONVIF Management Interface (HTTP)", ONVIF_HTTP_PORT, "http-auth")]
+    elif t_clean in ["cms", "20001", str(CMS_PORT), "prop", "proprietary", "5"] or (IS_ORYZA and t_clean == "4"):
         targets = [("AuthMech-CMS", "CMS Management Interface (TLS)", CMS_PORT, "ssl-enum-ciphers")]
     else:  # all
         targets = [
             ("AuthMech-Web", "Web Admin Interface (HTTPS)", HTTPS_PORT, "ssl-enum-ciphers"),
             ("AuthMech-SSH", "SSH Remote CLI", SSH_PORT, "ssh2-enum-algos"),
-            ("AuthMech-RTSP", "RTSP Media Stream", rtsp_enum_port, "ssl-enum-ciphers"),
-            ("AuthMech-ONVIF", "ONVIF Management Interface", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"),
+            ("AuthMech-RTSP", "RTSP Streaming (RFC 2326)", RTSP_PORT, "rtsp-methods"),
+            ("AuthMech-RTSPS", "RTSPS Media Stream", rtsp_enum_port, "ssl-enum-ciphers"),
+            ("AuthMech-ONVIF-HTTPS", "ONVIF Management Interface (HTTPS)", ONVIF_HTTPS_PORT, "ssl-enum-ciphers"),
             ("AuthMech-CMS", "CMS Management Interface (TLS)", CMS_PORT, "ssl-enum-ciphers"),
         ]
 
@@ -1360,46 +1416,60 @@ def run_cipher_enumeration(enum_target: str = "all") -> int:
 def resolve_authmech_key(raw_id: str) -> Optional[str]:
     """Chuyển đổi linh hoạt ID AuthMech giữa tên ngữ nghĩa và số cũ."""
     k = str(raw_id).lower().replace("authmech-", "").replace("authmech", "").strip()
-    if k in ["web", "1"]:
+    k = k.replace("-", "_")
+    if k in ["web", "web_https", "https", "1"]:
         return "web"
-    elif k in ["ssh", "2"]:
-        if IS_ORYZA and k == "2":
-            return "rtsp"
+    elif k in ["web_http", "http", "80"]:
+        return "web_http"
+    elif k in ["ssh", "22"]:
         return "ssh"
-    elif k in ["rtsp", "rtsps", "3"]:
-        if IS_ORYZA and k == "3":
-            return "onvif"
-        return "rtsp"
-    elif k in ["onvif", "4"]:
-        if IS_ORYZA and k == "4":
-            return "cms"
-        return "onvif"
+    elif k in ["rtsp_554", "554"]:
+        return "rtsp_554"
+    elif k in ["rtsp"]:
+        return "rtsp_554"
+    elif k == "2":
+        return "rtsp_554" if IS_ORYZA else "ssh"
+    elif k in ["rtsps", "rtsp_443", "443"]:
+        return "rtsps"
+    elif k in ["3"]:
+        return "onvif_https" if IS_ORYZA else "rtsp_554"
+    elif k in ["onvif", "onvif_https", "onvif_443"]:
+        return "onvif_https"
+    elif k in ["onvif_http", "onvif_80"]:
+        return "onvif_http"
+    elif k == "4":
+        return "cms" if IS_ORYZA else "onvif_https"
     elif k in ["cms", "20001", "5"]:
         return "cms"
-    return k if k in ["web", "ssh", "rtsp", "onvif", "cms"] else None
+    return k if k in ["web", "web_http", "ssh", "rtsp", "rtsp_554", "rtsps", "onvif", "onvif_https", "onvif_http", "cms"] else None
 
 
 def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float = 3.0, record_pcap: bool = True, launch_vlc: bool = True, auth_type: str = "auto") -> List[Dict[str, Any]]:
     """
     Chạy kiểm thử cho tất cả hoặc theo danh sách được yêu cầu.
-    Hỗ trợ cả tên ngữ nghĩa: web, ssh, rtsp, onvif, cms và số thứ tự cũ 1..5.
+    Hỗ trợ cả tên ngữ nghĩa: web, web_http, ssh, rtsp, rtsps, onvif_https, onvif_http, cms và số thứ tự 1..5.
     Hỗ trợ tham số auth_type: auto, basic, digest, digest-md5, digest-sha256, wsse_sha1, wsse_sha256, wsse_text, http_digest, adapter.
     """
     handler_map = {
-        "web": lambda wait_sec=3.0, record_pcap=True: audit_authmech_1_web(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type),
+        "web": lambda wait_sec=3.0, record_pcap=True: audit_authmech_1_web(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type, port_override=HTTPS_PORT, scheme_override="https", id_override="AuthMech-Web", name_override="Web Admin Interface (HTTPS)", pcap_override="authmech-web.pcap"),
+        "web_http": lambda wait_sec=3.0, record_pcap=True: audit_authmech_1_web(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type, port_override=HTTP_PORT, scheme_override="http", id_override="AuthMech-Web-HTTP", name_override="Web Admin Interface (HTTP)", pcap_override="authmech-web_http.pcap"),
         "ssh": audit_authmech_2_ssh,
-        "rtsp": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc, auth_type=auth_type),
-        "onvif": lambda wait_sec=3.0, record_pcap=True: audit_authmech_4_onvif(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type),
+        "rtsp": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc, auth_type=auth_type, port_override=RTSP_PORT, id_override="AuthMech-RTSP", name_override="RTSP Streaming (RFC 2326)", pcap_override="authmech-rtsp 554.pcap"),
+        "rtsp_554": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc, auth_type=auth_type, port_override=RTSP_PORT, id_override="AuthMech-RTSP", name_override="RTSP Streaming (RFC 2326)", pcap_override="authmech-rtsp 554.pcap"),
+        "rtsps": lambda wait_sec=3.0, record_pcap=True: audit_authmech_3_rtsp(wait_sec=wait_sec, record_pcap=record_pcap, launch_vlc=launch_vlc, auth_type=auth_type, port_override=RTSPS_PORT if (RTSPS_PORT != 0 and RTSPS_PORT != RTSP_PORT) else 443, id_override="AuthMech-RTSPS", name_override="RTSPS Media Stream", pcap_override="authmech-rtsp 443.pcap" if IS_ORYZA else "authmech-rtsp.pcap"),
+        "onvif": lambda wait_sec=3.0, record_pcap=True: audit_authmech_4_onvif(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type, port_override=ONVIF_HTTPS_PORT, scheme_override="https", id_override="AuthMech-ONVIF-HTTPS", name_override="ONVIF Device Service (HTTPS)", pcap_override="authmech-onvif.pcap"),
+        "onvif_https": lambda wait_sec=3.0, record_pcap=True: audit_authmech_4_onvif(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type, port_override=ONVIF_HTTPS_PORT, scheme_override="https", id_override="AuthMech-ONVIF-HTTPS", name_override="ONVIF Device Service (HTTPS)", pcap_override="authmech-onvif.pcap"),
+        "onvif_http": lambda wait_sec=3.0, record_pcap=True: audit_authmech_4_onvif(wait_sec=wait_sec, record_pcap=record_pcap, auth_type=auth_type, port_override=ONVIF_HTTP_PORT, scheme_override="http", id_override="AuthMech-ONVIF-HTTP", name_override="ONVIF Device Service (HTTP)", pcap_override="authmech-onvif_http.pcap"),
         "cms": lambda wait_sec=3.0, record_pcap=True: audit_authmech_cms(port=CMS_PORT, wait_sec=wait_sec, record_pcap=record_pcap),
     }
 
     if not target_keys or any(k.lower() in ["all", "all-mechs"] for k in target_keys):
         if any(k.lower() == "all-mechs" for k in (target_keys or [])):
-            keys_to_run = ["web", "ssh", "rtsp", "onvif", "cms"]
+            keys_to_run = ["web", "web_http", "ssh", "rtsp_554", "rtsps", "onvif_https", "onvif_http", "cms"]
         elif IS_ORYZA:
-            keys_to_run = ["web", "rtsp", "onvif", "cms"]
+            keys_to_run = ["web", "rtsp_554", "rtsps", "onvif_https", "cms"]
         else:
-            keys_to_run = ["web", "ssh", "rtsp", "onvif"]
+            keys_to_run = ["web", "ssh", "rtsp_554", "rtsps", "onvif_https"]
     else:
         keys_to_run = []
         for raw in target_keys:

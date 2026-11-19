@@ -26,6 +26,12 @@ captures/evidence/
 captures/uploads/
 !captures/.gitkeep
 
+# Snapshots taken by onvif_manager
+snapshots/*.jpg
+snapshots/*.jpeg
+snapshots/*.png
+!snapshots/.gitkeep
+
 # Mock server certificates and keys
 *.key
 *.crt
