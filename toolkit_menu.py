@@ -536,6 +536,7 @@ def main():
             table.add_row("[bold green]L[/bold green]", "Nhan dien & Doi dai mang (Auto-Link)", "Tu dong bat IP camera khi cam cap va cau hinh da subnet")
             table.add_row("[bold green]D[/bold green]", "Do quet Cong & Nhan dien Dich vu", "Quet toan dien TCP/UDP, nhan dien dich vu & phat hien cong bat thuong")
             table.add_row("[bold green]C[/bold green]", "Quet mang tim Camera (WS-Discovery)", "Phat thanh UDP 3702 tim kiem va doi camera muc tieu")
+            table.add_row("[bold green]O[/bold green]", "Trình quản lý ONVIF (OxDM-Linux)", "Đăng nhập ONVIF, thông số thiết bị, live snapshot, luồng VLC & Web GUI")
             table.add_row("[bold magenta]S[/bold magenta]", "Cau hinh thong so Camera & Mat khau", "Thay doi IP, tai khoan admin, mat khau ket noi")
             table.add_section()
             table.add_row("[bold yellow]2.1.3[/bold yellow]", "YEU CAU 2.1.3: MAT MA & XAC THUC", "Ma hoa TLS 1.0-1.3, SOGIS ACM, Chung thu so, Digest SHA-256 vs Basic Auth")
@@ -557,6 +558,7 @@ def main():
             print("  [L]     Nhan dien & Doi dai mang (Auto-Link)")
             print("  [D]     Do quet Cong & Nhan dien Dich vu")
             print("  [C]     Quet mang tim Camera (WS-Discovery)")
+            print("  [O]     Trinh quan ly ONVIF (OxDM-Linux)")
             print("  [S]     Cau hinh thong so Camera & Mat khau")
             print("  [2.1.3] YEU CAU 2.1.3: Do kiem Mat ma & Gia tri xac thuc")
             print("  [2.1.5] YEU CAU 2.1.5: Phong ve vet can xac thuc")
@@ -580,6 +582,9 @@ def main():
             input("\nBấm Enter để tiếp tục...")
         elif choice.upper() == "C":
             change_target_camera()
+            input("\nBấm Enter để tiếp tục...")
+        elif choice.upper() == "O":
+            run_script("onvif_manager.py")
             input("\nBấm Enter để tiếp tục...")
         elif choice.upper() == "S":
             run_script("configure_target.py")
