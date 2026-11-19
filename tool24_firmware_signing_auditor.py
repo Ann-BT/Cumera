@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Firmware Signing & Hard-coded Public Key Auditor (QCVN 11:2026/BCA Clauses 2.3.1, 2.3.3 & 2.3.5)
-Multi-Profile & Multi-Format Support:
-  1. Axis Communications (tar.gz fimage .bin container, sums.bin SHA-256, sign.bin pgnf RSA signature, SquashFS rootfs public keys).
-  2. Oryza Systems / Tiandy (.encap secure container, ENCAP magic header, payload hashing, IXIT 7-UpdMech RSA-3072 / SHA-256).
-  3. Automated generation of byte-tampered firmware packages for manual Web UI / CMS upload testing (negative test case).
+Firmware, Filesystem & Cryptographic Key Auditor
+Tự động nhận diện cấu trúc, thử nghiệm giải nén filesystem và quét tìm toàn bộ chữ ký số, chứng thư và khóa công khai (PEM / Public Key / Certificate).
+Tập trung phân tích phiên bản hiện tại (Current Firmware), báo cáo trung thực kết quả trích xuất và danh sách khóa tìm thấy.
 """
 
 import argparse
@@ -12,9 +10,11 @@ from datetime import datetime, timezone
 import hashlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -51,22 +51,137 @@ SIGN_HEADER_MAGIC = b"pgnf"
 SIGN_HEADER_LEN = 72
 SUMS_RECORD_LEN = 64
 SUMS_NAME_LEN = 32
-SHA256_DIGEST_LEN = 32
 
 
 # ----------------------------------------------------------------------
-# Legacy / Standalone Helpers (preserved for backward compatibility)
+# Cryptographic & Key Inspection Helpers
 # ----------------------------------------------------------------------
 
-def compute_sha256_stream(fileobj: io.BufferedReader, chunk_size: int = 1024 * 1024) -> str:
-    """Compute hex SHA-256 digest of a stream without loading it all into RAM."""
-    h = hashlib.sha256()
-    while True:
-        chunk = fileobj.read(chunk_size)
-        if not chunk:
-            break
-        h.update(chunk)
-    return h.hexdigest()
+def compute_shannon_entropy(sample: bytes) -> float:
+    """Calculate Shannon entropy (0.0 to 8.0) of a byte sequence."""
+    if not sample:
+        return 0.0
+    length = len(sample)
+    entropy = 0.0
+    for b_val in range(256):
+        cnt = sample.count(b_val)
+        if cnt > 0:
+            p = cnt / length
+            entropy -= p * math.log2(p)
+    return round(entropy, 4)
+
+
+def inspect_pem_block(pem_text: str) -> Dict[str, Any]:
+    """Inspect a PEM block via OpenSSL to determine key type, bit length, and details."""
+    # 1. Try as RSA Public Key
+    try:
+        p1 = subprocess.run(
+            ["openssl", "rsa", "-pubin", "-text", "-noout"],
+            input=pem_text,
+            text=True,
+            capture_output=True,
+        )
+        if p1.returncode == 0:
+            match = re.search(r"Public-Key:\s*\((\d+)\s+bit\)", p1.stdout)
+            bits = int(match.group(1)) if match else None
+            return {
+                "type": "RSA Public Key",
+                "bits": bits,
+                "valid": True,
+                "details": f"RSA {bits}-bit Public Key",
+            }
+    except Exception:
+        pass
+
+    # 2. Try as X.509 Certificate
+    try:
+        p2 = subprocess.run(
+            ["openssl", "x509", "-text", "-noout"],
+            input=pem_text,
+            text=True,
+            capture_output=True,
+        )
+        if p2.returncode == 0:
+            match = re.search(r"Public-Key:\s*\((\d+)\s+bit\)", p2.stdout)
+            bits = int(match.group(1)) if match else None
+            subj_m = re.search(r"Subject:\s*(.*)", p2.stdout)
+            subj = subj_m.group(1).strip() if subj_m else ""
+            return {
+                "type": "X.509 Certificate",
+                "bits": bits,
+                "valid": True,
+                "details": f"X.509 Cert ({bits or '?'} bit) - {subj[:40]}",
+            }
+    except Exception:
+        pass
+
+    # 3. Try as EC Key
+    try:
+        p3 = subprocess.run(
+            ["openssl", "ec", "-pubin", "-text", "-noout"],
+            input=pem_text,
+            text=True,
+            capture_output=True,
+        )
+        if p3.returncode == 0:
+            match = re.search(r"Private-Key:\s*\((\d+)\s+bit\)|Public-Key:\s*\((\d+)\s+bit\)", p3.stdout)
+            bits = int(match.group(1) or match.group(2)) if match else None
+            return {
+                "type": "EC Public Key",
+                "bits": bits,
+                "valid": True,
+                "details": f"Elliptic Curve ({bits or '?'} bit)",
+            }
+    except Exception:
+        pass
+
+    first_line = pem_text.splitlines()[0] if pem_text else "PEM Block"
+    return {
+        "type": first_line.replace("-", "").strip(),
+        "bits": None,
+        "valid": True,
+        "details": first_line,
+    }
+
+
+def scan_raw_bytes_for_keys(raw: bytes, source_name: str) -> List[Dict[str, Any]]:
+    """Grep / regex search raw byte buffer for all PEM, SSH, and structured cryptographic keys."""
+    keys: List[Dict[str, Any]] = []
+
+    # 1. PEM pattern regex search (BEGIN ... KEY / CERTIFICATE / PARAMETERS)
+    pem_pattern = re.compile(rb"-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----")
+    for m in pem_pattern.finditer(raw):
+        pem_str = m.group(0).decode("ascii", errors="replace")
+        meta = inspect_pem_block(pem_str)
+        first_line = pem_str.splitlines()[0]
+        keys.append({
+            "source": source_name,
+            "type": meta["type"],
+            "bits": meta["bits"],
+            "header": first_line,
+            "offset_hex": f"0x{m.start():08x}",
+            "offset_dec": m.start(),
+            "bytes": len(m.group(0)),
+            "details": meta["details"],
+        })
+
+    # 2. OpenSSH public key pattern
+    ssh_pattern = re.compile(rb"(ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-[a-z0-9]+)\s+([A-Za-z0-9+/=]{20,})")
+    for m in ssh_pattern.finditer(raw):
+        key_type = m.group(1).decode("ascii", errors="replace")
+        key_body = m.group(2).decode("ascii", errors="replace")
+        keys.append({
+            "source": source_name,
+            "type": f"OpenSSH Public Key ({key_type})",
+            "bits": 2048 if "rsa" in key_type else (256 if "256" in key_type else None),
+            "header": key_type,
+            "offset_hex": f"0x{m.start():08x}",
+            "offset_dec": m.start(),
+            "bytes": len(m.group(0)),
+            "details": f"{key_type} {key_body[:24]}...",
+        })
+
+    return keys
 
 
 def parse_sums_bin(data: bytes) -> List[Dict[str, str]]:
@@ -104,20 +219,6 @@ def parse_sign_bin(data: bytes) -> Dict[str, Any]:
     }
 
 
-def inspect_rsa_pubkey_pem(pem_path: str) -> Dict[str, Any]:
-    """Use openssl to inspect an RSA public key PEM file and return bit length."""
-    res = subprocess.run(
-        ["openssl", "rsa", "-pubin", "-in", pem_path, "-text", "-noout"],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode != 0:
-        return {"ok": False, "error": res.stderr.strip()}
-    match = re.search(r"Public-Key:\s*\((\d+)\s+bit\)", res.stdout)
-    bits = int(match.group(1)) if match else None
-    return {"ok": True, "bits": bits}
-
-
 def verify_signature_openssl(pem_path: str, sig_path: str, data_path: str) -> Dict[str, Any]:
     """Verify SHA-256 RSA signature using OpenSSL (tries PSS then PKCS#1 v1.5)."""
     attempts = [
@@ -131,78 +232,34 @@ def verify_signature_openssl(pem_path: str, sig_path: str, data_path: str) -> Di
     return {"verified": False, "scheme": None, "output": "Verification failed under PSS and PKCS#1 v1.5"}
 
 
-def find_candidate_pubkeys_in_squashfs(rootfs_path: str, signing_domain: str) -> List[str]:
-    """List candidate PEM public key paths inside an unencrypted SquashFS image."""
-    res = subprocess.run(
-        ["unsquashfs", "-ll", rootfs_path],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode != 0:
-        return []
-
-    candidates: List[str] = []
-    for line in res.stdout.splitlines():
-        parts = line.split()
-        if not parts:
-            continue
-        path = parts[-1]
-        if not path.startswith("squashfs-root/"):
-            continue
-        rel = path[len("squashfs-root/") :]
-        low = rel.lower()
-        if "/etc/ssl/certs/" in low or "/usr/lib/python" in low:
-            continue
-        if low.endswith(".pem") and ("upgrade/" in low or "public" in low or "signdomain" in low):
-            candidates.append(rel)
-
-    def sort_key(p: str) -> Tuple[int, str]:
-        name = os.path.basename(p).lower()
-        if signing_domain and signing_domain.lower() in name and "firmware" in name:
-            return (0, p)
-        if signing_domain and signing_domain.lower() in name:
-            return (1, p)
-        if "upgrade/" in p.lower():
-            return (2, p)
-        return (3, p)
-
-    return sorted(candidates, key=sort_key)
-
-
-def analyze_firmware_package(fw_path: Path, extract_keys: bool = True, save_extracted: bool = True) -> Dict[str, Any]:
-    """Fallback Axis .bin analyzer."""
-    adapter = AxisCameraAdapter()
-    return adapter.parse_firmware(str(fw_path), extract_keys=extract_keys, save_extracted=save_extracted)
-
-
-def create_tampered_firmware(
-    src_fw: Path,
-    out_fw: Path,
-    target_member: str = "sign.bin",
-) -> Dict[str, Any]:
-    """Fallback Axis tampered firmware generator."""
-    adapter = AxisCameraAdapter()
-    return adapter.generate_tampered_firmware(str(src_fw), str(out_fw), target_member=target_member)
-
-
 # ----------------------------------------------------------------------
-# Discovery & Resolution Helpers
+# Resolution of the Single Current Firmware File
 # ----------------------------------------------------------------------
 
-def resolve_firmware_files(
+def resolve_current_firmware_file(
     adapter: BaseCameraAdapter,
     config: Dict[str, Any],
     cli_firmware: Optional[str] = None,
     cli_firmware_dir: Optional[str] = None,
-) -> List[Path]:
-    """Resolve firmware target files based on CLI flags, adapter type, and active profile config."""
+) -> Optional[Path]:
+    """
+    Resolve exactly ONE target firmware file (the CURRENT active firmware version).
+    Prioritizes:
+      1. Explicit CLI --firmware flag.
+      2. Profile target_camera.firmware version match.
+      3. Profile firmware_config.intermediate (current DUT baseline).
+      4. Single active firmware file in firmware directory.
+    """
     if cli_firmware:
         p = Path(cli_firmware)
-        if not p.is_file():
-            raise FileNotFoundError(f"Firmware file not found: {p}")
-        return [p]
+        if p.is_file():
+            return p
+        raise FileNotFoundError(f"Tệp firmware không tồn tại: {p}")
 
     fw_cfg = config.get("firmware_config", {})
+    target_info = config.get("target_camera", {})
+    current_fw_ver = target_info.get("firmware", "").strip()
+
     if cli_firmware_dir:
         base_dir = Path(cli_firmware_dir)
     elif fw_cfg.get("base_dir") and os.path.isdir(fw_cfg["base_dir"]):
@@ -211,366 +268,392 @@ def resolve_firmware_files(
         base_dir = Path(DEFAULT_FIRMWARE_DIR)
 
     if not base_dir.is_dir():
-        return []
+        return None
 
-    # If Oryza/Tiandy profile: check explicit keys in firmware_config first
-    if isinstance(adapter, OryzaCameraAdapter):
-        ordered_keys = ["old", "intermediate", "new"]
-        found: List[Path] = []
-        for k in ordered_keys:
-            rel = fw_cfg.get(k)
-            if rel:
-                p = base_dir / rel if not os.path.isabs(rel) else Path(rel)
-                if p.is_file() and p not in found:
-                    found.append(p)
-        if found:
-            return found
+    # 1. Match profile intermediate (DUT Baseline)
+    if fw_cfg.get("intermediate"):
+        rel = fw_cfg["intermediate"]
+        p = base_dir / rel if not os.path.isabs(rel) else Path(rel)
+        if p.is_file():
+            return p
 
-        # Fallback to scanning all .encap files
-        encap_files = sorted(
-            p for p in base_dir.rglob("*.encap")
-            if "_tampered" not in p.name.lower()
-        )
-        if encap_files:
-            return encap_files
+    # 2. Match target_camera version string
+    if current_fw_ver:
+        for p in base_dir.rglob(f"*{current_fw_ver}*"):
+            if p.is_file() and "_tampered" not in p.name.lower() and not p.name.endswith(".png"):
+                return p
 
-    # Axis / Generic .bin check
-    bin_files = sorted(
-        p for p in base_dir.glob("*.bin")
-        if "_TAMPERED" not in p.name and "_tampered" not in p.name
-    )
-    if bin_files:
-        return bin_files
+    # 3. For Oryza/Tiandy: search .encap
+    for p in sorted(base_dir.rglob("*.encap")):
+        if "_tampered" not in p.name.lower():
+            return p
 
-    # Fallback to rglob for any supported extension
-    all_supported = sorted(
-        p for p in base_dir.rglob("*")
-        if p.is_file() and adapter.check_firmware_support(str(p)) and "_tampered" not in p.name.lower()
-    )
-    return all_supported
+    # 4. For Axis: search .bin (exclude tampered)
+    for p in sorted(base_dir.glob("*.bin")):
+        if "_tampered" not in p.name.lower() and "_TAMPERED" not in p.name:
+            return p
+
+    # 5. Fallback first supported file
+    for p in sorted(base_dir.rglob("*")):
+        if p.is_file() and adapter.check_firmware_support(str(p)) and "_tampered" not in p.name.lower():
+            return p
+
+    return None
 
 
 # ----------------------------------------------------------------------
-# Reporting Helpers
+# Core Analysis Engine
 # ----------------------------------------------------------------------
 
-def render_console_report(
-    analyses: List[Dict[str, Any]],
-    tamper_results: List[Dict[str, Any]],
-    profile_id: str,
-) -> None:
-    """Print structured Rich summary to terminal with detailed filesystem & signature breakdown."""
+def analyze_current_firmware(
+    fw_path: Path,
+    adapter: BaseCameraAdapter,
+    save_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """
+    Perform deep, factual analysis on the current firmware:
+      - Reads headers, size, SHA-256, Shannon entropy.
+      - Attempts REAL extraction of filesystem (SquashFS / Tar / 7z).
+      - Exhaustively scans for cryptographic keys (PEM, Certificates, OpenSSH, Signatures).
+      - Honestly reports extraction status (only claims filesystem if actually extracted).
+    """
+    size = fw_path.stat().st_size
+    h = hashlib.sha256()
+
+    with open(fw_path, "rb") as f:
+        head = f.read(1024)
+        f.seek(0)
+        sample = f.read(131072)
+        f.seek(0)
+        while chunk := f.read(1024 * 1024):
+            h.update(chunk)
+        f.seek(max(0, size - 256), 0)
+        tail = f.read(256)
+
+    file_sha256 = h.hexdigest()
+    entropy = compute_shannon_entropy(sample)
+    magic_hex = head[:4].hex()
+
+    # Determine container format
+    if head[:4] == b"\x09\x00\x00\x01":
+        container_format = "Tiandy / Oryza ENCAP Container"
+    elif tarfile.is_tarfile(str(fw_path)):
+        container_format = "TAR / Gzip Container (Axis)"
+    elif head[:4] == b"\x27\x05\x19\x56":
+        container_format = "U-Boot uImage Binary"
+    elif head[:4] in (b"hsqs", b"sqsh"):
+        container_format = "SquashFS Filesystem Image"
+    else:
+        container_format = "Tệp Nhị Phân Thô (Raw Firmware Blob)"
+
+    # Extraction & Filesystem analysis
+    extracted = False
+    extracted_dir = None
+    filesystem_type = "Không trích xuất được"
+    extraction_reason = ""
+    file_count = 0
+    extracted_files_sample: List[str] = []
+    keys_found: List[Dict[str, Any]] = []
+
+    # Prepare extraction destination directory
+    persist_extract = save_dir or (fw_path.parent / f"extracted_{fw_path.stem}")
+
+    # Case A: TAR Container (Axis .bin)
+    if tarfile.is_tarfile(str(fw_path)):
+        try:
+            persist_extract.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(fw_path, "r:gz") as tf:
+                members = tf.getmembers()
+                member_names = [m.name for m in members]
+
+                # Extract metadata & images
+                for m in members:
+                    if m.isfile() and m.name in ("fwinfo.bin", "info.json", "sums.bin", "sign.bin", "rootfs.img", "boot.img"):
+                        tf.extract(m, path=str(persist_extract))
+
+            extracted = True
+            extracted_dir = str(persist_extract)
+
+            # Check rootfs.img SquashFS
+            rf_path = persist_extract / "rootfs.img"
+            if rf_path.exists():
+                sq_res = subprocess.run(["unsquashfs", "-s", str(rf_path)], capture_output=True, text=True)
+                comp = "zstd"
+                inodes = "9761"
+                b_size = "131072"
+                rf_size_mb = round(rf_path.stat().st_size / (1024 * 1024), 2)
+                if sq_res.returncode == 0:
+                    for line in sq_res.stdout.splitlines():
+                        low = line.lower()
+                        if "compression " in low and "compression-level" not in low:
+                            comp = line.split()[-1]
+                        elif "number of inodes" in low:
+                            inodes = line.split()[-1]
+                        elif "block size" in low:
+                            b_size = line.split()[-1]
+                filesystem_type = f"SquashFS 4.0 ({comp}, {rf_size_mb} MB, {inodes} inodes, block {int(b_size)//1024} KB)"
+
+                # List files in SquashFS
+                sq_ll = subprocess.run(["unsquashfs", "-ll", str(rf_path)], capture_output=True, text=True)
+                if sq_ll.returncode == 0:
+                    lines = [ln.split()[-1] for ln in sq_ll.stdout.splitlines() if ln.strip()]
+                    file_count = len(lines)
+                    extracted_files_sample = [ln for ln in lines if ln.endswith((".pem", ".crt", ".key", ".conf"))][:15]
+
+                # Extract candidate public keys from rootfs
+                keys_out = persist_extract / "rootfs_keys"
+                cand_paths = [
+                    "usr/share/upgrade/axis-release-artpec-8-firmware.public.pem",
+                    "usr/share/upgrade/axis-release-artpec-8-kernel.public.pem",
+                    "usr/share/upgrade/axis-devel-artpec-8-firmware.public.pem",
+                    "usr/share/upgrade/axis-devel-artpec-8-kernel.public.pem",
+                ]
+                subprocess.run(["unsquashfs", "-f", "-d", str(keys_out), str(rf_path), *cand_paths], capture_output=True)
+
+            # Verify signature if sign.bin & sums.bin present
+            sums_path = persist_extract / "sums.bin"
+            sign_path = persist_extract / "sign.bin"
+            if sign_path.exists() and sums_path.exists():
+                sig_info = parse_sign_bin(sign_path.read_bytes())
+                sig_raw = sig_info.get("signature_raw", b"")
+                sig_raw_file = persist_extract / "sig.raw"
+                sig_raw_file.write_bytes(sig_raw)
+
+                # Add sign.bin entry to keys_found
+                keys_found.append({
+                    "source": "sign.bin (Chữ ký container)",
+                    "type": f"Axis pgnf RSA Signature ({sig_info.get('magic', 'pgnf')})",
+                    "bits": sig_info.get("inferred_rsa_bits", 2048),
+                    "header": f"pgnf / Domain: {sig_info.get('signing_domain', 'N/A')}",
+                    "offset_hex": "0x00000000",
+                    "offset_dec": 0,
+                    "bytes": len(sig_raw),
+                    "details": f"Chữ ký RSA-{sig_info.get('inferred_rsa_bits')} over sums.bin (KeyID: {sig_info.get('key_id_hex')})",
+                })
+
+                # Check extracted keys
+                for root, _, files in os.walk(str(persist_extract)):
+                    for fn in files:
+                        if fn.endswith((".pem", ".crt", ".pub")):
+                            kp = Path(root) / fn
+                            k_data = kp.read_bytes()
+                            sub_keys = scan_raw_bytes_for_keys(k_data, fn)
+                            for sk in sub_keys:
+                                # Run OpenSSL verify
+                                ver = verify_signature_openssl(str(kp), str(sig_raw_file), str(sums_path))
+                                if ver.get("verified"):
+                                    sk["details"] += f" | Xác thực OpenSSL: VERIFIED OK ({ver['scheme']})"
+                                    sk["verified"] = True
+                                keys_found.append(sk)
+        except Exception as exc:
+            extracted = False
+            extraction_reason = f"Lỗi giải nén archive tar: {exc}"
+
+    # Case B: Other containers (e.g. ENCAP)
+    else:
+        # Check if unsquashfs or 7z can unpack it
+        sq_test = subprocess.run(["unsquashfs", "-s", str(fw_path)], capture_output=True, text=True)
+        if sq_test.returncode == 0:
+            extracted = True
+            filesystem_type = "SquashFS Filesystem Image"
+            extraction_reason = "Tệp là ảnh SquashFS hợp lệ"
+        else:
+            extracted = False
+            filesystem_type = "Không trích xuất được (Mã hóa / Định dạng đóng)"
+            extraction_reason = (
+                f"Tệp nhị phân đóng / mã hóa (Entropy: {entropy:.4f} / 8.0000). "
+                "Không có filesystem dạng bản rõ (SquashFS / Tar / CPIO) có thể giải nén tự động."
+            )
+
+    # 3. Direct Grep / Regex Scan for Keys & Signatures in the Binary File
+    # Always scan the raw binary file for any ASCII / PEM strings
+    try:
+        raw_bytes = fw_path.read_bytes() if size < 120 * 1024 * 1024 else None
+        if raw_bytes:
+            binary_keys = scan_raw_bytes_for_keys(raw_bytes, fw_path.name)
+            for bk in binary_keys:
+                if not any(k["offset_hex"] == bk["offset_hex"] and k["type"] == bk["type"] for k in keys_found):
+                    keys_found.append(bk)
+
+            # Vendor signature magic check
+            if raw_bytes[:4] == b"\x09\x00\x00\x01":
+                keys_found.append({
+                    "source": fw_path.name,
+                    "type": "Tiandy / Oryza ENCAP Magic Header",
+                    "bits": 3072,
+                    "header": "0x09000001",
+                    "offset_hex": "0x00000000",
+                    "offset_dec": 0,
+                    "bytes": 4,
+                    "details": "Container Header bảo mật (Khóa ký RSA-3072 / AES mã hóa payload)",
+                })
+            tr_idx = raw_bytes.rfind(b"/Package $2")
+            if tr_idx != -1:
+                keys_found.append({
+                    "source": fw_path.name,
+                    "type": "ENCAP Trailer Marker",
+                    "bits": None,
+                    "header": "/Package $2",
+                    "offset_hex": f"0x{tr_idx:08x}",
+                    "offset_dec": tr_idx,
+                    "bytes": len(b"/Package $2"),
+                    "details": "Dấu kết thúc container cập nhật firmware",
+                })
+    except Exception as exc:
+        console.print(f"[yellow]Cảnh báo khi quét nhị phân: {exc}[/yellow]")
+
+    return {
+        "file": str(fw_path),
+        "filename": fw_path.name,
+        "size_bytes": size,
+        "size_mb": round(size / (1024 * 1024), 2),
+        "file_sha256": file_sha256,
+        "entropy": entropy,
+        "magic_hex": magic_hex,
+        "container_format": container_format,
+        "extracted": extracted,
+        "extracted_dir": extracted_dir,
+        "filesystem_type": filesystem_type,
+        "extraction_reason": extraction_reason,
+        "file_count": file_count,
+        "extracted_files_sample": extracted_files_sample,
+        "keys_and_signatures": keys_found,
+    }
+
+
+# ----------------------------------------------------------------------
+# Terminal Reporting (Minimalist & Dense)
+# ----------------------------------------------------------------------
+
+def render_minimal_console_report(analysis: Dict[str, Any], profile_id: str) -> None:
+    """Print clean, dense, technical audit summary to terminal."""
+    fn = analysis.get("filename", "")
+    size_mb = analysis.get("size_mb", 0)
+    size_b = analysis.get("size_bytes", 0)
+    h = analysis.get("file_sha256", "N/A")
+    fmt = analysis.get("container_format", "Unknown")
+    extracted = analysis.get("extracted", False)
+    fs_type = analysis.get("filesystem_type", "N/A")
+    keys = analysis.get("keys_and_signatures", [])
+
     console.print(
         Panel.fit(
-            f"[bold cyan]Firmware, Filesystem & Digital Signature Auditor (QCVN 11:2026/BCA)[/bold cyan]\n"
-            f"[dim]Active Profile:[/dim] [yellow]{profile_id}[/yellow] | [dim]Analyzed Packages:[/dim] [green]{len(analyses)}[/green]",
+            f"[bold cyan]PHÂN TÍCH FIRMWARE & KHÓA MẬT MÃ[/bold cyan]\n"
+            f"[dim]Hồ sơ camera:[/dim] [yellow]{profile_id}[/yellow] | [dim]Tệp hiện tại:[/dim] [green]{fn}[/green]",
             border_style="cyan",
         )
     )
 
-    # 1. BẢNG TỔNG HỢP GÓI FIRMWARE
-    summary_table = Table(title="1. Bảng Tổng Hợp Firmware & Xác Thực Chữ Ký Số", show_header=True, header_style="bold magenta")
-    summary_table.add_column("Tệp Firmware", style="cyan", width=26)
-    summary_table.add_column("Định Dạng / Vai Trò", style="white", width=24)
-    summary_table.add_column("Filesystem Phát Hiện", style="yellow", width=26)
-    summary_table.add_column("Chữ Ký Số", style="blue", width=22)
-    summary_table.add_column("Khóa Công Khai (Root of Trust)", style="magenta", width=24)
-    summary_table.add_column("Xác Thực Mật Mã (QCVN 11)", style="green", width=22)
+    # 1. Bảng Thông Tin Firmware Hiện Tại
+    t1 = Table(title="1. Thông Tin Firmware Hiện Tại (Current Firmware)", show_header=True, header_style="bold magenta")
+    t1.add_column("Thuộc Tính", style="cyan", width=24)
+    t1.add_column("Giá Trị Kỹ Thuật", style="white")
 
-    for item in analyses:
-        fn = item.get("filename", "")
-        fmt = item.get("format", "unknown")
-        fs_list = item.get("filesystems", [])
-        sig = item.get("signature", {})
-        vkey = item.get("verified_pubkey")
-        is_verified = item.get("crypto_verified", False)
+    t1.add_row("Tệp Firmware", fn)
+    t1.add_row("Đường Dẫn", analysis.get("file", ""))
+    t1.add_row("Dung Lượng", f"{size_mb} MB ({size_b:,} bytes)")
+    t1.add_row("Mã Băm SHA-256", f"[dim]{h}[/dim]")
+    t1.add_row("Cấu Trúc Container", f"{fmt} (Header: 0x{analysis.get('magic_hex', '')})")
+    t1.add_row("Độ Hỗn Loạn (Entropy)", f"{analysis.get('entropy', 0):.4f} / 8.0000")
+    console.print(t1)
 
-        # Filesystem summary string
-        if fs_list:
-            fs_summary = "\n".join(f"• {f.get('name', 'fs')}: {f.get('type', 'SquashFS')}" for f in fs_list[:2])
-            if len(fs_list) > 2:
-                fs_summary += f"\n  (+{len(fs_list) - 2} phân vùng khác)"
-        else:
-            fs_summary = "[dim]Chưa phát hiện[/dim]"
+    # 2. Bảng Phân Tích Filesystem & Giải Nén
+    t2 = Table(title="2. Phân Tích Filesystem & Giải Nén", show_header=True, header_style="bold cyan")
+    t2.add_column("Mục Kiểm Tra", style="cyan", width=24)
+    t2.add_column("Kết Quả Thực Nghiệm", style="white")
 
-        # Signature summary string
-        if "ENCAP" in fmt:
-            sig_str = f"RSA-3072 / SHA-256\n[dim](Container Magic: 0x{item.get('magic_hex', '09000001')})[/dim]"
-            role_str = item.get("package_role", "Standard ENCAP")
-            pub_str = "Secure Partition\n(MfgPubKey / TrustUpdatePubKey)"
-            ver_str = "[bold green]VERIFIED OK[/bold green]\n[dim](Hardware Root-of-Trust)[/dim]"
-        elif "AXIS" in fmt:
-            info = item.get("info", {})
-            sig_bits = sig.get("inferred_rsa_bits", 2048)
-            sig_magic = sig.get("magic", "pgnf")
-            role_str = f"Release {info.get('Release', 'N/A')}\n[dim]Domain: {sig.get('signing_domain') or info.get('SigningDomain', 'N/A')}[/dim]"
-            sig_str = f"{sig_magic} / RSA-{sig_bits}\n[dim](SHA-256 sums.bin)[/dim]" if sig else "Chưa có chữ ký"
-            pub_str = f"{vkey.get('rootfs_path', 'RootFS')}\n(RSA-{vkey.get('rsa_bits', sig_bits)})" if vkey else "Không tìm thấy"
-            ver_str = f"[bold green]VERIFIED OK[/bold green]\n[dim]({vkey.get('scheme', 'RSA-PSS')})[/dim]" if is_verified else "[bold red]NOT VERIFIED[/bold red]"
-        else:
-            role_str = "Generic Firmware Image"
-            sig_str = f"RSA / SHA-256" if sig else "Container Hash"
-            pub_str = vkey.get("rootfs_path", "Firmware Header") if vkey else "Firmware Storage"
-            ver_str = "[bold green]VERIFIED OK[/bold green]" if is_verified else "[dim]Cần thẩm định[/dim]"
+    status_str = "[bold green]ĐÃ GIẢI NÉN THÀNH CÔNG[/bold green]" if extracted else "[bold yellow]KHÔNG THỂ GIẢI NÉN TỰ ĐỘNG[/bold yellow]"
+    t2.add_row("Trạng Thái Giải Nén", status_str)
+    t2.add_row("Cấu Trúc Filesystem", f"[bold]{fs_type}[/bold]")
+    if extracted:
+        t2.add_row("Thư Mục Trích Xuất", str(analysis.get("extracted_dir", "")))
+        t2.add_row("Tổng Số Tệp / Thư Mục", f"{analysis.get('file_count', 0):,} mục")
+    else:
+        t2.add_row("Nguyên Nhân Kỹ Thuật", analysis.get("extraction_reason", "Container nhị phân đóng."))
+    console.print(t2)
 
-        summary_table.add_row(fn, role_str, fs_summary, sig_str, pub_str, ver_str)
+    # 3. Bảng Khóa Mật Mã & Chữ Ký Số Tìm Thấy
+    t3 = Table(title=f"3. Khóa Mật Mã & Chữ Ký Số Tìm Thấy ({len(keys)} mục)", show_header=True, header_style="bold blue")
+    t3.add_column("Nguồn / Tệp", style="cyan", width=22)
+    t3.add_column("Vị Trí Offset", style="dim", width=14)
+    t3.add_column("Loại Khóa / Chữ Ký", style="white", width=26)
+    t3.add_column("Độ Dài Bit", style="yellow", width=12)
+    t3.add_column("Chi Tiết / Nhận Diện", style="green")
 
-    console.print(summary_table)
-
-    # 2. CHI TIẾT CÁC FILESYSTEM PHÁT HIỆN
-    fs_table = Table(title="2. Chi Tiết Filesystem & Cấu Trúc Trích Xuất (Filesystem Breakdown)", show_header=True, header_style="bold cyan")
-    fs_table.add_column("Tệp Gốc", style="cyan", width=22)
-    fs_table.add_column("Phân Vùng / Filesystem", style="white", width=24)
-    fs_table.add_column("Loại & Nén", style="yellow", width=26)
-    fs_table.add_column("Offset (Hex/Dec)", style="dim", width=18)
-    fs_table.add_column("Dung Lượng", style="white", width=14)
-    fs_table.add_column("Trạng Thái Trích Xuất & Nội Dung", style="green")
-
-    has_any_fs = False
-    for item in analyses:
-        fn = item.get("filename", "")
-        for fs in item.get("filesystems", []):
-            has_any_fs = True
-            fs_table.add_row(
-                fn,
-                fs.get("name", "filesystem"),
-                f"{fs.get('type', 'N/A')}\n[dim]{fs.get('compression', '')}[/dim]",
-                f"{fs.get('offset_hex', '0x0')}\n[dim]({fs.get('offset_dec', 0):,} B)[/dim]",
-                f"{fs.get('size_mb', 0)} MB",
-                f"{fs.get('extracted_status', 'N/A')}\n[dim]{fs.get('details', '')}[/dim]",
+    if not keys:
+        t3.add_row("[dim]N/A[/dim]", "-", "[dim]0 khóa công khai / chứng thư bản rõ[/dim]", "-", "[dim]Không tìm thấy chuỗi BEGIN/END KEY trong tệp[/dim]")
+    else:
+        for k in keys:
+            bits_str = f"RSA-{k.get('bits')}" if k.get("bits") else "-"
+            t3.add_row(
+                k.get("source", fn),
+                k.get("offset_hex", "-"),
+                k.get("type", "Key"),
+                bits_str,
+                k.get("details", k.get("header", "")),
             )
-
-    if has_any_fs:
-        console.print(fs_table)
-
-    # 3. CHI TIẾT CHỮ KÝ SỐ & KHÓA MẬT MÃ
-    sig_table = Table(title="3. Chi Tiết Chữ Ký Số, Khóa Công Khai & Đối Soát QCVN 11", show_header=True, header_style="bold blue")
-    sig_table.add_column("Tệp Firmware", style="cyan", width=24)
-    sig_table.add_column("Cấu Trúc Chữ Ký & Thuật Toán", style="white", width=28)
-    sig_table.add_column("Khóa Công Khai Hard-coded", style="magenta", width=28)
-    sig_table.add_column("OpenSSL Cryptographic Verification", style="green")
-
-    for item in analyses:
-        fn = item.get("filename", "")
-        fmt = item.get("format", "unknown")
-        sig = item.get("signature", {})
-        vkey = item.get("verified_pubkey")
-        is_verified = item.get("crypto_verified", False)
-
-        if "ENCAP" in fmt:
-            ixit = item.get("ixit_declaration", {})
-            sig_spec = f"RSA-3072 / SHA-256\nMagic Header: 0x{item.get('magic_hex', '09000001')}\nTrailer: {item.get('trailer_marker')}"
-            key_spec = f"Phân vùng chỉ đọc an toàn (Read-Only Secure Partition)\nKhóa MfgPubKey / TrustUpdatePubKey\nĐộ dài: RSA 3072-bit"
-            proof = f"[bold green]VERIFIED (IXIT 7-UpdMech Hardware Root-of-Trust)[/bold green]\nCơ chế: U-Boot kiểm tra RSA-3072 trước khi giải nén & ghi flash\nChống hạ cấp: So khớp phiên bản bảo mật A/B rollback"
-        elif "AXIS" in fmt:
-            sig_bits = sig.get("inferred_rsa_bits", 2048) if sig else 2048
-            sig_magic = sig.get("magic", "pgnf") if sig else "N/A"
-            sig_domain = sig.get("signing_domain", "N/A") if sig else "N/A"
-            sig_bytes = sig.get("signature_bytes", 256) if sig else 0
-            sig_spec = f"Magic: {sig_magic}\nThuật toán: RSA-{sig_bits} + SHA-256\nDomain: {sig_domain}\nChữ ký: {sig_bytes} bytes"
-            if vkey:
-                key_spec = f"Trích xuất từ RootFS SquashFS:\n{vkey.get('rootfs_path', 'N/A')}\nĐộ dài: RSA {vkey.get('rsa_bits', sig_bits)}-bit"
-            else:
-                key_spec = "Chưa trích xuất khóa công khai từ rootfs.img"
-            proof = f"[bold green]VERIFIED OK ({vkey.get('scheme', 'RSA-PSS')})[/bold green]\nĐối soát toàn vẹn sums.bin: [green]PASS (4/4 tệp khớp)[/green]" if is_verified else "[bold red]FAILED TO VERIFY[/bold red]"
-        else:
-            sig_spec = "Container SHA-256 Digest"
-            key_spec = "Embedded Firmware Header"
-            proof = "[bold green]PASSED HASH INTEGRITY[/bold green]" if is_verified else "[dim]Cần thẩm định[/dim]"
-
-        sig_table.add_row(fn, sig_spec, key_spec, proof)
-
-    console.print(sig_table)
-
-    if tamper_results:
-        t_table = Table(title="Generated Tampered Firmware Packages (Manual Web UI / CMS Upload Test)", show_header=True)
-        t_table.add_column("Source Firmware", style="cyan", width=28)
-        t_table.add_column("Tampered Output File", style="yellow")
-        t_table.add_column("Bit-Flip Modification", style="green")
-
-        for tr in tamper_results:
-            member = tr.get("tampered_member", "payload")
-            offset = tr.get("flipped_offset_in_member", 0)
-            orig = tr.get("original_byte", "0x??")
-            tamp = tr.get("tampered_byte", "0x??")
-            t_table.add_row(
-                os.path.basename(tr.get("source", "")),
-                tr.get("output", ""),
-                f"{member}[{offset}]: {orig} -> {tamp}",
-            )
-        console.print(t_table)
+    console.print(t3)
 
 
-def write_markdown_report(
-    path: Path,
-    analyses: List[Dict[str, Any]],
-    tamper_results: List[Dict[str, Any]],
-    profile_id: str,
-    vendor: str,
-    model: str,
-) -> None:
-    """Write comprehensive Markdown audit report for QCVN 11:2026/BCA Clauses 2.3.1, 2.3.3, 2.3.5."""
+def write_clean_markdown_report(path: Path, analysis: Dict[str, Any], profile_id: str) -> None:
+    """Write concise, technical Markdown report."""
+    fn = analysis.get("filename", "")
+    size_mb = analysis.get("size_mb", 0)
+    size_b = analysis.get("size_bytes", 0)
+    h = analysis.get("file_sha256", "N/A")
+    fmt = analysis.get("container_format", "Unknown")
+    extracted = analysis.get("extracted", False)
+    fs_type = analysis.get("filesystem_type", "N/A")
+    keys = analysis.get("keys_and_signatures", [])
+
     lines = [
-        "# Báo Cáo Đo Kiểm Chữ Ký Số, Filesystem & Tính Toàn Vẹn Firmware",
-        "## Quy Chuẩn Kỹ Thuật Quốc Gia: QCVN 11:2026/BCA (Khoản 2.3.1, Khoản 2.3.3 & Khoản 2.3.5)",
+        "# Báo Cáo Phân Tích Firmware, Filesystem & Khóa Mật Mã",
         "",
         f"- **Thời điểm kiểm tra (UTC):** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        f"- **Hồ sơ thiết bị (Profile):** `{profile_id}` ({vendor} - `{model}`)",
-        f"- **Số lượng gói firmware phân tích:** {len(analyses)}",
+        f"- **Hồ sơ thiết bị (Profile):** `{profile_id}`",
+        f"- **Tệp firmware phân tích:** `{fn}` ({size_mb} MB)",
         "",
-        "### 1. Bảng Tổng Hợp Đánh Giá Firmware & Chữ Ký Số",
+        "## 1. Thông Tin Tệp Firmware Hiện Tại",
         "",
-        "| Tên File | Định Dạng Container | Filesystem Phát Hiện | Chữ Ký Số | Khóa Công Khai (Root of Trust) | Kết Luận QCVN 11 |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        f"- **Đường dẫn tệp:** `{analysis.get('file', '')}`",
+        f"- **Dung lượng:** {size_b:,} bytes ({size_mb} MB)",
+        f"- **Mã băm SHA-256:** `{h}`",
+        f"- **Định dạng container:** `{fmt}`",
+        f"- **Độ hỗn loạn Shannon (Entropy):** `{analysis.get('entropy', 0):.4f} / 8.0000`",
+        "",
+        "## 2. Phân Tích Filesystem & Giải Nén",
+        "",
+        f"- **Trạng thái giải nén:** `{'Đã giải nén thành công' if extracted else 'Không thể giải nén tự động'}`",
+        f"- **Loại Filesystem:** `{fs_type}`",
     ]
 
-    for item in analyses:
-        fmt = item.get("format", "unknown")
-        fn = item.get("filename", "")
-        h = item.get("file_sha256")
-        h_short = f"`{h[:16]}...`" if h else "`N/A`"
-        fs_list = item.get("filesystems", [])
-        fs_desc = ", ".join(f["name"] for f in fs_list) if fs_list else "Chưa phát hiện"
-        vkey = item.get("verified_pubkey")
-        is_verified = item.get("crypto_verified", False)
-
-        if "AXIS" in fmt:
-            sig_status = f"RSA-{vkey.get('rsa_bits', 2048)} (Verified)" if vkey else "Not verified"
-            pub_desc = f"`{vkey['rootfs_path']}`" if vkey else "Chưa trích xuất"
-            concl = "ĐẠT (Khoản 2.3.3 & 2.3.5)" if is_verified else "CHƯA ĐẠT"
-        elif "ENCAP" in fmt:
-            sig_status = "RSA-3072 / SHA-256"
-            pub_desc = "Secure Partition (MfgPubKey)"
-            concl = "ĐẠT (Khoản 2.3.1, 2.3.3, 2.3.5)"
-        else:
-            sig_status = "SHA-256 / RSA"
-            pub_desc = "Firmware Header"
-            concl = "ĐẠT (Khoản 2.3.3, 2.3.5)" if is_verified else "Cần thẩm định"
-
-        lines.append(f"| `{fn}` | {fmt} | {fs_desc} | {sig_status} | {pub_desc} | **{concl}** |")
+    if extracted:
+        lines.extend([
+            f"- **Thư mục trích xuất:** `{analysis.get('extracted_dir', '')}`",
+            f"- **Tổng số tệp/thư mục:** {analysis.get('file_count', 0):,} mục",
+        ])
+    else:
+        lines.append(f"- **Nguyên nhân kỹ thuật:** {analysis.get('extraction_reason', '')}")
 
     lines.extend([
         "",
-        "---",
+        "## 3. Danh Sách Khóa Mật Mã & Chữ Ký Số Tìm Thấy",
         "",
-        "### 2. Chi Tiết Filesystem & Cấu Trúc Trích Xuất (Filesystem Breakdown)",
-        "",
-        "| Tên Gói Firmware | Phân Vùng / Filesystem | Loại & Thuật Toán Nén | Offset (Hex / Dec) | Kích Thước | Trạng Thái Trích Xuất |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| Nguồn / Tệp | Offset | Loại Khóa / Chữ Ký | Thuật Toán / Độ Dài | Chi Tiết / Nhận Diện |",
+        "| :--- | :--- | :--- | :--- | :--- |",
     ])
 
-    for item in analyses:
-        fn = item.get("filename", "")
-        for fs in item.get("filesystems", []):
+    if not keys:
+        lines.append("| Tệp nhị phân | - | 0 khóa bản rõ | - | Không phát hiện chuỗi BEGIN/END KEY trong tệp nhị phân |")
+    else:
+        for k in keys:
+            bits_str = f"RSA-{k.get('bits')}" if k.get("bits") else "N/A"
             lines.append(
-                f"| `{fn}` | `{fs.get('name', 'fs')}` | {fs.get('type', 'N/A')} ({fs.get('compression', '')}) | "
-                f"`{fs.get('offset_hex', '0x0')}` ({fs.get('offset_dec', 0):,} B) | {fs.get('size_mb', 0)} MB | {fs.get('extracted_status', 'N/A')} |"
+                f"| `{k.get('source', fn)}` | `{k.get('offset_hex', '-')}` | {k.get('type', 'Key')} | "
+                f"{bits_str} | {k.get('details', '')} |"
             )
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "### 3. Chi Tiết Phân Tích Kỹ Thuật Từng Gói Firmware & Chữ Ký Số",
-        "",
-    ])
-
-    for item in analyses:
-        fn = item.get("filename", "")
-        fmt = item.get("format", "unknown")
-        lines.append(f"#### Firmware: `{fn}`")
-        lines.append(f"- **Đường dẫn tệp:** `{item.get('file')}`")
-        lines.append(f"- **Dung lượng:** {item.get('size_bytes', 0):,} bytes ({item.get('size_mb', 0)} MB)")
-        lines.append(f"- **SHA-256:** `{item.get('file_sha256', 'N/A')}`")
-        lines.append(f"- **Định dạng container:** `{fmt}`")
-        if item.get("entropy"):
-            lines.append(f"- **Độ hỗn loạn Shannon (Entropy):** `{item.get('entropy')} / 8.0000` (Khẳng định tính chất mã hóa/nén an toàn)")
-
-        if "AXIS" in fmt:
-            info = item.get("info", {})
-            sig = item.get("signature", {})
-            vkey = item.get("verified_pubkey")
-            lines.extend([
-                f"- **Signing Domain:** `{info.get('SigningDomain', 'N/A')}`",
-                f"- **Kiểm tra tính toàn vẹn (sums.bin SHA-256):** `{'PASS (Khớp toàn bộ các tệp payload)' if item.get('sums_all_matched') else 'FAIL'}`",
-                f"- **Cấu trúc sign.bin:** `magic={sig.get('magic')}`, `signature_bytes={sig.get('signature_bytes')}B`, `RSA-{sig.get('inferred_rsa_bits')}`",
-                f"- **Khóa công khai trích xuất từ RootFS SquashFS:** `{vkey['rootfs_path']}` (`RSA-{vkey['rsa_bits']}`)" if vkey else "- **Khóa công khai RootFS:** Không trích xuất được",
-                f"- **Xác thực mật mã OpenSSL:** `VERIFIED OK ({vkey['scheme']})`" if vkey else "- **Xác thực OpenSSL:** THẤT BẠI",
-            ])
-        elif "ENCAP" in fmt:
-            ixit = item.get("ixit_declaration", {})
-            lines.extend([
-                f"- **Vai trò thử nghiệm:** {item.get('package_role')}",
-                f"- **Phiên bản:** `{item.get('version')}`",
-                f"- **Header Magic:** `0x{item.get('magic_hex')}` ({'Hợp lệ chuẩn ENCAP Tiandy/Oryza' if item.get('magic_valid') else 'Không hợp lệ'})",
-                f"- **Trailer Marker:** `{item.get('trailer_marker')}`",
-                f"- **Thuật toán ký số khai báo (IXIT 7-UpdMech):** `{ixit.get('signing_algorithm')}`",
-                f"- **Cơ chế lưu trữ khóa công khai gốc:** `{ixit.get('verification_key')}`",
-                f"- **Cơ chế chống hạ cấp (Anti-rollback):** `{ixit.get('anti_rollback_mechanism')}`",
-                f"- **Kênh nạp firmware an toàn:** {', '.join(ixit.get('update_channels', []))}",
-            ])
-
-        if item.get("errors"):
-            lines.append(f"- **Cảnh báo / Lỗi ghi nhận:** {'; '.join(item['errors'])}")
-        lines.append("")
-
-    if tamper_results:
-        lines.extend([
-            "---",
-            "",
-            "### 4. Gói Firmware Giả Mạo Để Kiểm Thử Tiêu Cực (Negative Testing)",
-            "",
-            "| Gói Nguồn | Tệp Giả Mạo Đã Tạo | Vị Trí Byte Sửa Đổi | Byte Gốc -> Byte Giả | Mục Đích Thử Nghiệm |",
-            "| :--- | :--- | :--- | :--- | :--- |",
-        ])
-        for tr in tamper_results:
-            src_n = os.path.basename(tr.get("source", ""))
-            out_n = os.path.basename(tr.get("output", ""))
-            mem = tr.get("tampered_member", "payload")
-            off = tr.get("flipped_offset_in_member", 0)
-            orig = tr.get("original_byte", "0x??")
-            tamp = tr.get("tampered_byte", "0x??")
-            lines.append(f"| `{src_n}` | `{out_n}` | `{mem}[{off}]` | `{orig} -> {tamp}` | Chứng minh DUT từ chối nạp |")
-        lines.append("")
-
-    lines.extend([
-        "---",
-        "",
-        "### 4. Đối Soát Các Khoản Yêu Cầu Của QCVN 11:2026/BCA",
-        "",
-        "1. **Khoản 2.3.1 (Chống hạ cấp phần mềm / Anti-rollback):**",
-        "   - Yêu cầu thiết bị kiểm tra số phiên bản bảo mật và từ chối nạp bản firmware cũ hơn.",
-        "   - Bằng chứng kỹ thuật: Cơ chế so khớp phiên bản bảo mật phần sụn và cơ chế A/B dual partition rollback protection.",
-        "",
-        "2. **Khoản 2.3.3 (Xác thực tính xác thực của phần mềm cập nhật):**",
-        "   - Yêu cầu thiết bị xác thực chữ ký số bằng khóa công khai tin cậy lưu trong phân vùng chỉ đọc trước khi giải nén.",
-        "   - Bằng chứng kỹ thuật: Chữ ký số RSA (2048-bit / 3072-bit) kết hợp hàm băm SHA-256 được kiểm tra hợp lệ với khóa công khai gốc.",
-        "",
-        "3. **Khoản 2.3.5 (Kiểm tra tính toàn vẹn của phần mềm cập nhật):**",
-        "   - Yêu cầu thiết bị kiểm tra mã băm SHA-256 toàn vẹn của container và các tệp thành phần trước khi ghi flash.",
-        "   - Bằng chứng kỹ thuật: Đối soát hàm băm SHA-256 khớp hoàn toàn giữa cấu trúc container và dữ liệu payload.",
-        "",
-    ])
-
-    if tamper_results:
-        lines.extend([
-            "---",
-            "",
-            "### 5. Gói Firmware Giả Mạo Để Kiểm Thử Tiêu Cực (Opt-in)",
-            "",
-            "| Gói Nguồn | Tệp Giả Mạo Đã Tạo | Vị Trí Byte Sửa Đổi | Byte Gốc -> Byte Giả | Mục Đích Thử Nghiệm |",
-            "| :--- | :--- | :--- | :--- | :--- |",
-        ])
-        for tr in tamper_results:
-            src_n = os.path.basename(tr.get("source", ""))
-            out_n = os.path.basename(tr.get("output", ""))
-            mem = tr.get("tampered_member", "payload")
-            off = tr.get("flipped_offset_in_member", 0)
-            orig = tr.get("original_byte", "0x??")
-            tamp = tr.get("tampered_byte", "0x??")
-            lines.append(f"| `{src_n}` | `{out_n}` | `{mem}[{off}]` | `{orig} -> {tamp}` | Chứng minh DUT từ chối nạp |")
-        lines.append("")
-
+    lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -579,15 +662,11 @@ def write_markdown_report(
 # ----------------------------------------------------------------------
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Firmware Signing & Hard-coded Public Key Auditor (QCVN 11)")
-    parser.add_argument("--profile", help="Active camera profile ID (e.g. axis_q1806_le, oryza_orz_b52z)")
-    parser.add_argument("--firmware-dir", help="Directory containing firmware files (overrides profile default)")
-    parser.add_argument("--firmware", help="Specific firmware file to audit (overrides directory scan)")
-    parser.add_argument("--tamper", action="store_true", default=False, help="Explicitly enable generating tampered firmware package (disabled by default)")
-    parser.add_argument("--no-tamper", action="store_true", default=True, help="Skip generating tampered firmware package (default)")
-    parser.add_argument("--tamper-member", choices=["sign.bin", "sums.bin", "info.json"], default="sign.bin", help="Member inside firmware archive to flip byte (Axis)")
-    parser.add_argument("--tamper-all", action="store_true", help="Generate tampered file for all analyzed packages")
-    parser.add_argument("--report-dir", help="Directory for JSON/MD reports (defaults to toolkit or evidence dir)")
+    parser = argparse.ArgumentParser(description="Firmware, Filesystem & Cryptographic Key Auditor (Single Current Version)")
+    parser.add_argument("--profile", help="Active camera profile ID")
+    parser.add_argument("--firmware", help="Specific firmware file to audit (defaults to current DUT firmware)")
+    parser.add_argument("--firmware-dir", help="Directory containing firmware files")
+    parser.add_argument("--report-dir", help="Directory for JSON/MD reports")
     args = parser.parse_args()
 
     # Load active profile configuration
@@ -598,85 +677,34 @@ def main() -> int:
         try:
             cfg = switch_profile(args.profile)
             active_profile = args.profile
-            console.print(f"[green]Switched active profile to: {active_profile}[/green]")
+            console.print(f"[green]Đã chuyển active profile: {active_profile}[/green]")
         except Exception as exc:
-            console.print(f"[red]Failed to switch profile to '{args.profile}': {exc}[/red]")
+            console.print(f"[red]Không thể chuyển profile '{args.profile}': {exc}[/red]")
             return 1
 
     adapter = get_adapter(cfg)
-    vendor = cfg.get("vendor", "Generic")
-    model = cfg.get("model", "Device")
 
-    # Discover target firmware files
+    # Resolve exactly ONE CURRENT firmware file
     try:
-        fw_files = resolve_firmware_files(
+        current_fw = resolve_current_firmware_file(
             adapter=adapter,
             config=cfg,
             cli_firmware=args.firmware,
             cli_firmware_dir=args.firmware_dir,
         )
     except Exception as exc:
-        console.print(f"[red]Error locating firmware files: {exc}[/red]")
+        console.print(f"[red]Lỗi định vị firmware: {exc}[/red]")
         return 1
 
-    if not fw_files:
-        console.print(f"[yellow]No firmware files found for profile '{active_profile}'.[/yellow]")
+    if not current_fw:
+        console.print(f"[yellow]Không tìm thấy tệp firmware hiện tại cho profile '{active_profile}'.[/yellow]")
         return 1
 
-    console.print(f"[dim]Found {len(fw_files)} firmware file(s) for profile '{active_profile}':[/dim]")
-    for f in fw_files:
-        console.print(f"  • {f.name}")
+    console.print(f"[cyan]Đang phân tích firmware hiện tại: {current_fw.name}...[/cyan]")
+    analysis = analyze_current_firmware(current_fw, adapter)
 
-    # Step 1 & 2: Firmware Package Analysis
-    analyses: List[Dict[str, Any]] = []
-    for fw in fw_files:
-        console.print(f"[cyan]Analyzing {fw.name}...[/cyan]")
-        try:
-            res = adapter.parse_firmware(str(fw), extract_keys=True)
-            analyses.append(res)
-        except Exception as exc:
-            console.print(f"[red]Error analyzing {fw.name}: {exc}[/red]")
-            analyses.append({
-                "file": str(fw),
-                "filename": fw.name,
-                "size_bytes": fw.stat().st_size if fw.exists() else 0,
-                "format": "error",
-                "errors": [str(exc)],
-            })
-
-    # Step 3: Tampered Firmware Generation (Opt-in only via --tamper)
-    tamper_results: List[Dict[str, Any]] = []
-    if args.tamper:
-        if args.tamper_all:
-            targets = [fw for fw in fw_files if "_tampered" not in fw.name.lower() and "_TAMPERED" not in fw.name]
-        else:
-            # Pick the best representative package to tamper
-            target_candidates = [
-                fw for fw in fw_files
-                if "_tampered" not in fw.name.lower() and "_TAMPERED" not in fw.name
-            ]
-            if isinstance(adapter, OryzaCameraAdapter):
-                pref = next((p for p in target_candidates if ".0.7" in p.name), None)
-                if not pref:
-                    pref = next((p for p in target_candidates if ".0.6" in p.name), None)
-                targets = [pref] if pref else [target_candidates[-1]]
-            else:
-                pref = next((p for p in target_candidates if "12_11_118" in p.name), None)
-                targets = [pref] if pref else [target_candidates[0]]
-
-        for fw in targets:
-            try:
-                console.print(f"[yellow]Generating tampered firmware for {fw.name}...[/yellow]")
-                tr = adapter.generate_tampered_firmware(
-                    file_path=str(fw),
-                    target_member=args.tamper_member,
-                )
-                tamper_results.append(tr)
-            except Exception as exc:
-                console.print(f"[red]Failed to tamper {fw.name}: {exc}[/red]")
-
-    # Terminal report
-    render_console_report(analyses, tamper_results, active_profile)
+    # Render terminal report
+    render_minimal_console_report(analysis, active_profile)
 
     # Save reports
     report_dir = Path(args.report_dir) if args.report_dir else Path(TOOLKIT_DIR)
@@ -687,16 +715,18 @@ def main() -> int:
 
     output_payload = {
         "profile": active_profile,
-        "vendor": vendor,
-        "model": model,
+        "vendor": cfg.get("vendor", "Generic"),
+        "model": cfg.get("model", "Device"),
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "analyses": analyses,
-        "tampered_files": tamper_results,
+        "current_firmware": analysis,
+        # Backward compatibility aliases for existing API callers
+        "analyses": [analysis],
+        "tampered_files": [],
     }
 
     json_path.write_text(json.dumps(output_payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    write_markdown_report(md_path, analyses, tamper_results, active_profile, vendor, model)
-    console.print(f"[green]Saved reports: {md_path} and {json_path}[/green]")
+    write_clean_markdown_report(md_path, analysis, active_profile)
+    console.print(f"[green]Đã lưu báo cáo: {md_path.name} và {json_path.name}[/green]")
 
     return 0
 

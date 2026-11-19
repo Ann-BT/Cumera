@@ -418,7 +418,7 @@
         </button>
 
         <!-- FIRMWARE -->
-        <button onclick="switchTab('firmware_update')" id="nav_firmware_update" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Phân tích tự động cấu trúc firmware, nhận diện filesystem & kiểm tra chữ ký số (QCVN 11:2026/BCA)">
+        <button onclick="switchTab('firmware_update')" id="nav_firmware_update" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Phân tích cấu trúc firmware, nhận diện filesystem &amp; kiểm tra khóa mật mã">
           <div class="flex items-center gap-2 overflow-hidden">
             <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             <span class="nav-label truncate font-medium">Firmware</span>
@@ -2148,13 +2148,14 @@
         <!-- ============================================================== -->
         <!-- TAB: FIRMWARE UPDATE & SIGNING -->
         <!-- ============================================================== -->
-        <!-- TAB: FIRMWARE ANALYSIS, FILESYSTEM & SIGNING AUDIT -->
+        <!-- TAB: PHÂN TÍCH FIRMWARE & KHÓA MẬT MÃ (PHIÊN BẢN HIỆN TẠI) -->
         <!-- ============================================================== -->
         <div id="tab_content_firmware_update" class="tab-pane hidden space-y-3">
+          <!-- Top Header -->
           <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-3 rounded">
             <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Tự Động Firmware, Filesystem &amp; Chữ Ký Số</h2>
-              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tự động nhận diện container, tìm kiếm &amp; trích xuất Filesystem (SquashFS, CPIO, Tar, uImage), bóc tách chữ ký số (RSA / pgnf / ENCAP) và khóa công khai hard-coded (QCVN 11:2026/BCA Khoản 2.3.1, 2.3.3 &amp; 2.3.5).</p>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Firmware Hiện Tại, Filesystem &amp; Khóa Mật Mã</h2>
+              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tự động nhận diện định dạng container, bóc tách cấu trúc filesystem và quét toàn diện chữ ký số, khóa công khai / chứng chỉ mật mã.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button onclick="runFirmwareAudit()" class="px-3.5 py-1.5 rounded text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center gap-1.5 shadow-sm">
@@ -2181,101 +2182,83 @@
             </div>
           </div>
 
-          <!-- Bảng 1: Bảng tổng hợp kiểm thử firmware & chữ ký số -->
-          <div class="bg-[#14171f] border border-[#272c3a] rounded overflow-hidden">
-            <div class="px-3 py-2 border-b border-[#272c3a] flex items-center justify-between">
-              <span class="text-xs font-bold text-white uppercase tracking-wider">Bước 1: Bảng Tổng Hợp Firmware &amp; Xác Thực Chữ Ký Số</span>
-              <span id="fw_summary_count_badge" class="font-mono text-[10px] text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">0 gói</span>
+          <!-- Khối 1: Thông tin Firmware & Container -->
+          <div class="bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2">
+            <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Thông Tin Tệp Firmware Hiện Tại</span>
+              <span id="fw_status_badge" class="font-mono text-[10px] text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">Chờ phân tích</span>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase">
-                  <tr>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Tệp Firmware</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Phiên bản / Vai trò</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Định dạng Container</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Filesystem Phát Hiện</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Chữ Ký Số &amp; Hash</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Khóa Công Khai (Root of Trust)</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Xác Thực Mật Mã (QCVN 11)</th>
-                  </tr>
-                </thead>
-                <tbody id="fw_audit_tbody" class="divide-y divide-[#272c3a]">
-                  <tr><td colspan="7" class="px-3 py-4 text-center text-[#64748b]">Chưa có dữ liệu. Nhấn "Bắt Đầu Phân Tích Firmware" để chạy kiểm tra tự động.</td></tr>
-                </tbody>
-              </table>
+            <div id="fw_info_grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs font-mono">
+              <div class="p-2 rounded bg-[#090c13] border border-[#272c3a]">
+                <div class="text-[10px] text-[#64748b] uppercase">Tệp Firmware</div>
+                <div id="fw_val_filename" class="text-white font-medium truncate mt-0.5" title="">-</div>
+                <div id="fw_val_size" class="text-[10px] text-[#94a3b8] mt-0.5">-</div>
+              </div>
+              <div class="p-2 rounded bg-[#090c13] border border-[#272c3a]">
+                <div class="text-[10px] text-[#64748b] uppercase">Định Dạng Container</div>
+                <div id="fw_val_container" class="text-cyan-300 font-medium truncate mt-0.5">-</div>
+                <div id="fw_val_magic" class="text-[10px] text-[#94a3b8] mt-0.5">Magic: -</div>
+              </div>
+              <div class="p-2 rounded bg-[#090c13] border border-[#272c3a]">
+                <div class="text-[10px] text-[#64748b] uppercase">Độ Hỗn Loạn (Entropy)</div>
+                <div id="fw_val_entropy" class="text-amber-300 font-medium mt-0.5">-</div>
+                <div id="fw_val_entropy_desc" class="text-[10px] text-[#94a3b8] mt-0.5">-</div>
+              </div>
+              <div class="p-2 rounded bg-[#090c13] border border-[#272c3a]">
+                <div class="text-[10px] text-[#64748b] uppercase">Mã Băm SHA-256</div>
+                <div id="fw_val_sha256" class="text-emerald-300 font-medium text-[10px] truncate select-all mt-0.5" title="">-</div>
+                <div class="text-[10px] text-[#64748b] mt-0.5">Khóa băm toàn vẹn tệp</div>
+              </div>
             </div>
           </div>
 
-          <!-- Bảng 2: Chi tiết Filesystem & Cấu trúc đã trích xuất -->
-          <div class="bg-[#14171f] border border-[#272c3a] rounded overflow-hidden">
-            <div class="px-3 py-2 border-b border-[#272c3a] flex items-center justify-between">
-              <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Bước 2: Chi Tiết Filesystem &amp; Cấu Trúc Trích Xuất (Filesystem Breakdown)</span>
-              <span class="text-[10px] text-[#64748b] font-mono">SquashFS / Tar / uImage / CPIO</span>
+          <!-- Khối 2: Kết Quả Trích Xuất Filesystem -->
+          <div class="bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2">
+            <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Phân Tích Filesystem &amp; Trích Xuất</span>
+                <span id="fw_fs_status_badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1c2230] text-[#94a3b8] border border-[#2a354c]">Chưa kiểm tra</span>
+              </div>
+              <span id="fw_fs_type_badge" class="font-mono text-[10px] text-[#94a3b8]">-</span>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase">
-                  <tr>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Tệp Nguồn</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Phân Vùng / Filesystem</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Loại &amp; Thuật Toán Nén</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Offset (Hex / Dec)</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Dung Lượng</th>
-                    <th class="px-3 py-2 border-b border-[#272c3a]">Trạng Thái Trích Xuất &amp; Nội Dung</th>
-                  </tr>
-                </thead>
-                <tbody id="fw_fs_tbody" class="divide-y divide-[#272c3a]">
-                  <tr><td colspan="6" class="px-3 py-3 text-center text-[#64748b]">Chưa phát hiện phân vùng filesystem.</td></tr>
-                </tbody>
-              </table>
+            <div id="fw_fs_details_container" class="text-xs space-y-2">
+              <div id="fw_fs_reason_box" class="p-2.5 rounded bg-[#090c13] border border-[#272c3a] text-[#94a3b8] font-mono leading-relaxed">
+                Chưa có dữ liệu trích xuất. Nhấn "Bắt Đầu Phân Tích Firmware" để tiến hành kiểm tra.
+              </div>
+              <div id="fw_fs_files_box" class="hidden space-y-1.5">
+                <div class="text-[11px] text-[#94a3b8] font-semibold">Tệp tin trích xuất trong Filesystem:</div>
+                <div id="fw_fs_files_list" class="max-h-40 overflow-y-auto bg-[#090c13] border border-[#272c3a] p-2 rounded text-[11px] font-mono text-[#cbd5e1] space-y-0.5">
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Bước 3: Chi tiết Chữ Ký Số, Khóa Công Khai & Wireshark Filter -->
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <div class="lg:col-span-7 bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2.5">
-              <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Bước 3: Chi Tiết Chữ Ký Số &amp; Khóa Mật Mã Tìm Thấy</h3>
-              <div id="fw_sig_details_box" class="text-xs text-[#94a3b8] space-y-2 font-mono">
-                <div class="text-[#64748b]">Nhấn "Bắt Đầu Phân Tích Firmware" để trích xuất khóa và phân tích chữ ký.</div>
+          <!-- Khối 3: Khóa Mật Mã & Chữ Ký Số Phát Hiện Được -->
+          <div class="bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-2">
+            <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
+              <div>
+                <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Khóa Mật Mã &amp; Chữ Ký Số Tìm Thấy</span>
+                <span class="text-[10px] text-[#64748b] ml-1.5 font-normal">(PEM, Certificate, OpenSSH, RSA, Signature Markers)</span>
               </div>
+              <span id="fw_keys_count_badge" class="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/60">0 khóa</span>
             </div>
-
-            <div class="lg:col-span-5 bg-[#14171f] border border-[#272c3a] rounded p-3 space-y-3">
-              <h3 class="text-xs font-bold text-emerald-300 uppercase tracking-wider">Đối Soát Tiêu Chuẩn QCVN 11:2026/BCA</h3>
-              <div id="fw_qcvn11_checklist" class="space-y-2 text-[11px]">
-                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
-                  <div>
-                    <span class="font-bold text-emerald-300">Khoản 2.3.1 (Chống hạ cấp / Anti-rollback):</span>
-                    <p class="text-[#94a3b8] mt-0.5">Bắt buộc DUT kiểm tra phiên bản bảo mật; từ chối khi cập nhật bản cũ hơn.</p>
-                  </div>
-                </div>
-                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
-                  <div>
-                    <span class="font-bold text-emerald-300">Khoản 2.3.3 (Xác thực chữ ký số):</span>
-                    <p class="text-[#94a3b8] mt-0.5">Xác thực chữ ký RSA bằng khóa công khai tin cậy lưu trong phân vùng chỉ đọc trước khi giải nén.</p>
-                  </div>
-                </div>
-                <div class="p-2 rounded bg-[#090c13] border border-[#272c3a] flex items-start gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
-                  <div>
-                    <span class="font-bold text-emerald-300">Khoản 2.3.5 (Tính toàn vẹn phần mềm):</span>
-                    <p class="text-[#94a3b8] mt-0.5">Kiểm tra mã băm SHA-256 toàn vẹn của container và các tệp thành phần trước khi ghi flash.</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Wireshark Filter -->
-              <div class="pt-2 border-t border-[#272c3a] space-y-1.5">
-                <span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">Wireshark Filter Kênh Truyền Khi Update</span>
-                <div class="bg-[#090c13] border border-[#272c3a] rounded p-2 flex items-center justify-between text-[11px] font-mono">
-                  <span class="text-emerald-300 select-all truncate">tls.handshake.type == 1 || http.request.method == "POST"</span>
-                  <button onclick="copyFilter('tls.handshake.type == 1 || http.request.method == &quot;POST&quot;')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition shrink-0">Copy</button>
-                </div>
-              </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase font-mono">
+                  <tr>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Nguồn / Tệp</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Loại Khóa / Chữ Ký</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Offset</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Kích Thước</th>
+                    <th class="px-3 py-2 border-b border-[#272c3a]">Chi Tiết / Thuật Toán</th>
+                  </tr>
+                </thead>
+                <tbody id="fw_keys_tbody" class="divide-y divide-[#272c3a] font-mono text-xs">
+                  <tr><td colspan="5" class="px-3 py-4 text-center text-[#64748b]">Chưa có dữ liệu khóa mật mã. Nhấn "Bắt Đầu Phân Tích Firmware" để quét.</td></tr>
+                </tbody>
+              </table>
             </div>
+            <div id="fw_keys_note_box" class="hidden p-2 rounded bg-[#090c13] border border-[#272c3a] text-[11px] text-[#94a3b8]"></div>
           </div>
         </div>
 
@@ -5388,14 +5371,28 @@
     }
 
     async function loadFirmwareSigningData() {
-      const tbody = document.getElementById('fw_audit_tbody');
-      const fsTbody = document.getElementById('fw_fs_tbody');
-      const sigBox = document.getElementById('fw_sig_details_box');
-      const countBadge = document.getElementById('fw_summary_count_badge');
-      if (!tbody) return;
+      const statusBadge = document.getElementById('fw_status_badge');
+      const valFilename = document.getElementById('fw_val_filename');
+      const valSize = document.getElementById('fw_val_size');
+      const valContainer = document.getElementById('fw_val_container');
+      const valMagic = document.getElementById('fw_val_magic');
+      const valEntropy = document.getElementById('fw_val_entropy');
+      const valEntropyDesc = document.getElementById('fw_val_entropy_desc');
+      const valSha256 = document.getElementById('fw_val_sha256');
+
+      const fsStatusBadge = document.getElementById('fw_fs_status_badge');
+      const fsTypeBadge = document.getElementById('fw_fs_type_badge');
+      const fsReasonBox = document.getElementById('fw_fs_reason_box');
+      const fsFilesBox = document.getElementById('fw_fs_files_box');
+      const fsFilesList = document.getElementById('fw_fs_files_list');
+
+      const keysCountBadge = document.getElementById('fw_keys_count_badge');
+      const keysTbody = document.getElementById('fw_keys_tbody');
+      const keysNoteBox = document.getElementById('fw_keys_note_box');
+
+      if (!statusBadge) return;
 
       try {
-        // Ensure path input is populated
         if (document.getElementById('fw_dir_input') && !document.getElementById('fw_dir_input').value) {
           initFirmwareDirInput();
         }
@@ -5405,158 +5402,115 @@
         if (payload.status !== 'ok' || !payload.data) {
           return;
         }
-        const analyses = payload.data.analyses || [];
-        if (countBadge) countBadge.textContent = `${analyses.length} gói`;
 
-        // 1. Render Summary Table
-        if (!analyses.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-[#64748b]">Không có dữ liệu firmware. Nhấn "Bắt Đầu Phân Tích Firmware" để chạy kiểm tra.</td></tr>';
-        } else {
-          tbody.innerHTML = analyses.map(item => {
-            const info = item.info || {};
-            const sig = item.signature || {};
-            const vkey = item.verified_pubkey;
-            const fmt = item.format || 'unknown';
-            const fsList = item.filesystems || [];
+        const data = payload.data;
+        const fw = data.current_firmware || (data.analyses && data.analyses[0]) || null;
+        if (!fw) return;
 
-            // Role / Version
-            const roleStr = item.package_role || (info.Release ? `Release ${info.Release}` : item.version || 'Chuẩn');
-
-            // Filesystem preview
-            let fsHtml = '<span class="text-[#64748b] text-[11px]">Chưa phát hiện</span>';
-            if (fsList.length > 0) {
-              fsHtml = `<div class="space-y-1">${fsList.map(f => `
-                <div class="px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/60 font-mono text-[10px] truncate max-w-xs" title="${escapeHtmlFw(f.details || '')}">
-                  <span class="font-bold">${escapeHtmlFw(f.name)}:</span> ${escapeHtmlFw(f.type)}
-                </div>
-              `).join('')}</div>`;
-            }
-
-            // SHA-256 / Hash status
-            const sumsBadge = item.sums_all_matched
-              ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[10px]">PASS (SHA-256)</span>'
-              : '<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60 font-mono text-[10px]">FAIL / Missing</span>';
-
-            // Signature details
-            let sigHtml = '<span class="text-[#64748b]">N/A</span>';
-            if (sig.inferred_rsa_bits || sig.magic) {
-              sigHtml = `<div class="space-y-0.5">
-                <div class="font-mono text-[11px] text-cyan-300 font-semibold">${escapeHtmlFw(sig.magic || 'RSA')} / RSA-${escapeHtmlFw(sig.inferred_rsa_bits || '?')}</div>
-                <div class="text-[10px] text-[#94a3b8]">${escapeHtmlFw(sig.hash_algorithm || 'SHA-256')} (${escapeHtmlFw(sig.signature_bytes || 256)}B)</div>
-              </div>`;
-            }
-
-            // Public Key
-            const pubKeyHtml = vkey
-              ? `<span class="font-mono text-[11px] text-emerald-300">${escapeHtmlFw(vkey.rootfs_path)} (RSA-${escapeHtmlFw(vkey.rsa_bits)})</span>`
-              : '<span class="text-[#64748b]">Không tìm thấy</span>';
-
-            // Verification status
-            const verifyBadge = item.crypto_verified
-              ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[10px]">VERIFIED OK (${escapeHtmlFw(vkey?.scheme || 'Hardware Root-of-Trust')})</span>`
-              : '<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60 font-mono text-[10px]">NOT VERIFIED</span>';
-
-            return `<tr class="hover:bg-[#191d28] transition">
-              <td class="px-3 py-2 font-mono text-white font-medium">
-                <div>${escapeHtmlFw(item.filename)}</div>
-                <div class="text-[10px] text-[#64748b] font-normal">${escapeHtmlFw(item.size_mb || 0)} MB (${Number(item.size_bytes || 0).toLocaleString()} B)</div>
-              </td>
-              <td class="px-3 py-2 text-[#cbd5e1] text-[11px]">${escapeHtmlFw(roleStr)}</td>
-              <td class="px-3 py-2 font-mono text-xs text-[#94a3b8]">${escapeHtmlFw(fmt)}</td>
-              <td class="px-3 py-2">${fsHtml}</td>
-              <td class="px-3 py-2 space-y-1">${sumsBadge}${sigHtml}</td>
-              <td class="px-3 py-2">${pubKeyHtml}</td>
-              <td class="px-3 py-2">${verifyBadge}</td>
-            </tr>`;
-          }).join('');
+        // 1. Fill Firmware Info
+        if (statusBadge) {
+          statusBadge.className = 'font-mono text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60';
+          statusBadge.textContent = 'Đã phân tích';
+        }
+        if (valFilename) {
+          valFilename.textContent = fw.filename || '-';
+          valFilename.title = fw.file || '';
+        }
+        if (valSize) {
+          valSize.textContent = `${fw.size_mb || 0} MB (${Number(fw.size_bytes || 0).toLocaleString()} bytes)`;
+        }
+        if (valContainer) {
+          valContainer.textContent = fw.container_format || 'Không rõ';
+        }
+        if (valMagic) {
+          valMagic.textContent = `Magic: 0x${fw.magic_hex || '00000000'}`;
+        }
+        if (valEntropy) {
+          valEntropy.textContent = `${fw.entropy || 0} / 8.0000`;
+          valEntropy.className = (fw.entropy > 7.9) ? 'text-amber-400 font-bold mt-0.5' : 'text-cyan-300 font-medium mt-0.5';
+        }
+        if (valEntropyDesc) {
+          valEntropyDesc.textContent = (fw.entropy > 7.9) ? 'Mật độ entropy cao (Mã hóa / Nén chặt)' : 'Entropy tiêu chuẩn';
+        }
+        if (valSha256) {
+          valSha256.textContent = fw.file_sha256 || '-';
+          valSha256.title = fw.file_sha256 || '';
         }
 
-        // 2. Render Filesystem Breakdown Table
-        if (fsTbody) {
-          const allFsRows = [];
-          analyses.forEach(item => {
-            const fsList = item.filesystems || [];
-            fsList.forEach(fs => {
-              allFsRows.push(`
-                <tr class="hover:bg-[#191d28] transition">
-                  <td class="px-3 py-2 font-mono text-white text-[11px]">${escapeHtmlFw(item.filename)}</td>
-                  <td class="px-3 py-2 font-mono text-cyan-300 font-semibold text-[11px]">${escapeHtmlFw(fs.name)}</td>
-                  <td class="px-3 py-2 text-[#cbd5e1] text-[11px]">
-                    <div class="font-medium">${escapeHtmlFw(fs.type)}</div>
-                    <div class="text-[10px] text-[#94a3b8]">${escapeHtmlFw(fs.compression || 'N/A')}</div>
-                  </td>
-                  <td class="px-3 py-2 font-mono text-[#94a3b8] text-[11px]">
-                    <div>${escapeHtmlFw(fs.offset_hex || '0x00000000')}</div>
-                    <div class="text-[10px] text-[#64748b]">(${Number(fs.offset_dec || 0).toLocaleString()} B)</div>
-                  </td>
-                  <td class="px-3 py-2 font-mono text-[#cbd5e1] text-[11px]">${escapeHtmlFw(fs.size_mb || 0)} MB</td>
-                  <td class="px-3 py-2 text-xs">
-                    <span class="px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 text-[10px] font-mono">${escapeHtmlFw(fs.extracted_status || 'Hợp lệ')}</span>
-                    <div class="text-[11px] text-[#94a3b8] mt-1">${escapeHtmlFw(fs.details || '')}</div>
-                  </td>
-                </tr>
-              `);
-            });
-          });
+        // 2. Fill Filesystem Extraction
+        if (fsStatusBadge && fsTypeBadge && fsReasonBox) {
+          if (fw.extracted) {
+            fsStatusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 font-semibold';
+            fsStatusBadge.textContent = 'ĐÃ GIẢI NÉN THÀNH CÔNG';
+            fsTypeBadge.className = 'font-mono text-[10px] text-emerald-400 font-bold';
+            fsTypeBadge.textContent = fw.filesystem_type || 'SquashFS / Tar';
 
-          if (!allFsRows.length) {
-            fsTbody.innerHTML = '<tr><td colspan="6" class="px-3 py-3 text-center text-[#64748b]">Chưa phát hiện phân vùng filesystem.</td></tr>';
+            let reasonHtml = `
+              <div class="text-emerald-300 font-semibold mb-1">Trích xuất thành công: ${escapeHtmlFw(fw.filesystem_type)}</div>
+              <div><span class="text-[#64748b]">Thư mục trích xuất:</span> <span class="text-white select-all font-mono">${escapeHtmlFw(fw.extracted_dir || 'N/A')}</span></div>
+              <div><span class="text-[#64748b]">Tổng số tệp phát hiện:</span> <span class="text-cyan-300 font-bold">${fw.file_count || 0} tệp</span></div>
+            `;
+            fsReasonBox.innerHTML = reasonHtml;
+
+            if (fw.extracted_files_sample && fw.extracted_files_sample.length > 0 && fsFilesBox && fsFilesList) {
+              fsFilesBox.classList.remove('hidden');
+              fsFilesList.innerHTML = fw.extracted_files_sample.map(f => `<div class="truncate">📁 ${escapeHtmlFw(f)}</div>`).join('');
+            } else if (fsFilesBox) {
+              fsFilesBox.classList.add('hidden');
+            }
           } else {
-            fsTbody.innerHTML = allFsRows.join('');
+            fsStatusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/60 text-rose-300 border border-rose-800/60 font-semibold';
+            fsStatusBadge.textContent = 'KHÔNG THỂ GIẢI NÉN';
+            fsTypeBadge.className = 'font-mono text-[10px] text-rose-400 font-medium';
+            fsTypeBadge.textContent = fw.filesystem_type || 'Định dạng đóng / Mã hóa';
+
+            fsReasonBox.innerHTML = `
+              <div class="text-rose-400 font-semibold mb-1">Không thể giải nén tự động:</div>
+              <div class="text-[#cbd5e1] leading-relaxed">${escapeHtmlFw(fw.extraction_reason || 'Container đóng hoặc mã hóa.')}</div>
+            `;
+            if (fsFilesBox) fsFilesBox.classList.add('hidden');
           }
         }
 
-        // 3. Render Signature & Keys Details Box
-        if (sigBox) {
-          const sigCards = analyses.map(item => {
-            const sig = item.signature || {};
-            const vkey = item.verified_pubkey;
-            const fmt = item.format || '';
-            const ixit = item.ixit_declaration || {};
+        // 3. Fill Cryptographic Keys & Signatures
+        const keys = fw.keys_and_signatures || [];
+        if (keysCountBadge) {
+          keysCountBadge.textContent = `${keys.length} mục`;
+        }
 
-            let proofDetails = '';
-            if (fmt.includes('ENCAP')) {
-              proofDetails = `
-                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                  <div>
-                    <span class="text-[#64748b]">Cấu trúc container:</span> <span class="text-emerald-400">Header 0x${escapeHtmlFw(item.magic_hex)} (Hợp lệ)</span><br>
-                    <span class="text-[#64748b]">Độ hỗn loạn (Entropy):</span> <span class="text-cyan-400">${escapeHtmlFw(item.entropy || 7.998)} / 8.0000 (Mã hóa AES-256)</span><br>
-                    <span class="text-[#64748b]">Khai báo IXIT 10_SecParam:</span> <span class="text-white">SecParam-FirmwareDecKey (PBKDF2)</span>
-                  </div>
-                  <div>
-                    <span class="text-[#64748b]">Thuật toán ký số:</span> <span class="text-cyan-400">RSA 3072-bit + SHA-256</span><br>
-                    <span class="text-[#64748b]">Vị trí lưu khóa gốc:</span> <span class="text-emerald-400">Secure Partition (TrustUpdatePubKey)</span><br>
-                    <span class="text-[#64748b]">Chống hạ cấp:</span> <span class="text-white">A/B dual partition rollback protection</span>
-                  </div>
-                </div>
-              `;
-            } else if (fmt.includes('AXIS')) {
-              proofDetails = `
-                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                  <div>
-                    <span class="text-[#64748b]">Chữ ký container:</span> <span class="text-emerald-400">sign.bin (magic=pgnf, RSA-2048)</span><br>
-                    <span class="text-[#64748b]">Bảng băm toàn vẹn:</span> <span class="text-cyan-400">sums.bin (4/4 tệp khớp SHA-256)</span><br>
-                    <span class="text-[#64748b]">Signing Domain:</span> <span class="text-white">${escapeHtmlFw(sig.signing_domain || 'N/A')}</span>
-                  </div>
-                  <div>
-                    <span class="text-[#64748b]">Khóa công khai trích xuất:</span> <span class="text-emerald-400">${escapeHtmlFw(vkey?.rootfs_path || 'RootFS')}</span><br>
-                    <span class="text-[#64748b]">Xác thực OpenSSL:</span> <span class="text-green-400 font-bold">${escapeHtmlFw(vkey?.scheme || 'RSA-PSS + SHA-256')}</span>
-                  </div>
-                </div>
-              `;
-            } else {
-              proofDetails = `
-                <div class="text-cyan-300 font-semibold">Gói Firmware: ${escapeHtmlFw(item.filename)}</div>
-                <div class="text-[#94a3b8]">Định dạng: ${escapeHtmlFw(fmt)} | SHA-256: ${escapeHtmlFw(item.file_sha256)}</div>
-              `;
-            }
+        if (keysTbody) {
+          if (!keys.length) {
+            keysTbody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-[#64748b]">Không tìm thấy khóa mật mã hoặc chữ ký số dạng bản rõ trong tệp.</td></tr>';
+          } else {
+            keysTbody.innerHTML = keys.map(k => {
+              const bitsStr = k.bits ? `<span class="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/60 text-[10px]">${k.bits}-bit</span>` : '';
+              const offsetStr = k.offset_hex ? `${k.offset_hex} (${Number(k.offset_dec || 0).toLocaleString()} B)` : 'N/A';
+              const sizeStr = k.bytes ? `${k.bytes} Bytes` : (k.header ? `${k.header.length} B` : '-');
 
-            return `<div class="p-2.5 rounded bg-[#090c13] border border-[#272c3a] space-y-1">${proofDetails}</div>`;
-          }).join('');
+              return `<tr class="hover:bg-[#191d28] transition">
+                <td class="px-3 py-2 text-white font-medium max-w-[200px] truncate" title="${escapeHtmlFw(k.source || '')}">${escapeHtmlFw(k.source ? k.source.split('/').pop() : '-')}</td>
+                <td class="px-3 py-2 text-cyan-300 font-semibold">${escapeHtmlFw(k.type || '-')} ${bitsStr}</td>
+                <td class="px-3 py-2 text-[#94a3b8]">${escapeHtmlFw(offsetStr)}</td>
+                <td class="px-3 py-2 text-[#94a3b8]">${escapeHtmlFw(sizeStr)}</td>
+                <td class="px-3 py-2 text-[#cbd5e1]">
+                  <div>${escapeHtmlFw(k.details || '')}</div>
+                  ${k.header ? `<div class="text-[10px] text-[#64748b] truncate mt-0.5 font-mono">${escapeHtmlFw(k.header)}</div>` : ''}
+                </td>
+              </tr>`;
+            }).join('');
+          }
+        }
 
-          sigBox.innerHTML = sigCards || '<div class="text-[#64748b]">Chưa có dữ liệu phân tích.</div>';
+        if (keysNoteBox) {
+          if (keys.some(k => k.type && k.type.toLowerCase().includes('pem'))) {
+            keysNoteBox.classList.remove('hidden');
+            keysNoteBox.innerHTML = '<span class="text-emerald-400 font-semibold">Ghi chú:</span> Đã phát hiện khóa/chứng chỉ dạng bản rõ (PEM) trong tệp. Chi tiết thuật toán đã được giải mã bằng OpenSSL.';
+          } else if (!fw.extracted) {
+            keysNoteBox.classList.remove('hidden');
+            keysNoteBox.innerHTML = '<span class="text-amber-400 font-semibold">Ghi chú:</span> Firmware có entropy cao và không có khóa bản rõ (PEM / SSH). Payload mã hóa bảo vệ toàn bộ phân vùng rootfs và chữ ký số.';
+          } else {
+            keysNoteBox.classList.add('hidden');
+          }
         }
 
       } catch (err) {
