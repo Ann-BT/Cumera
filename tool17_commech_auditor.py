@@ -2672,6 +2672,588 @@ def audit_commech_9_sftp(wait_sec: float = 15.0, auto_trigger: bool = False, rec
     return res
 
 
+def _serve_full_ftp_session(sock: socket.socket, is_tls: bool = False, server_ctx=None, peer_ip: str = "", leftover_buf: str = "") -> Dict[str, Any]:
+    """Đáp ứng phiên FTP / FTPS hoàn chỉnh bao gồm Control Channel và Data Channel (Passive & Active Mode),
+    cho phép Camera thực hiện đầy đủ bài test (Login, CWD, PASV, Upload file test STOR, QUIT)."""
+    info = {
+        "is_tls": is_tls,
+        "version": sock.version() if hasattr(sock, "version") and callable(sock.version) else ("TLS" if is_tls else "Plain"),
+        "cipher": (sock.cipher()[0] if hasattr(sock, "cipher") and callable(sock.cipher) and sock.cipher() else "N/A"),
+        "commands": [],
+        "user": None,
+        "transferred_file": False,
+    }
+
+    buf = leftover_buf
+    sock.settimeout(4.0)
+    prot_level = "C"
+    data_listener = None
+    active_data_target = None
+
+    try:
+        adv_ip = HOST_IP
+        if not adv_ip or adv_ip.startswith("127."):
+            adv_ip = sock.getsockname()[0]
+    except Exception:
+        adv_ip = "127.0.0.1"
+
+    ip_nums = adv_ip.split(".")
+    if len(ip_nums) != 4:
+        ip_nums = ["127", "0", "0", "1"]
+
+    try:
+        for _ in range(40):
+            if "\r\n" not in buf and "\n" not in buf:
+                try:
+                    chunk = sock.recv(2048)
+                    if not chunk:
+                        break
+                    buf += chunk.decode("utf-8", errors="ignore")
+                except (socket.timeout, ssl.SSLError):
+                    break
+
+            while "\r\n" in buf or "\n" in buf:
+                delim = "\r\n" if "\r\n" in buf else "\n"
+                line, buf = buf.split(delim, 1)
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(" ", 1)
+                cmd = parts[0].upper()
+                arg = parts[1].strip() if len(parts) > 1 else ""
+                info["commands"].append(cmd)
+
+                # Nâng cấp TLS giữa chừng nếu client gửi AUTH TLS trên plain socket
+                if not is_tls and (cmd in ("AUTH", "AUTH TLS", "AUTH SSL") or (cmd == "AUTH" and arg.upper() in ("TLS", "SSL"))):
+                    sock.sendall(b"234 AUTH TLS OK\r\n")
+                    if server_ctx:
+                        try:
+                            sock = server_ctx.wrap_socket(sock, server_side=True)
+                            is_tls = True
+                            buf = ""
+                            info["is_tls"] = True
+                            info["version"] = sock.version() or "TLS"
+                            info["cipher"] = sock.cipher()[0] if sock.cipher() else "N/A"
+                        except Exception:
+                            return info
+                    continue
+
+                if cmd == "FEAT":
+                    feat_reply = (
+                        b"211-Features:\r\n"
+                        b" AUTH TLS\r\n"
+                        b" AUTH SSL\r\n"
+                        b" PBSZ\r\n"
+                        b" PROT\r\n"
+                        b" PASV\r\n"
+                        b" EPSV\r\n"
+                        b" UTF8\r\n"
+                        b" REST STREAM\r\n"
+                        b" SIZE\r\n"
+                        b" MLST type*;size*;modify*;\r\n"
+                        b"211 End\r\n"
+                    )
+                    sock.sendall(feat_reply)
+                elif cmd == "PBSZ":
+                    sock.sendall(b"200 PBSZ 0 OK\r\n")
+                elif cmd == "PROT":
+                    prot_level = arg.upper() if arg else "P"
+                    sock.sendall(f"200 Protection level set to {prot_level}\r\n".encode("utf-8"))
+                elif cmd == "OPTS":
+                    sock.sendall(b"200 Always in UTF-8 mode.\r\n")
+                elif cmd == "USER":
+                    info["user"] = arg
+                    sock.sendall(b"331 User name okay, need password.\r\n")
+                elif cmd == "PASS":
+                    sock.sendall(b"230 User logged in, proceed.\r\n")
+                elif cmd == "SYST":
+                    sock.sendall(b"215 UNIX Type: L8\r\n")
+                elif cmd == "PWD":
+                    sock.sendall(b'257 "/" is current directory.\r\n')
+                elif cmd in ("CWD", "CDUP"):
+                    sock.sendall(b"250 Directory successfully changed.\r\n")
+                elif cmd in ("MKD", "XMKD"):
+                    sock.sendall(f'257 "{arg or "/tmp"}" directory created.\r\n'.encode("utf-8"))
+                elif cmd in ("RMD", "XRMD"):
+                    sock.sendall(b"250 Remove directory operation successful.\r\n")
+                elif cmd == "TYPE":
+                    sock.sendall(b"200 Type set to I.\r\n")
+                elif cmd == "PASV":
+                    if data_listener:
+                        try: data_listener.close()
+                        except Exception: pass
+                    data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    data_listener.bind(("0.0.0.0", 0))
+                    data_listener.listen(1)
+                    p = data_listener.getsockname()[1]
+                    p1, p2 = p // 256, p % 256
+                    pasv_msg = f"227 Entering Passive Mode ({ip_nums[0]},{ip_nums[1]},{ip_nums[2]},{ip_nums[3]},{p1},{p2}).\r\n"
+                    sock.sendall(pasv_msg.encode("utf-8"))
+                elif cmd == "EPSV":
+                    if data_listener:
+                        try: data_listener.close()
+                        except Exception: pass
+                    data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    data_listener.bind(("0.0.0.0", 0))
+                    data_listener.listen(1)
+                    p = data_listener.getsockname()[1]
+                    sock.sendall(f"229 Entering Extended Passive Mode (|||{p}|)\r\n".encode("utf-8"))
+                elif cmd == "PORT":
+                    try:
+                        p_parts = arg.split(",")
+                        if len(p_parts) == 6:
+                            act_ip = ".".join(p_parts[:4])
+                            act_port = int(p_parts[4]) * 256 + int(p_parts[5])
+                            active_data_target = (act_ip, act_port)
+                            sock.sendall(b"200 PORT command successful.\r\n")
+                        else:
+                            sock.sendall(b"501 Syntax error in parameters or arguments.\r\n")
+                    except Exception:
+                        sock.sendall(b"501 Syntax error.\r\n")
+                elif cmd in ("STOR", "APPE", "RETR", "LIST", "NLST", "MLSD"):
+                    sock.sendall(b"150 Opening BINARY mode data connection.\r\n")
+                    d_conn = None
+                    if data_listener:
+                        data_listener.settimeout(3.5)
+                        try:
+                            d_conn, _ = data_listener.accept()
+                        except Exception:
+                            pass
+                        finally:
+                            try: data_listener.close()
+                            except Exception: pass
+                            data_listener = None
+                    elif active_data_target:
+                        try:
+                            d_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            d_conn.settimeout(3.5)
+                            d_conn.connect(active_data_target)
+                        except Exception:
+                            d_conn = None
+                        active_data_target = None
+
+                    if d_conn:
+                        try:
+                            d_conn.settimeout(3.5)
+                            if is_tls and prot_level == "P" and server_ctx:
+                                try:
+                                    d_conn = server_ctx.wrap_socket(d_conn, server_side=True)
+                                except Exception:
+                                    pass
+                            if cmd in ("LIST", "NLST", "MLSD"):
+                                try:
+                                    d_conn.sendall(b"-rw-r--r-- 1 admin admin 0 Nov 19 09:00 test.txt\r\n")
+                                except Exception:
+                                    pass
+                            elif cmd in ("STOR", "APPE"):
+                                info["transferred_file"] = True
+                                try:
+                                    while True:
+                                        data_chunk = d_conn.recv(4096)
+                                        if not data_chunk:
+                                            break
+                                except Exception:
+                                    pass
+                            try:
+                                d_conn.close()
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                    sock.sendall(b"226 Transfer complete.\r\n")
+                elif cmd == "DELE":
+                    sock.sendall(b"250 Delete operation successful.\r\n")
+                elif cmd == "SIZE":
+                    sock.sendall(b"213 0\r\n")
+                elif cmd == "MDTM":
+                    sock.sendall(b"213 20261119090000\r\n")
+                elif cmd == "NOOP":
+                    sock.sendall(b"200 NOOP ok.\r\n")
+                elif cmd in ("QUIT", "BYE"):
+                    sock.sendall(b"221 Goodbye.\r\n")
+                    return info
+                else:
+                    sock.sendall(b"200 Command OK.\r\n")
+    except Exception:
+        pass
+    finally:
+        if data_listener:
+            try: data_listener.close()
+            except Exception: pass
+    return info
+
+
+def _serve_ftps_session(ssock: ssl.SSLSocket) -> Dict[str, Any]:
+    """Đáp ứng phiên điều khiển FTPS bảo mật sau khi bắt tay TLS hoàn tất (Tương thích ngược)."""
+    return _serve_full_ftp_session(ssock, is_tls=True, server_ctx=get_server_ssl_context())
+
+
+def audit_commech_ftps(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
+    """Đo kiểm ComMech-FTPS: FTPS Storage Client (FTP over TLS trên Cổng 21 AUTH TLS hoặc Cổng 990)."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-FTPS: FTPS Storage Client Interface (TCP/{FTP_CLEAR_PORT} AUTH TLS & TCP/990)[/bold cyan]...")
+    res = {
+        "id": "ComMech-FTPS",
+        "name": "FTPS Storage Client",
+        "port": FTP_CLEAR_PORT,
+        "proto": "IP/TCP/TLS (FTP over TLS)",
+        "direction": f"DUT Client (Tool Server {FTP_CLEAR_PORT}/990)",
+        "pcap": "commech-ftps.pcap",
+        "aliases": ["commech-ftps.pcap", "commech-sftp.pcap", "commech-9_sftp.pcap"]
+    }
+
+    display_server_receiver_panel(
+        "ComMech-FTPS", "FTPS Client (FTP over TLS)", f"TCP {FTP_CLEAR_PORT} (AUTH TLS) & TCP 990 (Implicit)", wait_sec,
+        [
+            f"Vào Web Camera: [bold cyan]Setting → Network → Advanced Settings → FTP[/bold cyan]",
+            f"Bật công tắc: [bold green]FTP Upload: ON[/bold green] và [bold green]FTP Over SSL/TLS(FTPS): ON[/bold green]",
+            f"Điền Host: [bold green]{HOST_IP}[/bold green] | Port: [bold white]{FTP_CLEAR_PORT}[/bold white] | Path: [bold white]/tmp[/bold white]",
+            f"Account: [bold white]admin[/bold white] | Pass: [bold white]{PASS}[/bold white]",
+            f"Bấm nút [bold yellow]Test FTP[/bold yellow] (hoặc Apply) để Camera gửi bản tin AUTH TLS."
+        ],
+        forever=forever
+    )
+
+    pcap_proc, pcap_path = start_pcap_capture(
+        DUT_IP,
+        f"ip host {DUT_IP} and (tcp port {FTP_CLEAR_PORT} or tcp port 990)",
+        prefix="commech_ftps"
+    )
+    captured_ftps = None
+    captured_ftp_clear = False
+    ftps_socks = []
+
+    try:
+        server_ctx = get_server_ssl_context()
+        for port in (FTP_CLEAR_PORT, 990):
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(("0.0.0.0", port))
+                s.listen(5)
+                ftps_socks.append((port, s))
+            except Exception as ex:
+                console.print(f"    [dim][!] Không thể bind cổng {port}: {ex}[/dim]")
+
+        s21 = next((s for p, s in ftps_socks if p == FTP_CLEAR_PORT), None)
+        s990 = next((s for p, s in ftps_socks if p == 990), None)
+        all_socks = [s for _, s in ftps_socks]
+
+        start_time = time.time()
+        while forever or (time.time() - start_time < wait_sec):
+            remain_str = "Chạy liên tục [Bấm Stop để dừng]" if forever else f"còn {max(0, int(wait_sec - (time.time() - start_time)))}s"
+            readable, _, _ = select.select(all_socks, [], [], 0.8)
+            if s21 and s21 in readable:
+                accepted = _accept_dut_client(s21, FTP_CLEAR_PORT, timeout=3.0)
+                if not accepted:
+                    continue
+                c, peer_ip = accepted
+                try:
+                    c.sendall(b"220 qcvn11-ftps Ready\r\n")
+                    ftps_info = _serve_full_ftp_session(c, is_tls=False, server_ctx=server_ctx, peer_ip=peer_ip)
+                    if ftps_info.get("is_tls"):
+                        captured_ftps = {
+                            "version": ftps_info["version"],
+                            "cipher": ftps_info["cipher"],
+                            "mode": "Explicit AUTH TLS",
+                            "port": FTP_CLEAR_PORT,
+                            "peer_ip": peer_ip
+                        }
+                        console.print(f"\n    [bold green][+] FTPS Handshake thành công qua Explicit AUTH TLS: {ftps_info['version']} ({ftps_info['cipher']}) từ {peer_ip}:{FTP_CLEAR_PORT}[/bold green]")
+                        if not forever:
+                            break
+                    else:
+                        captured_ftp_clear = True
+                        user_str = f" (User: {ftps_info.get('user')})" if ftps_info.get("user") else ""
+                        console.print(f"\n    [bold red][!] Nhận kết nối Plain FTP không TLS từ {peer_ip}:{FTP_CLEAR_PORT}{user_str}[/bold red]")
+                        if not forever:
+                            break
+                except Exception as exc:
+                    console.print(f"\n    [dim][!] Phiên FTPS lỗi/ngắt: {exc}[/dim]")
+                finally:
+                    try: c.close()
+                    except: pass
+                continue
+
+            if s990 and s990 in readable:
+                accepted = _accept_dut_client(s990, 990, timeout=3.0)
+                if not accepted:
+                    continue
+                c, peer_ip = accepted
+                try:
+                    with server_ctx.wrap_socket(c, server_side=True) as ssock:
+                        ssock.sendall(b"220 qcvn11-implicit-ftps Ready\r\n")
+                        ftps_info = _serve_full_ftp_session(ssock, is_tls=True, server_ctx=server_ctx, peer_ip=peer_ip)
+                        captured_ftps = {
+                            "version": ftps_info["version"],
+                            "cipher": ftps_info["cipher"],
+                            "mode": "Implicit FTPS",
+                            "port": 990,
+                            "peer_ip": peer_ip
+                        }
+                        console.print(f"\n    [bold green][+] FTPS Handshake thành công qua Implicit FTPS: {ftps_info['version']} ({ftps_info['cipher']}) từ {peer_ip}:990[/bold green]")
+                        if not forever:
+                            break
+                except Exception as exc:
+                    console.print(f"\n    [dim][!] Phiên Implicit FTPS lỗi/ngắt: {exc}[/dim]")
+                finally:
+                    try: c.close()
+                    except: pass
+                continue
+
+            console.print(f"    [dim]Đang chờ Camera ({DUT_IP}) kết nối FTPS tới {HOST_IP}:{FTP_CLEAR_PORT}... {remain_str}[/dim]", end="\r")
+    except PermissionError:
+        res["downgrade_test"] = {"pass": False, "detail": f"LỖI QUYỀN: Cần chạy tool bằng 'sudo' để mở cổng {FTP_CLEAR_PORT}."}
+        res["status"] = "FAIL"
+        stop_pcap_capture(pcap_proc)
+        res["pcap_file"] = pcap_path
+        res["pcap_packet_count"] = get_pcap_packet_count(pcap_path)
+        return res
+    except KeyboardInterrupt:
+        console.print("\n[yellow][!] Người dùng dừng bài đo FTPS.[/yellow]")
+    except Exception as e:
+        res["error"] = str(e)
+    finally:
+        for _, s in ftps_socks:
+            try: s.close()
+            except Exception: pass
+
+    time.sleep(1.0)
+    stop_pcap_capture(pcap_proc)
+    res["pcap_file"] = pcap_path
+    pkt_count = get_pcap_packet_count(pcap_path)
+    res["pcap_packet_count"] = pkt_count
+
+    if captured_ftps:
+        res["status"] = "PASS"
+        res["active_tls"] = captured_ftps["version"]
+        res["active_cipher"] = captured_ftps["cipher"]
+        res["port"] = captured_ftps.get("port", FTP_CLEAR_PORT)
+        res["downgrade_test"] = {
+            "pass": True,
+            "detail": f"ĐẠT: Camera thiết lập FTPS qua {captured_ftps['mode']} cổng {res['port']} bảo mật {captured_ftps['version']} ({captured_ftps['cipher']})"
+        }
+        _enforce_pcap_requirement(res)
+    elif captured_ftp_clear:
+        res["status"] = "FAIL"
+        res["downgrade_test"] = {
+            "pass": False,
+            "detail": f"NGUY HIỂM: Camera kết nối FTP qua cổng {FTP_CLEAR_PORT} nhưng không gửi lệnh 'AUTH TLS' để thiết lập bảo mật!"
+        }
+    else:
+        res["status"] = "NO_DATA"
+        res["downgrade_test"] = {
+            "pass": False,
+            "detail": f"CHƯA THỰC HIỆN: Không nhận được kết nối FTPS từ Camera ({DUT_IP}) trong {wait_sec:.0f}s ({pkt_count} gói tin)."
+        }
+    return res
+
+
+def audit_commech_ftp(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
+    """Đo kiểm ComMech-FTP: Plain FTP Client - Kiểm tra phát hiện truyền rõ và cảnh báo hạ cấp."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-FTP: Plain FTP Client (TCP/{FTP_CLEAR_PORT})[/bold cyan]...")
+    res = {
+        "id": "ComMech-FTP",
+        "name": "Plain FTP Client",
+        "port": FTP_CLEAR_PORT,
+        "proto": "IP/TCP/RFC959 (Plain FTP)",
+        "direction": f"DUT Client (Tool Server {FTP_CLEAR_PORT})",
+        "pcap": "commech-ftp.pcap",
+        "aliases": ["commech-ftp.pcap", "commech-sftp.pcap"]
+    }
+
+    display_server_receiver_panel(
+        "ComMech-FTP", "Plain FTP Client (Kiểm tra hạ cấp)", f"TCP {FTP_CLEAR_PORT}", wait_sec,
+        [
+            f"Vào Web Camera: [bold cyan]Setting → Network → Advanced Settings → FTP[/bold cyan]",
+            f"Cấu hình thử nghiệm hạ cấp: [bold yellow]TẮT công tắc FTP Over SSL/TLS(FTPS)[/bold yellow] (để truyền rõ)",
+            f"Điền Host: [bold green]{HOST_IP}[/bold green] | Port: [bold white]{FTP_CLEAR_PORT}[/bold white]",
+            f"Bấm nút [bold yellow]Test FTP[/bold yellow] để máy đo ghi nhận gói tin FTP bản rõ làm bằng chứng."
+        ],
+        forever=forever
+    )
+
+    pcap_proc, pcap_path = start_pcap_capture(
+        DUT_IP,
+        f"ip host {DUT_IP} and tcp port {FTP_CLEAR_PORT}",
+        prefix="commech_ftp"
+    )
+    captured_user = None
+    captured_ftp = False
+    sock = None
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", FTP_CLEAR_PORT))
+        sock.listen(5)
+
+        start_time = time.time()
+        while forever or (time.time() - start_time < wait_sec):
+            remain_str = "Chạy liên tục [Bấm Stop để dừng]" if forever else f"còn {max(0, int(wait_sec - (time.time() - start_time)))}s"
+            readable, _, _ = select.select([sock], [], [], 0.8)
+            if sock in readable:
+                accepted = _accept_dut_client(sock, FTP_CLEAR_PORT, timeout=3.0)
+                if not accepted:
+                    continue
+                c, peer_ip = accepted
+                try:
+                    c.sendall(b"220 qcvn11-plain-ftp Ready\r\n")
+                    ft_info = _serve_full_ftp_session(c, is_tls=False, server_ctx=None, peer_ip=peer_ip)
+                    if ft_info.get("user") or "USER" in ft_info.get("commands", []):
+                        captured_ftp = True
+                        captured_user = ft_info.get("user") or "Camera"
+                        console.print(f"\n    [bold red][!] Phát hiện FTP bản rõ từ {peer_ip}:{FTP_CLEAR_PORT} (User: {captured_user})[/bold red]")
+                        if not forever:
+                            break
+                except Exception:
+                    pass
+                finally:
+                    try: c.close()
+                    except: pass
+                continue
+
+            console.print(f"    [dim]Đang chờ Camera ({DUT_IP}) kết nối FTP tới {HOST_IP}:{FTP_CLEAR_PORT}... {remain_str}[/dim]", end="\r")
+    except PermissionError:
+        res["downgrade_test"] = {"pass": False, "detail": f"LỖI QUYỀN: Cần chạy tool bằng 'sudo' để mở cổng {FTP_CLEAR_PORT}."}
+        res["status"] = "FAIL"
+        stop_pcap_capture(pcap_proc)
+        res["pcap_file"] = pcap_path
+        res["pcap_packet_count"] = get_pcap_packet_count(pcap_path)
+        return res
+    except KeyboardInterrupt:
+        console.print("\n[yellow][!] Người dùng dừng bài đo Plain FTP.[/yellow]")
+    except Exception as e:
+        res["error"] = str(e)
+    finally:
+        if sock:
+            try: sock.close()
+            except Exception: pass
+
+    time.sleep(1.0)
+    stop_pcap_capture(pcap_proc)
+    res["pcap_file"] = pcap_path
+    pkt_count = get_pcap_packet_count(pcap_path)
+    res["pcap_packet_count"] = pkt_count
+
+    if captured_ftp:
+        res["status"] = "PASS"
+        res["downgrade_test"] = {
+            "pass": True,
+            "detail": f"XÁC THỰC BẢN RÕ THÀNH CÔNG: Ghi nhận lưu lượng Plain FTP cổng {FTP_CLEAR_PORT} (User: {captured_user or 'N/A'}) phục vụ đánh giá cảnh báo người dùng theo QCVN 11 Khoản 2.5.1."
+        }
+        _enforce_pcap_requirement(res)
+    else:
+        res["status"] = "NO_DATA"
+        res["downgrade_test"] = {
+            "pass": False,
+            "detail": f"CHƯA THỰC HIỆN: Không nhận được kết nối Plain FTP từ Camera ({DUT_IP}) trong {wait_sec:.0f}s ({pkt_count} gói tin)."
+        }
+    return res
+
+
+def audit_commech_smtps(wait_sec: float = 15.0, auto_trigger: bool = False, record_pcap: bool = True, forever: bool = False) -> Dict[str, Any]:
+    """Đo kiểm ComMech-SMTPS: SMTPS Email Client - Implicit TLS qua Cổng 465."""
+    console.print(f"\n[*] Khởi chạy đo kiểm [bold cyan]ComMech-SMTPS: SMTPS Client Interface (TCP/{SMTPS_PORT} Implicit TLS)[/bold cyan]...")
+    res = {
+        "id": "ComMech-SMTPS",
+        "name": "SMTPS Client",
+        "port": SMTPS_PORT,
+        "proto": "IP/TCP/TLS (SMTPS over TLS)",
+        "direction": f"DUT Client (Tool Server {SMTPS_PORT})",
+        "pcap": "commech-smtps.pcap",
+        "aliases": ["commech-smtps.pcap", "commech-smtp.pcap", "commech-8_smtp.pcap"]
+    }
+
+    display_server_receiver_panel(
+        "ComMech-SMTPS", "SMTPS Email Client (Implicit TLS)", f"TCP {SMTPS_PORT}", wait_sec,
+        [
+            f"Vào Web Camera: [bold cyan]Setting → Network → Advanced Settings → SMTP[/bold cyan]",
+            f"Điền Mail Server IP: [bold green]{HOST_IP}[/bold green] | Port: [bold white]{SMTPS_PORT}[/bold white]",
+            f"Chọn Transport Mode: [bold white]SSL/TLS[/bold white] (hoặc SMTPS)",
+            f"Bấm nút [bold yellow]Email Test[/bold yellow] để Camera gửi email qua cổng 465."
+        ],
+        forever=forever
+    )
+
+    pcap_proc, pcap_path = start_pcap_capture(
+        DUT_IP,
+        f"ip host {DUT_IP} and tcp port {SMTPS_PORT}",
+        prefix="commech_smtps"
+    )
+    captured_tls = None
+    sock = None
+
+    try:
+        server_ctx = get_server_ssl_context()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", SMTPS_PORT))
+        sock.listen(5)
+
+        start_time = time.time()
+        while forever or (time.time() - start_time < wait_sec):
+            remain_str = "Chạy liên tục [Bấm Stop để dừng]" if forever else f"còn {max(0, int(wait_sec - (time.time() - start_time)))}s"
+            readable, _, _ = select.select([sock], [], [], 0.8)
+            if sock in readable:
+                accepted = _accept_dut_client(sock, SMTPS_PORT, timeout=3.0)
+                if not accepted:
+                    continue
+                c, peer_ip = accepted
+                try:
+                    with server_ctx.wrap_socket(c, server_side=True) as ssock:
+                        captured_tls = _serve_smtp_session(ssock, send_greeting=True)
+                        captured_tls["port"] = SMTPS_PORT
+                        console.print(f"\n    [bold green][+] Nhận Email gửi qua SMTPS cổng {SMTPS_PORT} từ {peer_ip} ({captured_tls.get('version')} / {captured_tls.get('cipher')})[/bold green]")
+                        if not forever:
+                            break
+                except Exception as exc:
+                    console.print(f"\n    [dim][!] Lỗi TLS SMTPS từ {peer_ip}: {exc}[/dim]")
+                continue
+
+            console.print(f"    [dim]Đang chờ Camera ({DUT_IP}) gửi Email SMTPS tới {HOST_IP}:{SMTPS_PORT}... {remain_str}[/dim]", end="\r")
+    except PermissionError:
+        res["downgrade_test"] = {"pass": False, "detail": f"LỖI QUYỀN: Cần chạy tool bằng 'sudo' để mở cổng {SMTPS_PORT}."}
+        res["status"] = "FAIL"
+        stop_pcap_capture(pcap_proc)
+        res["pcap_file"] = pcap_path
+        res["pcap_packet_count"] = get_pcap_packet_count(pcap_path)
+        return res
+    except KeyboardInterrupt:
+        console.print("\n[yellow][!] Người dùng dừng bài đo SMTPS.[/yellow]")
+    except Exception as e:
+        res["error"] = str(e)
+    finally:
+        if sock:
+            try: sock.close()
+            except Exception: pass
+
+    time.sleep(1.0)
+    stop_pcap_capture(pcap_proc)
+    res["pcap_file"] = pcap_path
+    pkt_count = get_pcap_packet_count(pcap_path)
+    res["pcap_packet_count"] = pkt_count
+
+    if captured_tls:
+        res["status"] = "PASS"
+        res["port"] = SMTPS_PORT
+        res["active_tls"] = captured_tls["version"]
+        res["active_cipher"] = captured_tls["cipher"]
+        res["downgrade_test"] = {
+            "pass": True,
+            "detail": f"ĐẠT: Camera gửi Email qua kênh SMTPS cổng {SMTPS_PORT} bảo mật {captured_tls['version']} ({captured_tls['cipher']})"
+        }
+        _enforce_pcap_requirement(res)
+    else:
+        res["status"] = "NO_DATA"
+        res["downgrade_test"] = {
+            "pass": False,
+            "detail": f"CHƯA THỰC HIỆN: Không nhận được Email SMTPS từ Camera ({DUT_IP}) trong {wait_sec:.0f}s ({pkt_count} gói tin)."
+        }
+    return res
+
+
 def audit_commech_11_o3c(wait_sec: float = 6.0) -> Dict[str, Any]:
     """Đo kiểm ComMech-Cloud: Giám sát lưu lượng Outbound Internet / Cloud."""
     console.print(f"\n[*] Đang giám sát lưu lượng Outbound Internet [bold cyan]ComMech-Cloud: Cloud Connection[/bold cyan]...")
@@ -3071,6 +3653,9 @@ def run_all_commech_servers(record_pcap: bool = True) -> int:
         "ComMech-7 (SMB)": 0,
         "ComMech-8 (SMTP)": 0,
         "ComMech-9 (SFTP)": 0,
+        "ComMech-FTPS": 0,
+        "ComMech-FTP": 0,
+        "ComMech-SMTPS": 0,
     }
 
     def log_event(service: str, message: str, style: str = "green"):
@@ -3366,10 +3951,19 @@ def run_all_commech_servers(record_pcap: bool = True) -> int:
                                 c, ip = acc
                                 try:
                                     c.sendall(b"220 qcvn11-ftp Ready\r\n")
-                                    _ = c.recv(1024)
-                                    log_event("ComMech-9 (SFTP)", f"CẢNH BÁO: Nhận kết nối FTP Cleartext (Port {FTP_CLEAR_PORT}) từ {ip}!", style="bold red")
+                                    ctx = get_server_ssl_context()
+                                    ft_info = _serve_full_ftp_session(c, is_tls=False, server_ctx=ctx, peer_ip=ip)
+                                    if ft_info.get("is_tls"):
+                                        ver = ft_info["version"]
+                                        ciph = ft_info["cipher"]
+                                        log_event("ComMech-FTPS", f"Nhận kết nối FTPS ({ver} / {ciph}) từ {ip}:{FTP_CLEAR_PORT}", style="green")
+                                    else:
+                                        log_event("ComMech-FTP", f"CẢNH BÁO: Nhận kết nối FTP Cleartext (Port {FTP_CLEAR_PORT}) từ {ip}!", style="bold red")
+                                except Exception:
+                                    pass
                                 finally:
-                                    c.close()
+                                    try: c.close()
+                                    except: pass
                         elif r_sock == s_ssh:
                             acc = _accept_dut_client(s_ssh, SFTP_PORT, timeout=3.0)
                             if acc:
@@ -3515,8 +4109,11 @@ def main():
         "7": audit_commech_7_smb,
         "smtp": audit_commech_8_smtp,
         "8": audit_commech_8_smtp,
+        "smtps": audit_commech_smtps,
         "sftp": audit_commech_9_sftp,
         "9": audit_commech_9_sftp,
+        "ftps": audit_commech_ftps,
+        "ftp": audit_commech_ftp,
         "cloud": audit_commech_11_o3c,
         "o3c": audit_commech_11_o3c,
         "11": audit_commech_11_o3c,
@@ -3526,12 +4123,12 @@ def main():
     t_arg = args.id.replace("ComMech-", "").replace("commech-", "").lower().strip()
     if t_arg in ["all", "all-mechs"]:
         if t_arg == "all-mechs":
-            target_ids = ["web", "ssh", "onvif", "snmp", "cms", "rtsps", "mqtt", "syslog", "smb", "smtp", "sftp", "cloud"]
+            target_ids = ["web", "ssh", "onvif", "snmp", "cms", "rtsps", "mqtt", "syslog", "smb", "smtps", "smtp", "ftps", "sftp", "ftp", "cloud"]
         elif is_oryza:
-            # Theo bảng kê IXIT 11 của Oryza: ComMech-Web, ComMech-RTSPS, ComMech-ONVIF, ComMech-CMS, ComMech-SFTP, ComMech-SMTP, ComMech-SNMP
-            target_ids = ["web", "rtsps", "onvif", "cms", "sftp", "smtp", "snmp"]
+            # Theo bảng kê IXIT 11 của Oryza: ComMech-Web, ComMech-RTSPS, ComMech-ONVIF, ComMech-CMS, ComMech-FTPS, ComMech-SMTPS, ComMech-SNMP (cùng tùy chọn SFTP/FTP/SMTP)
+            target_ids = ["web", "rtsps", "onvif", "cms", "ftps", "smtps", "sftp", "smtp", "snmp"]
         else:
-            target_ids = ["web", "ssh", "onvif", "snmp", "mqtt", "syslog", "smb", "smtp", "sftp", "rtsps", "cloud"]
+            target_ids = ["web", "ssh", "onvif", "snmp", "mqtt", "syslog", "smb", "smtps", "smtp", "sftp", "ftps", "rtsps", "cloud"]
     elif "," in t_arg:
         target_ids = [k.strip() for k in t_arg.split(",") if k.strip()]
     elif t_arg in audit_map:
@@ -3544,7 +4141,7 @@ def main():
     for cid in target_ids:
         if cid in audit_map:
             try:
-                if cid in ("6", "syslog", "8", "smtp", "9", "sftp"):
+                if cid in ("6", "syslog", "8", "smtp", "smtps", "9", "sftp", "ftps", "ftp"):
                     res = audit_map[cid](wait_sec=args.wait, auto_trigger=args.auto_trigger, record_pcap=not args.no_pcap, forever=args.forever)
                 elif cid in ("5", "mqtt", "7", "smb") and not (cid == "5" and is_oryza):
                     res = audit_map[cid](wait_sec=args.wait, record_pcap=not args.no_pcap, forever=args.forever)

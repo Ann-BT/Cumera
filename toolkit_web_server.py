@@ -728,6 +728,19 @@ async def get_firmware_signing_result():
         raise HTTPException(status_code=500, detail=f"Lỗi đọc dữ liệu firmware: {e}")
 
 
+@app.get("/api/dos/latest")
+async def get_latest_dos_report():
+    """Retrieve the latest DoS / Mass Reconnect audit report JSON."""
+    reports = sorted(BASE_DIR.glob("mass_reconnect_report_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not reports:
+        return {"status": "none", "message": "Chưa có báo cáo mass reconnect nào."}
+    try:
+        data = json.loads(reports[0].read_text(encoding="utf-8"))
+        return {"status": "ok", "filename": reports[0].name, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc báo cáo DoS: {e}")
+
+
 @app.get("/api/firmware_signing/download_tampered")
 async def download_tampered_firmware(path: str):
     """Download a generated 1-byte tampered firmware (.bin / .encap) file."""
@@ -792,7 +805,10 @@ async def open_wireshark(data: dict):
         "commech-syslog.pcap": ["commech-6_syslog.pcap"],
         "commech-smb.pcap": ["commech-7_smb.pcap"],
         "commech-smtp.pcap": ["commech-8_smtp.pcap", "commech-7_smtp.pcap"],
+        "commech-smtps.pcap": ["commech-smtps.pcap", "commech-smtp.pcap", "commech-8_smtp.pcap"],
         "commech-sftp.pcap": ["commech-9_sftp.pcap", "commech-6_sftp.pcap"],
+        "commech-ftps.pcap": ["commech-ftps.pcap", "commech-sftp.pcap", "commech-9_sftp.pcap"],
+        "commech-ftp.pcap": ["commech-ftp.pcap", "commech-sftp.pcap", "commech-9_sftp.pcap"],
         "commech-cloud.pcap": ["commech-11_o3c.pcap"],
     }
 
