@@ -1464,12 +1464,10 @@ def run_authmech_audit(target_keys: Optional[List[str]] = None, wait_sec: float 
     }
 
     if not target_keys or any(k.lower() in ["all", "all-mechs"] for k in target_keys):
-        if any(k.lower() == "all-mechs" for k in (target_keys or [])):
-            keys_to_run = ["web", "web_http", "ssh", "rtsp_554", "rtsps", "onvif_https", "onvif_http", "cms"]
-        elif IS_ORYZA:
-            keys_to_run = ["web", "rtsp_554", "rtsps", "onvif_https", "cms"]
+        if IS_ORYZA:
+            keys_to_run = ["web", "web_http", "rtsp_554", "rtsps", "onvif_https", "onvif_http", "cms"]
         else:
-            keys_to_run = ["web", "ssh", "rtsp_554", "rtsps", "onvif_https"]
+            keys_to_run = ["web", "web_http", "ssh", "rtsp_554", "rtsps", "onvif_https", "onvif_http"]
     else:
         keys_to_run = []
         for raw in target_keys:

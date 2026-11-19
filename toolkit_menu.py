@@ -139,7 +139,7 @@ def menu_cryptography_and_auth():
             t.add_row("5", "BÁO CÁO TỔNG HỢP TOÀN BỘ (Master Audit)", "Tự động chạy toàn bộ các bài test, xuất báo cáo Markdown & JSON")
             t.add_row("6", "Đo kiểm chuyên sâu bắt tay xác thực RTSP / RTSPS (Tool 12)", "Gửi request, bóc tách Digest SHA-256 & gói tin SDP 200 OK trên luồng video")
             t.add_row("7", "Kiểm tra kết nối & Bắt gói tin Wireshark (Tool 14)", "Bắt gói tin pcap, trích xuất dissection Wireshark & luồng RTP video thực tế")
-            t.add_row("8", "Đo kiểm 4 Cơ chế xác thực AuthMech (Tool 21)", "Bắt gói tin PCAP & Liệt kê toàn bộ Ciphersuite/KEX Nmap Enum đối soát")
+            t.add_row("8", "Đo kiểm các Cơ chế xác thực AuthMech (Tool 21)", "Bắt gói tin PCAP & Liệt kê toàn bộ Ciphersuite/KEX Nmap Enum đối soát (Web HTTPS/HTTP, SSH, RTSPS/RTSP, ONVIF HTTPS/HTTP, CMS)")
             t.add_row("9", "Đo kiểm 11 Cơ chế truyền thông ComMech (Tool 17)", "Đối soát 11 cơ chế truyền thông, thử tấn công hạ cấp TLS/SSH & xuất bằng chứng PCAP")
             t.add_row("0", "[bold red]Quay lại Menu chính[/bold red]", "")
             console.print(t)
@@ -155,7 +155,7 @@ def menu_cryptography_and_auth():
             print("  [5] BÁO CÁO TỔNG HỢP TOÀN BỘ (Master Audit)")
             print("  [6] Đo kiểm chuyên sâu bắt tay xác thực RTSP / RTSPS (Tool 12)")
             print("  [7] Kiểm tra kết nối & Bắt gói tin Wireshark (Tool 14)")
-            print("  [8] Đo kiểm 4 Cơ chế xác thực AuthMech (Tool 21)")
+            print("  [8] Đo kiểm các Cơ chế xác thực AuthMech (Tool 21)")
             print("  [9] Đo kiểm 11 Cơ chế truyền thông ComMech (Tool 17)")
             print("  [0] Quay lại Menu chính")
             choice = input("Nhập lựa chọn: ").strip()
@@ -253,19 +253,21 @@ def menu_cryptography_and_auth():
             input("\nBấm Enter để tiếp tục...")
         elif choice == "8":
             if console:
-                console.print(f"\n[bold cyan]=== ĐO KIỂM 4 CƠ CHẾ XÁC THỰC AUTHMECH ===[/bold cyan]")
-                console.print("  [bold yellow]1[/bold yellow]. [bold green]Chạy toàn bộ 4 AuthMech & bắt gói tin PCAP[/bold green]")
+                console.print(f"\n[bold cyan]=== ĐO KIỂM CÁC CƠ CHẾ XÁC THỰC AUTHMECH (TOOL 21) ===[/bold cyan]")
+                console.print("  [bold yellow]1[/bold yellow]. [bold green]Chạy toàn bộ các AuthMech chuẩn & bắt gói tin PCAP[/bold green]")
                 console.print("  [bold yellow]2[/bold yellow]. [bold cyan]Bóc tách TOÀN BỘ Ciphersuite & KEX (Nmap Enum)[/bold cyan]")
-                console.print("  [bold yellow]3[/bold yellow]. [bold white]Đo kiểm chỉ định 1 AuthMech (1, 2, 3 hoặc 4)[/bold white]")
+                console.print("  [bold yellow]3[/bold yellow]. [bold white]Đo kiểm chỉ định 1 AuthMech (web, web_http, ssh, rtsp_554, rtsps, onvif_https, onvif_http, cms)[/bold white]")
                 console.print("  [bold yellow]4[/bold yellow]. [bold magenta]Kích thích AuthMech KHÔNG lưu PCAP (dùng cho TelData)[/bold magenta]")
+                console.print("  [bold yellow]5[/bold yellow]. [bold blue]Chạy toàn diện cả Cleartext & TLS (--id all-mechs)[/bold blue]")
                 console.print("  [bold yellow]0[/bold yellow]. [dim]Quay lại[/dim]")
-                sub8 = Prompt.ask("Chọn chế độ", choices=["1", "2", "3", "4", "0"], default="1").strip()
+                sub8 = Prompt.ask("Chọn chế độ", choices=["1", "2", "3", "4", "5", "0"], default="1").strip()
             else:
-                print("\n=== ĐO KIỂM 4 CƠ CHẾ XÁC THỰC AUTHMECH ===")
-                print("  [1] Chạy toàn bộ 4 AuthMech & bắt gói tin PCAP")
+                print("\n=== ĐO KIỂM CÁC CƠ CHẾ XÁC THỰC AUTHMECH (TOOL 21) ===")
+                print("  [1] Chạy toàn bộ các AuthMech chuẩn & bắt gói tin PCAP")
                 print("  [2] Bóc tách TOÀN BỘ Ciphersuite & KEX (Nmap Enum)")
-                print("  [3] Đo kiểm chỉ định 1 AuthMech (1, 2, 3 hoặc 4)")
+                print("  [3] Đo kiểm chỉ định 1 AuthMech (web, web_http, ssh, rtsp_554, rtsps, onvif_https, onvif_http, cms)")
                 print("  [4] Kích thích AuthMech KHÔNG lưu PCAP (dùng cho TelData)")
+                print("  [5] Chạy toàn diện cả Cleartext & TLS (--id all-mechs)")
                 print("  [0] Quay lại")
                 sub8 = input("Chọn chế độ [1]: ").strip() or "1"
 
@@ -274,10 +276,12 @@ def menu_cryptography_and_auth():
             elif sub8 == "2":
                 run_script("tool21_authmech_auditor.py", "--enum", "all")
             elif sub8 == "3":
-                sub_id = input("Nhập ID cần kiểm (1, 2, 3, 4): ").strip() or "1"
+                sub_id = input("Nhập ID cần kiểm (web, web_http, ssh, rtsp_554, rtsps, onvif_https, onvif_http, cms): ").strip() or "web"
                 run_script("tool21_authmech_auditor.py", "--id", sub_id)
             elif sub8 == "4":
                 run_script("tool21_authmech_auditor.py", "--id", "all", "--wait", "1.5", "--no-pcap")
+            elif sub8 == "5":
+                run_script("tool21_authmech_auditor.py", "--id", "all-mechs")
             input("\nBấm Enter để tiếp tục...")
         elif choice == "9":
             print("\n  [1] Đo kiểm đầy đủ 11 phương thức (Ghi PCAP bằng chứng)")
