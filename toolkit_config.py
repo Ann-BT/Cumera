@@ -314,6 +314,7 @@ def get_target_info(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     tc = data.get("target_camera", {}) if isinstance(data, dict) else {}
     user = str(tc.get("username") or "admin")
     passwd = str(tc.get("password") or "")
+    safety_code = str(tc.get("safety_code") or data.get("safety_code") or "").strip()
     return {
         "ip": str(tc.get("ip") or DEFAULT_DUT_FALLBACK_IP).strip(),
         "model": str(tc.get("model") or "Generic IP Camera").strip(),
@@ -322,6 +323,7 @@ def get_target_info(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
         "password": passwd,
         "ssh_username": str(tc.get("ssh_username") or user),
         "ssh_password": str(tc.get("ssh_password") or passwd),
+        "safety_code": safety_code,
     }
 
 

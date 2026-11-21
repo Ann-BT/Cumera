@@ -1,0 +1,65 @@
+{
+  "profile_id": "fpt_play_4si",
+  "name": "FPT Camera Play 4Si",
+  "vendor": "FPT Telecom",
+  "hardware_heritage": "FPT Life",
+  "model": "Play 4Si",
+  "firmware": "v1.0.0",
+  "mac_samples": [
+    "88:3B:DC:B9:1E:EF"
+  ],
+  "evidence_base_dir": "/home/merlin/PSI/26101701 - Play 4Si/Bằng chứng",
+  "firmware_config": {
+    "base_dir": "/home/merlin/PSI/26101701 - Play 4Si"
+  },
+  "target_camera": {
+    "ip": "10.42.0.249",
+    "model": "Play 4Si",
+    "firmware": "v1.0.0",
+    "username": "fpt_user",
+    "password": "",
+    "ssh_username": "root",
+    "ssh_password": ""
+  },
+  "test_host": {
+    "ip": "10.42.0.1",
+    "interface": "wlp0s20f3"
+  },
+  "ixit_declared_ports": [
+    443,
+    8183,
+    8883
+  ],
+  "service_ports": {
+    "http": 80,
+    "https": 443,
+    "mqtt_tls": 8883,
+    "stun_turn_udp": 8183,
+    "onvif_http": 80,
+    "onvif_https": 443,
+    "rtsp": 554,
+    "rtsps": 443,
+    "ssh": 22
+  },
+  "baseline_declaration": {
+    "tls_version_expected": "TLSv1.3",
+    "tls_ciphers_declared": [
+      "TLS_AES_256_GCM_SHA384",
+      "TLS_AES_128_GCM_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+    ],
+    "auth_value_mechanisms_declared": [
+      "FPT-ID-OTP",
+      "MQTTS-ClientCertificate",
+      "JWT-OAuth2",
+      "DTLS-Fingerprint"
+    ],
+    "prohibited_auth_found": [],
+    "lockout_thresholds": {
+      "password_attempts": 3,
+      "otp_attempts": 5,
+      "duration_minutes": 15
+    }
+  }
+}

@@ -17,8 +17,8 @@
     "new": "New/v5.2.1615.2412.514.0.1.0.7.encap"
   },
   "target_camera": {
-    "ip": "192.168.99.84",
-    "model": "ORZ-B52Z-AJBMIR60-S1",
+    "ip": "192.168.99.184",
+    "model": "Dahua",
     "firmware": "v5.2.1615.2412.514.0.1.0.6",
     "username": "admin",
     "password": "Psitest135#",
@@ -49,7 +49,7 @@
     "rtsp_cleartext": 554,
     "rtsps": 443,
     "rtsps_tls": 443,
-    "rtsp_path": "/snl/live/1/1",
+    "rtsp_path": "/stream1",
     "ssh": 22,
     "snmp": 161,
     "snmp_udp": 161,

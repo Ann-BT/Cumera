@@ -994,16 +994,7 @@ def display_results_terminal(
     pcap_path: str
 ):
     """Hiển thị kết quả đo kiểm trực quan, sinh động trên Terminal bằng rich."""
-    console.print("\n")
-    console.print(Panel(
-        f"[bold white]THIẾT BỊ MỤC TIÊU (DUT):[/bold white] [bold cyan]{DUT_MODEL}[/bold cyan]  |  "
-        f"[bold white]IP:[/bold white] [bold yellow]{DUT_IP}[/bold yellow]  |  "
-        f"[bold white]FIRMWARE:[/bold white] [bold green]{DUT_FW}[/bold green]\n"
-        f"[bold white]FILE BẰNG CHỨNG PCAP:[/bold white] [bold blue]{os.path.basename(pcap_path)}[/bold blue]  |  "
-        f"[bold white]TỔNG SỐ GÓI BẮT ĐƯỢC:[/bold white] [bold magenta]{summary['total_packets_read']}[/bold magenta]",
-        title="[bold green]ĐO KIỂM GIÁM SÁT TRUYỀN TIN QUỐC TẾ & TELEMETRY (QCVN 11 - 3.11.4 & 3.11.5)[/bold green]",
-        border_style="green"
-    ))
+    console.print(f"\n[bold cyan]▶ Telemetry & GeoIP Audit[/bold cyan] | DUT: [cyan]{DUT_IP}[/cyan] ({DUT_MODEL}) | PCAP: [bold blue]{os.path.basename(pcap_path)}[/bold blue] ({summary['total_packets_read']} pkts)\n")
 
     # Bảng kết luận Hợp quy
     verdict_table = Table(title="KẾT LUẬN HỢP QUY ĐIỀU 2.11.4 & 2.11.5 (QCVN 11:2026/BCA)", header_style="bold cyan")

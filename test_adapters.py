@@ -9,6 +9,8 @@ import unittest
 from adapters import (
     AxisCameraAdapter,
     BaseCameraAdapter,
+    DahuaCameraAdapter,
+    FptCameraAdapter,
     GenericCameraAdapter,
     OryzaCameraAdapter,
     get_camera_adapter,
@@ -100,6 +102,87 @@ class TestCameraAdapters(unittest.TestCase):
         self.assertTrue(adapter.check_firmware_support("update.bin"))
         self.assertFalse(adapter.check_firmware_support("update.iso"))
 
+    def test_factory_with_dahua_config(self):
+        dahua_cfg = {
+            "active_profile": "dahua_hdw1539da",
+            "vendor": "Dahua Security",
+            "model": "DH-IPC-HDW1539DA-SAW-IL",
+            "target_camera": {"ip": "192.168.1.108"},
+            "service_ports": {"rtsp": 554, "rtsps": 443, "proprietary_tcp": 37777, "proprietary_tls": 443},
+        }
+        adapter = get_camera_adapter(dahua_cfg)
+        self.assertIsInstance(adapter, DahuaCameraAdapter)
+
+        # Check Dahua Web Auth endpoints
+        auth_eps = adapter.get_web_auth_endpoints()
+        self.assertIn("/RPC2_Login", auth_eps)
+        self.assertIn("/cgi-bin/magicBox.cgi?action=getSystemInfo", auth_eps)
+
+        # Check Dahua RTSP endpoints
+        rtsp_urls = adapter.get_rtsp_urls()
+        self.assertTrue(any("/cam/realmonitor" in u for u in rtsp_urls))
+
+        # Check Proprietary Services (TLS 443 and TCP 37777)
+        prop_services = adapter.get_proprietary_services()
+        self.assertEqual(len(prop_services), 2)
+        self.assertEqual(prop_services[0]["port"], 443)
+        self.assertEqual(prop_services[1]["port"], 37777)
+
+        # Check AuthMech & ComMech definitions
+        auth_mechs = adapter.get_authmech_definitions()
+        self.assertEqual(len(auth_mechs), 10)
+        com_mechs = adapter.get_commech_definitions()
+        self.assertEqual(len(com_mechs), 18)
+
+        # Check Firmware support (.bin and .zip)
+        self.assertTrue(adapter.check_firmware_support("firmware.bin"))
+        self.assertTrue(adapter.check_firmware_support("DH_IPC.zip"))
+        self.assertFalse(adapter.check_firmware_support("update.iso"))
+
+    def test_factory_with_fpt_config(self):
+        fpt_cfg = {
+            "active_profile": "fpt_play_4si",
+            "vendor": "FPT Telecom",
+            "model": "Play 4Si",
+            "target_camera": {"ip": "10.42.0.249"},
+            "service_ports": {"mqtt_tls": 8883, "stun_turn_udp": 8183},
+        }
+        adapter = get_camera_adapter(fpt_cfg)
+        self.assertIsInstance(adapter, FptCameraAdapter)
+
+        # Check AuthMech definitions (no numbers in IDs)
+        auth_mechs = adapter.get_authmech_definitions()
+        self.assertEqual(len(auth_mechs), 3)
+        auth_ids = [m["id"] for m in auth_mechs]
+        self.assertIn("AuthMech-FPT-ID", auth_ids)
+        self.assertIn("AuthMech-MQTTS-Backend", auth_ids)
+        self.assertIn("AuthMech-Signaling-P2P", auth_ids)
+        # Ensure no numbers like AuthMech-1
+        for m_id in auth_ids:
+            self.assertFalse(any(c.isdigit() for c in m_id.replace("P2P", "").replace("ID", "")))
+
+        # Check ComMech definitions (no numbers in IDs)
+        com_mechs = adapter.get_commech_definitions()
+        self.assertEqual(len(com_mechs), 4)
+        com_ids = [m["id"] for m in com_mechs]
+        self.assertIn("ComMech-MQTTS-Cloud", com_ids)
+        self.assertIn("ComMech-WebRTC-P2P", com_ids)
+        self.assertIn("ComMech-STUN-TURN", com_ids)
+        self.assertIn("ComMech-HTTPS-Upload", com_ids)
+        for m_id in com_ids:
+            self.assertFalse(any(c.isdigit() for c in m_id.replace("P2P", "")))
+
+        # Check Proprietary Services
+        prop_services = adapter.get_proprietary_services()
+        self.assertEqual(len(prop_services), 2)
+        self.assertEqual(prop_services[0]["port"], 8883)
+        self.assertEqual(prop_services[1]["port"], 8183)
+
+        # Check Firmware support (.bin)
+        self.assertTrue(adapter.check_firmware_support("firmware.bin"))
+        self.assertTrue(adapter.check_firmware_support("ota.bin"))
+        self.assertFalse(adapter.check_firmware_support("firmware.encap"))
+
     def test_oryza_firmware_parse_and_tamper(self):
         import os, tempfile
         oryza_adapter = OryzaCameraAdapter()
@@ -153,7 +236,15 @@ class TestCameraAdapters(unittest.TestCase):
         self.assertEqual(oryza_adapter.get_proprietary_services()[0]["port"], 20001)
         self.assertEqual(oryza_adapter.get_proprietary_services()[0]["name"], "CMS")
 
-        # 3. Restore axis
+        # 3. Switch to dahua
+        switch_profile("dahua_hdw1539da")
+        self.assertEqual(get_active_profile(), "dahua_hdw1539da")
+        dahua_adapter = get_adapter()
+        self.assertIsInstance(dahua_adapter, DahuaCameraAdapter)
+        self.assertEqual(dahua_adapter.get_proprietary_services()[0]["port"], 443)
+        self.assertEqual(dahua_adapter.get_proprietary_services()[1]["port"], 37777)
+
+        # 4. Restore axis
         switch_profile("axis_q1806_le")
         self.assertEqual(get_active_profile(), "axis_q1806_le")
 

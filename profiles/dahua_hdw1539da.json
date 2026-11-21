@@ -1,0 +1,109 @@
+{
+  "profile_id": "dahua_hdw1539da",
+  "name": "Dahua DH-IPC-HDW1539DA-SAW-IL",
+  "vendor": "Dahua Security",
+  "hardware_heritage": "Dahua",
+  "model": "DH-IPC-HDW1539DA-SAW-IL",
+  "firmware": "V2.800.0000000.0.R",
+  "evidence_base_dir": "/home/merlin/PSI/26110902 - DH-IPC-HDW1539DA-SAW-IL/Bằng chứng",
+  "firmware_config": {
+    "base_dir": "/home/merlin/PSI/Firmware/Dahua"
+  },
+  "target_camera": {
+    "ip": "192.168.99.184",
+    "model": "Dahua",
+    "firmware": "V2.800.0000000.0.R",
+    "username": "admin",
+    "password": "L259B7E6",
+    "ssh_username": "admin",
+    "ssh_password": "7ujMko0L259B7E6",
+    "safety_code": "L259B7E6"
+  },
+  "safety_code": "L259B7E6",
+  "test_host": {
+    "ip": "192.168.1.250",
+    "interface": "enp3s0"
+  },
+  "ixit_declared_ports": [
+    22,
+    80,
+    443,
+    554,
+    37777
+  ],
+  "service_ports": {
+    "http": 80,
+    "https": 443,
+    "onvif_http": 80,
+    "onvif_https": 443,
+    "onvif_path": "/onvif/device_service",
+    "onvif_ws_discovery_udp": 3702,
+    "rtsp": 554,
+    "rtsp_cleartext": 554,
+    "rtsps": 443,
+    "rtsps_tls": 443,
+    "rtsp_path": "/stream1",
+    "ssh": 22,
+    "snmp": 161,
+    "snmp_udp": 161,
+    "proprietary_tcp": 37777,
+    "proprietary_tls": 443,
+    "mqtt_tls": 8883,
+    "mqtt_wss": 443,
+    "mqtt_clear": 1883,
+    "syslog_tls": 6514,
+    "syslog_clear": 514,
+    "smb": 445,
+    "smtp_starttls": 587,
+    "smtps": 465,
+    "smtp_clear": 25,
+    "smtp_receiver": [
+      25,
+      465,
+      587
+    ],
+    "sftp_port": 22,
+    "ftp_clear": 21,
+    "sftp_receiver": [
+      21,
+      22
+    ],
+    "alarm_receiver_http": 8088,
+    "alarm_receiver_https": 8443
+  },
+  "baseline_declaration": {
+    "tls_version_expected": "TLSv1.2",
+    "tls_ciphers_declared": [
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+    ],
+    "auth_value_mechanisms_declared": [
+      "Digest-SHA256",
+      "WSSE-SHA256"
+    ],
+    "prohibited_auth_found": [],
+    "lockout_thresholds": {
+      "web": 5,
+      "ssh": 5,
+      "rtsp": 5,
+      "proprietary": 5,
+      "onvif": 30,
+      "app": 5,
+      "duration_minutes": 5
+    }
+  },
+  "snmp_v3": {
+    "user": "admin",
+    "auth_pass": "Admin123password#",
+    "priv_pass": "Admin123password#",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES128"
+  },
+  "snmp_credentials": {
+    "user": "admin",
+    "auth_pass": "Admin123password#",
+    "priv_pass": "Admin123password#",
+    "auth_protocol": "SHA256",
+    "priv_protocol": "AES128"
+  }
+}

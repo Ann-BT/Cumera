@@ -182,36 +182,6 @@ def display_wireshark_panel(
     sort_tip: Optional[str] = None,
     title: str = "BẰNG CHỨNG GÓI TIN WIRESHARK & FILE PCAP ĐỐI SOÁT"
 ) -> None:
-    """
-    Renders standardized Rich Panel containing the PCAP file, Wireshark command,
-    display filters, decryption instructions (if TLS), and sorting instructions.
-    """
-    lines = []
-
+    """Minimal output: print only the PCAP file path if present (no redundant Wireshark manual)."""
     if pcap_file and os.path.exists(pcap_file) and os.path.getsize(pcap_file) > 0:
-        lines.append(f"  • [bold cyan]File bắt gói tin PCAP:[/bold cyan] [bold white]{pcap_file}[/bold white]")
-        lines.append(f"    (Mở trực tiếp: [bold green]wireshark {pcap_file}[/bold green])\n")
-    elif pcap_file:
-        lines.append(f"  • [bold cyan]File bắt gói tin PCAP:[/bold cyan] [bold white]{pcap_file}[/bold white] [dim](Chờ ghi nhận)[/dim]\n")
-
-    lines.append(f"  • [bold yellow]Các bộ lọc Display Filter đối soát trong Wireshark:[/bold yellow]")
-    for idx, (label, filter_syntax) in enumerate(filters, 1):
-        lines.append(f"    {idx}. [bold white]{label}:[/bold white]")
-        lines.append(f"       ↳ [bold green]{filter_syntax}[/bold green]")
-
-    if is_tls:
-        lines.append("")
-        lines.append("  • [bold yellow]Giải mã lưu lượng mã hóa TLS 1.3 / HTTPS / RTSPS trong Wireshark:[/bold yellow]")
-        lines.append(f"    ↳ Tệp khóa giải mã session: [bold white]{SSLKEYLOG_PATH}[/bold white]")
-        lines.append(f"    ↳ Thiết lập Wireshark: [bold cyan]Edit[/bold cyan] → [bold cyan]Preferences[/bold cyan] → [bold cyan]Protocols[/bold cyan] → [bold cyan]TLS[/bold cyan]")
-        lines.append(f"       Điền đường dẫn tệp vào ô [bold white](Pre)-Master-Secret log filename[/bold white] để tự động giải mã ra bản rõ.")
-
-    lines.append("")
-    default_sort = "Click tiêu đề cột [bold white]No.[/bold white] để sắp xếp theo thời gian, hoặc bấm [bold white]Ctrl + G[/bold white] để nhảy đến số gói tin."
-    lines.append(f"  [dim][HUONG DAN] Sort / Tim kiem: {sort_tip or default_sort}[/dim]")
-
-    console.print(Panel(
-        "\n".join(lines),
-        title=f"[bold yellow][PCAP EVIDENCE] {title}[/bold yellow]",
-        border_style="yellow"
-    ))
+        console.print(f"[dim]↳ PCAP: {pcap_file}[/dim]")

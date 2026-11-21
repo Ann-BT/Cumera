@@ -54,6 +54,11 @@ from toolkit_config import (
 )
 from adapters import get_camera_adapter
 
+try:
+    import hotspot_manager
+except Exception:
+    hotspot_manager = None
+
 # Tự động nhận diện môi trường ảo .venv (ưu tiên trong thư mục hiện tại, rồi thư mục cha)
 VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python"
 if not VENV_PYTHON.exists():
@@ -388,6 +393,9 @@ async def save_config(data: dict):
         current.setdefault("service_ports", {})
 
         tc = current["target_camera"]
+        if "safety_code" in data:
+            current["safety_code"] = str(data["safety_code"]).strip()
+            tc["safety_code"] = str(data["safety_code"]).strip()
         if "ip" in data and data["ip"]:
             tc["ip"] = str(data["ip"]).strip()
         if "username" in data and data["username"]:
@@ -525,6 +533,58 @@ async def auto_link_api():
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore")
         return {"status": "ok", "output": out, "code": proc.returncode}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------
+# WI-FI HOTSPOT & PACKET CAPTURE ENDPOINTS
+# -------------------------------------------------------------
+@app.get("/api/hotspot/status")
+async def api_hotspot_status():
+    if not hotspot_manager:
+        raise HTTPException(status_code=500, detail="Hotspot manager module is not loaded")
+    return hotspot_manager.get_hotspot_status()
+
+
+@app.post("/api/hotspot/start")
+async def api_hotspot_start(data: dict = None):
+    if not hotspot_manager:
+        raise HTTPException(status_code=500, detail="Hotspot manager module is not loaded")
+    payload = data or {}
+    ssid = payload.get("ssid")
+    password = payload.get("password")
+    return await asyncio.to_thread(hotspot_manager.start_hotspot, ssid, password)
+
+
+@app.post("/api/hotspot/stop")
+async def api_hotspot_stop():
+    if not hotspot_manager:
+        raise HTTPException(status_code=500, detail="Hotspot manager module is not loaded")
+    return await asyncio.to_thread(hotspot_manager.stop_hotspot)
+
+
+@app.post("/api/hotspot/ping")
+async def api_hotspot_ping(data: dict):
+    if not hotspot_manager:
+        raise HTTPException(status_code=500, detail="Hotspot manager module is not loaded")
+    ip = (data or {}).get("ip", "").strip()
+    if not ip:
+        raise HTTPException(status_code=400, detail="IP is required")
+    return await asyncio.to_thread(hotspot_manager.ping_client, ip)
+
+
+@app.post("/api/hotspot/set_target")
+async def api_hotspot_set_target(data: dict):
+    ip = (data or {}).get("ip", "").strip()
+    if not ip:
+        raise HTTPException(status_code=400, detail="Target IP is required")
+    try:
+        cfg = tc_load_config(str(CONFIG_FILE))
+        cfg.setdefault("target_camera", {})
+        cfg["target_camera"]["ip"] = ip
+        tc_save_config(cfg, str(CONFIG_FILE))
+        return {"status": "ok", "message": f"Đã cập nhật IP mục tiêu sang: {ip}", "ip": ip}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -753,6 +813,97 @@ async def download_tampered_firmware(path: str):
     if workspace_root not in target.parents and "/home/merlin/PSI" not in str(target):
         raise HTTPException(status_code=403, detail="Đường dẫn nằm ngoài workspace.")
     return FileResponse(path=str(target), filename=target.name, media_type="application/octet-stream")
+
+
+@app.post("/api/firmware/upload")
+async def upload_firmware(request: Request, filename: str = "firmware.bin", target_dir: Optional[str] = None):
+    """
+    Upload a firmware container/file (.bin, .encap, .img, .tar, .zip, etc.)
+    into the specified target directory or the active profile's firmware directory.
+    Streams chunks directly to disk to prevent RAM exhaustion on large (100MB-1GB) firmware files.
+    """
+    raw_name = os.path.basename(filename or "firmware.bin").strip()
+    safe_name = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in raw_name)
+    ext = os.path.splitext(safe_name.lower())[1]
+    allowed_exts = {
+        ".bin", ".encap", ".img", ".tar", ".gz", ".tgz",
+        ".zip", ".pkg", ".rom", ".dav", ".fw", ".iso"
+    }
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Định dạng tệp không được hỗ trợ ({ext}). Chỉ hỗ trợ: {', '.join(sorted(allowed_exts))}"
+        )
+
+    # Determine destination folder
+    save_dir: Optional[Path] = None
+    if target_dir:
+        candidate = Path(target_dir).expanduser().resolve()
+        workspace_root = BASE_DIR.parent.resolve()
+        if workspace_root in candidate.parents or candidate == workspace_root or "/home/merlin/PSI" in str(candidate):
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                if candidate.is_dir():
+                    save_dir = candidate
+            except Exception:
+                pass
+
+    if not save_dir:
+        try:
+            cfg = tc_load_config(str(CONFIG_FILE))
+            fw_cfg = cfg.get("firmware_config", {})
+            base_d = fw_cfg.get("base_dir")
+            if base_d and os.path.isdir(base_d):
+                save_dir = Path(base_d).resolve()
+        except Exception:
+            pass
+
+    if not save_dir:
+        save_dir = BASE_DIR / "uploads" / "firmware"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+    dest_path = save_dir / safe_name
+    size = 0
+    max_size = 1024 * 1024 * 1024  # 1GB limit
+
+    try:
+        with open(dest_path, "wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > max_size:
+                    raise HTTPException(status_code=413, detail="Tệp firmware vượt quá kích thước tối đa cho phép (1GB).")
+                f.write(chunk)
+    except HTTPException:
+        if dest_path.exists():
+            try:
+                dest_path.unlink()
+            except Exception:
+                pass
+        raise
+    except Exception as e:
+        if dest_path.exists():
+            try:
+                dest_path.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Lỗi ghi tệp firmware lên máy chủ: {e}")
+
+    if size == 0:
+        if dest_path.exists():
+            try:
+                dest_path.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=400, detail="Tệp tải lên rỗng (0 bytes).")
+
+    return {
+        "status": "ok",
+        "message": f"Tải lên tệp {safe_name} thành công ({size:,} bytes).",
+        "filename": safe_name,
+        "saved_path": str(dest_path),
+        "target_dir": str(save_dir),
+        "size_bytes": size,
+    }
 
 
 @app.post("/api/telemetry_geoip/upload_pcap")
@@ -1158,6 +1309,186 @@ async def api_stop_process(channel: str = Query("all")):
                 ch.task.cancel()
             stopped.append(cid)
     return {"status": "ok", "stopped_channels": stopped}
+
+
+@app.get("/api/terminal/shells")
+def api_get_available_shells():
+    """Detect available shells on host system (Linux / Windows)"""
+    shells = []
+    if sys.platform == "win32":
+        candidates = [
+            ("PowerShell", "powershell.exe"),
+            ("PowerShell Core", "pwsh.exe"),
+            ("Command Prompt", "cmd.exe"),
+            ("Git / WSL Bash", "bash.exe"),
+        ]
+        for name, cmd in candidates:
+            path = shutil.which(cmd)
+            if path:
+                shells.append({"name": name, "path": path, "id": cmd})
+        default_shell = shells[0]["path"] if shells else "cmd.exe"
+    else:
+        # Linux / Unix
+        candidates = [
+            ("bash", "bash"),
+            ("zsh", "zsh"),
+            ("fish", "fish"),
+            ("sh", "sh"),
+        ]
+        for name, cmd in candidates:
+            path = shutil.which(cmd)
+            if path and not any(s["path"] == path for s in shells):
+                shells.append({"name": name, "path": path, "id": cmd})
+        default_shell = os.environ.get("SHELL") or (shells[0]["path"] if shells else "/bin/bash")
+
+    return {
+        "status": "ok",
+        "platform": sys.platform,
+        "default": default_shell,
+        "shells": shells,
+    }
+
+
+@app.websocket("/ws/pty")
+async def websocket_pty(websocket: WebSocket):
+    """
+    Full interactive PTY WebSocket session (VS Code style).
+    Supports Linux native PTY and Windows subprocess fallback.
+    """
+    await websocket.accept()
+
+    query_params = websocket.query_params
+    shell_name = query_params.get("shell", "")
+
+    # Determine shell executable
+    if sys.platform == "win32":
+        shell_path = shutil.which(shell_name) or shutil.which("powershell.exe") or shutil.which("cmd.exe") or "cmd.exe"
+    else:
+        shell_path = shutil.which(shell_name) or os.environ.get("SHELL") or shutil.which("bash") or "/bin/sh"
+
+    cols = int(query_params.get("cols", 120))
+    rows = int(query_params.get("rows", 30))
+    working_dir = str(PROJECT_DIR)
+
+    if sys.platform != "win32":
+        import pty, fcntl, termios, struct
+        master_fd, slave_fd = pty.openpty()
+
+        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+        env["COLORTERM"] = "truecolor"
+
+        proc = subprocess.Popen(
+            [shell_path],
+            preexec_fn=os.setsid,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            cwd=working_dir,
+            env=env,
+        )
+        os.close(slave_fd)
+
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        loop = asyncio.get_running_loop()
+
+        def on_master_read():
+            try:
+                data = os.read(master_fd, 4096)
+                if data:
+                    asyncio.create_task(websocket.send_bytes(data))
+            except (BlockingIOError, InterruptedError):
+                pass
+            except Exception:
+                try:
+                    loop.remove_reader(master_fd)
+                except Exception:
+                    pass
+
+        loop.add_reader(master_fd, on_master_read)
+
+        try:
+            while True:
+                msg = await websocket.receive()
+                if "bytes" in msg and msg["bytes"]:
+                    os.write(master_fd, msg["bytes"])
+                elif "text" in msg and msg["text"]:
+                    try:
+                        cmd_obj = json.loads(msg["text"])
+                        if cmd_obj.get("action") == "resize":
+                            r = int(cmd_obj.get("rows", rows))
+                            c = int(cmd_obj.get("cols", cols))
+                            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", r, c, 0, 0))
+                            continue
+                    except Exception:
+                        pass
+                    os.write(master_fd, msg["text"].encode("utf-8"))
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        except Exception:
+            pass
+        finally:
+            try:
+                loop.remove_reader(master_fd)
+            except Exception:
+                pass
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+    else:
+        # Windows fallback
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+        proc = subprocess.Popen(
+            [shell_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=working_dir,
+            env=env,
+            bufsize=0,
+        )
+
+        async def win_reader():
+            loop = asyncio.get_running_loop()
+            while proc.poll() is None:
+                chunk = await loop.run_in_executor(None, proc.stdout.read, 1024)
+                if not chunk:
+                    break
+                await websocket.send_bytes(chunk)
+
+        read_task = asyncio.create_task(win_reader())
+        try:
+            while True:
+                msg = await websocket.receive()
+                if "bytes" in msg and msg["bytes"] and proc.stdin:
+                    proc.stdin.write(msg["bytes"])
+                    proc.stdin.flush()
+                elif "text" in msg and msg["text"] and proc.stdin:
+                    proc.stdin.write(msg["text"].encode("utf-8"))
+                    proc.stdin.flush()
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        except Exception:
+            pass
+        finally:
+            read_task.cancel()
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
 
 
 @app.websocket("/ws/run")

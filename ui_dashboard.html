@@ -7,6 +7,9 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="shortcut icon" href="/favicon.ico">
   <script src="assets/tailwindcss.min.js" onerror="var s=document.createElement('script');s.src='https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js';document.head.appendChild(s);"></script>
+  <link rel="stylesheet" href="/assets/xterm.css">
+  <script src="/assets/xterm.js"></script>
+  <script src="/assets/xterm-addon-fit.js"></script>
   <style>
     :root {
       --bg-app: #080a0f;
@@ -30,23 +33,44 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
     }
+    html, body {
+      scroll-behavior: smooth;
+    }
+    #main_content_scrollable {
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+    #terminal_output, #terminal_output_2 {
+      scroll-behavior: auto !important; /* Critical: prevent streaming jerkiness */
+      overscroll-behavior-y: contain;
+    }
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #232d40 transparent;
+    }
+    .custom-scrollbar {
+      -webkit-overflow-scrolling: touch;
+    }
     .custom-scrollbar::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #080a10;
+      background: transparent;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #1c2536;
-      border-radius: 3px;
+      background: #232d40;
+      border-radius: 9999px;
+      transition: background 0.15s ease;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #2b3952;
+      background: #38bdf8;
     }
     /* Typography & Terminal styling */
     .font-terminal {
       font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", "Fira Code", Menlo, Monaco, Consolas, monospace;
+      font-feature-settings: "liga" 0;
     }
     .console-resizer {
       height: 6px;
@@ -75,27 +99,90 @@
       background: #ffffff;
     }
 
-    /* Floating Console Overlay Workbench */
+    :root {
+      --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+      --duration-fast: 120ms;
+      --duration-normal: 220ms;
+    }
+
+    /* Bottom Docked Console Drawer (Slide Up From Bottom) */
     #docked_console_panel {
       position: fixed;
-      bottom: 12px;
-      right: 16px;
-      width: min(940px, calc(100vw - 32px));
-      height: 400px;
-      max-height: calc(100vh - 80px);
-      background: #080b11;
-      border: 1px solid #232d42;
-      border-radius: 8px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(56, 189, 248, 0.1);
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100vw;
+      height: 380px;
+      max-height: calc(100vh - 64px);
+      background: #07090e;
+      border-top: 1px solid #1a2234;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.85);
       z-index: 50;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+      transform: translateY(0);
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .term-jump-btn {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      background: #0e1726;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+      z-index: 20;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .term-jump-btn:hover {
+      background: #0284c7;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .split-col-resizer {
+      width: 4px;
+      cursor: col-resize;
+      background: #171f2e;
+      transition: background 0.15s ease;
+      z-index: 25;
+      user-select: none;
+    }
+    .split-col-resizer:hover, .split-col-resizer.resizing {
+      background: #38bdf8;
+    }
+    .term-drop-zone {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 50%;
+      background: rgba(8, 47, 73, 0.45);
+      border: 2px dashed #38bdf8;
+      backdrop-filter: blur(2px);
+      z-index: 40;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: all 0.15s ease;
+    }
+    .term-drop-zone.active {
+      display: flex;
     }
     #docked_console_panel.floating-minimized {
-      transform: translateY(calc(100% + 24px));
-      opacity: 0;
+      transform: translateY(100%);
       pointer-events: none;
     }
     #docked_console_panel.terminal-fullscreen {
@@ -112,44 +199,102 @@
       opacity: 1 !important;
       pointer-events: auto !important;
     }
+    @media (max-width: 767px) {
+      #docked_console_panel {
+        height: 55vh;
+        max-height: calc(100vh - 56px);
+      }
+    }
 
     /* Butter-smooth Micro-animations & Micro-interactions */
     @keyframes tabEnter {
       0% {
         opacity: 0;
-        transform: translateY(4px);
+        transform: translateY(6px) scale(0.995);
+        filter: blur(1px);
       }
       100% {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
+        filter: blur(0);
       }
     }
+    .tab-pane {
+      will-change: opacity, transform;
+    }
     .tab-pane.active {
-      animation: tabEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: tabEnter 0.22s var(--ease-spring) forwards;
+    }
+
+    /* Floating HUD Toast Notification */
+    #toast_bar {
+      position: fixed !important;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-24px) scale(0.96);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.24s var(--ease-spring) !important;
+      z-index: 99999 !important;
+      border-radius: 9999px !important;
+      padding: 6px 16px !important;
+      display: flex !important;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    #toast_bar.toast-active {
+      opacity: 1 !important;
+      transform: translateX(-50%) translateY(0) scale(1) !important;
+      pointer-events: auto !important;
+    }
+
+    /* Responsive Mobile Drawer for Sidebar */
+    @media (max-width: 767px) {
+      #app_sidebar {
+        position: fixed !important;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 40;
+        transform: translateX(-100%);
+        transition: transform 0.26s var(--ease-spring), width 0.26s var(--ease-spring) !important;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.85);
+        width: 240px !important;
+      }
+      #app_sidebar.mobile-open {
+        transform: translateX(0) !important;
+      }
     }
 
     /* Tactile Border-State Navigation Items (Anti-AI Slop) */
     .nav-item {
       position: relative;
       border-left: 3px solid transparent;
-      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.18s var(--ease-spring);
       background: transparent;
+      touch-action: manipulation;
     }
     .nav-item:hover {
-      background-color: #121724;
+      background-color: rgba(18, 23, 36, 0.85);
       color: #f1f5f9;
-      border-left-color: #26334a;
+      border-left-color: #334155;
       transform: translateX(2px);
     }
     .nav-item.active {
-      background: #141b28 !important;
+      background: rgba(20, 27, 40, 0.95) !important;
       color: #ffffff !important;
       border-left-color: #38bdf8 !important;
       font-weight: 600;
+      box-shadow: inset 1px 0 0 0 rgba(56, 189, 248, 0.25);
       transform: translateX(0);
     }
     .nav-item.active svg {
       color: #38bdf8 !important;
+      transform: scale(1.05);
+      transition: transform 0.18s var(--ease-spring);
     }
     .nav-item.running {
       border-left-color: #f59e0b !important;
@@ -157,19 +302,28 @@
       color: #fde047 !important;
     }
 
+    button, select, input {
+      touch-action: manipulation;
+    }
     button {
-      transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.14s var(--ease-spring);
     }
     button:active {
-      transform: scale(0.97);
+      transform: scale(0.965);
+    }
+    input:focus, select:focus {
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8 !important;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .card-interactive {
-      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+      transition: border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring), transform 0.2s var(--ease-spring);
     }
     .card-interactive:hover {
       border-color: #28344c;
-      box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.08);
+      transform: translateY(-1px);
     }
 
     /* Minimalist Borderless Tables with Subtle Zebra Striping */
@@ -279,61 +433,62 @@
   <!-- ============================================================== -->
   <!-- 1. TOP TOOLBAR & SYSTEM RIBBON -->
   <!-- ============================================================== -->
-  <header class="glass-header border-b border-[#171f2e] px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-    <div class="flex items-center gap-3">
+  <header class="glass-header border-b border-[#171f2e] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 shrink-0 z-20">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Mobile Sidebar Toggle -->
+      <button onclick="toggleMobileSidebar()" class="md:hidden p-1.5 -ml-1 rounded text-[#94a3b8] hover:text-white hover:bg-[#151c2a] transition focus:outline-none cursor-pointer" title="Menu điều hướng">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
       <!-- Clean Brand Identity -->
-      <div class="flex items-center gap-2.5">
-        <img src="/icon.png" alt="Cumera Logo" class="w-7 h-7 rounded-md border border-[#28374f] shadow-sm object-cover">
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-sm tracking-tight text-white">Cumera</span>
-          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#131b28] text-[#38bdf8] border border-[#213047]">v2.3</span>
+      <div class="flex items-center gap-2">
+        <img src="/icon.png" alt="Cumera Logo" class="w-6 h-6 sm:w-7 sm:h-7 rounded-md border border-[#28374f] shadow-sm object-cover">
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <span class="font-bold text-xs sm:text-sm tracking-tight text-white">Cumera</span>
+          <span class="text-[9px] sm:text-[10px] font-mono px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded bg-[#131b28] text-[#38bdf8] border border-[#213047]">v2.4</span>
         </div>
       </div>
 
-      <div class="h-4 w-px bg-[#1a2333]"></div>
+      <div class="h-4 w-px bg-[#1a2333] hidden sm:block"></div>
 
       <!-- Interactive Target Status Pill with Status Border -->
-      <button onclick="switchTab('target')" id="target_dut_pill" class="flex items-center gap-2 text-xs bg-[#090c13] hover:bg-[#111724] border border-[#232e42] hover:border-[#38bdf8] px-3 py-1.5 rounded-md shadow-sm transition-all duration-150 cursor-pointer group" title="Bấm để mở cấu hình thiết bị DUT">
+      <button onclick="switchTab('target')" id="target_dut_pill" class="flex items-center gap-1.5 sm:gap-2 text-xs bg-[#090c13] hover:bg-[#111724] border border-[#232e42] hover:border-[#38bdf8] px-2.5 sm:px-3 py-1.5 rounded-md shadow-sm transition-all duration-150 cursor-pointer group" title="Bấm để mở cấu hình thiết bị DUT">
         <span id="target_ping_indicator" class="w-1.5 h-3 rounded-full bg-amber-400 shrink-0"></span>
         <span class="text-[#64748b] font-mono text-[11px] font-semibold">DUT</span>
         <span id="target_ip_badge" class="font-mono font-bold text-[#38bdf8]">--</span>
-        <span id="target_latency_badge" class="font-mono text-[11px] text-[#94a3b8] font-semibold">(đang kiểm tra...)</span>
-        <span class="text-[#253248]">•</span>
-        <span id="target_model_badge" class="text-white font-medium">--</span>
-        <span class="text-[#253248]">•</span>
-        <span id="target_iface_badge" class="font-mono text-[#94a3b8]">--</span>
-        <svg class="w-3.5 h-3.5 text-[#64748b] group-hover:text-[#38bdf8] transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="hidden sm:inline text-[#253248]">•</span>
+        <span id="target_latency_badge" class="hidden sm:inline font-mono text-[11px] text-[#94a3b8] font-semibold">(đang kiểm tra...)</span>
+        <span class="hidden lg:inline text-[#253248]">•</span>
+        <span id="target_model_badge" class="hidden lg:inline text-white font-medium">--</span>
+        <span class="hidden xl:inline text-[#253248]">•</span>
+        <span id="target_iface_badge" class="hidden xl:inline font-mono text-[#94a3b8]">--</span>
+        <svg class="w-3.5 h-3.5 text-[#64748b] group-hover:text-[#38bdf8] transition-colors ml-0.5 sm:ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       </button>
 
-      <!-- Camera Profile Switcher Pill -->
-      <div class="flex items-center gap-1.5 text-xs bg-[#090c13] border border-[#232e42] hover:border-cyan-500/70 px-2.5 py-1.5 rounded-md shadow-sm transition-all" title="Chuyển đổi Camera Target Profile">
-        <span class="text-amber-400 font-mono text-[11px] font-semibold flex items-center gap-1">
-          <span>🎯</span><span class="hidden md:inline text-[#94a3b8]">Target Profile:</span>
-        </span>
-        <select id="header_profile_select" onchange="onProfileSelectChange(this.value)" class="bg-[#10131a] text-xs font-mono font-medium text-cyan-300 border border-[#272c3a] rounded px-2 py-0.5 focus:border-cyan-400 focus:outline-none cursor-pointer">
-          <option value="" disabled selected>Đang tải profiles...</option>
-        </select>
-      </div>
+      <!-- Camera Profile Switcher Dropdown -->
+      <select id="header_profile_select" onchange="onProfileSelectChange(this.value)" class="bg-[#0b0f17] text-xs font-mono font-medium text-cyan-300 border border-[#232e42] hover:border-cyan-500/70 rounded-md px-2 sm:px-2.5 py-1.5 focus:border-cyan-400 focus:outline-none cursor-pointer shadow-sm transition max-w-[130px] sm:max-w-[200px] md:max-w-none truncate" title="Target Profile">
+        <option value="" disabled selected>Đang tải profiles...</option>
+      </select>
     </div>
 
     <!-- Quick Action Button Group -->
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
       <!-- Terminal Overlay Trigger Button -->
-      <button onclick="toggleFloatingConsole()" id="btn_floating_term_toggle" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-semibold bg-[#090c13] hover:bg-[#111724] text-[#94a3b8] hover:text-white border border-[#232e42] hover:border-[#38bdf8] transition-all shadow-sm cursor-pointer group" title="Bật/Tắt Terminal (Ctrl + `)">
+      <button onclick="toggleFloatingConsole()" id="btn_floating_term_toggle" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-mono font-semibold bg-[#090c13] hover:bg-[#111724] text-[#94a3b8] hover:text-white border border-[#232e42] hover:border-[#38bdf8] transition-all shadow-sm cursor-pointer group active:scale-95" title="Bật/Tắt Terminal (Ctrl + `)">
         <svg class="w-3.5 h-3.5 text-cyan-400 group-hover:text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span>Console</span>
+        <span class="hidden sm:inline">Console</span>
         <span id="floating_term_indicator_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
       </button>
 
       <!-- Nút Kiểm tra & Cập nhật Cumera Trực tiếp -->
-      <button onclick="checkAppUpdate()" id="btn_check_update" class="bg-[#0b1615] hover:bg-[#102220] text-[#5eead4] hover:text-white px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d3d38] hover:border-[#2dd4bf] shadow-sm transition cursor-pointer" title="Kiểm tra và cập nhật Cumera trực tiếp từ GitHub">
+      <button onclick="checkAppUpdate()" id="btn_check_update" class="bg-[#0b1615] hover:bg-[#102220] text-[#5eead4] hover:text-white px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d3d38] hover:border-[#2dd4bf] shadow-sm transition cursor-pointer active:scale-95" title="Kiểm tra và cập nhật Cumera trực tiếp từ GitHub">
         <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        <span>Cập nhật</span>
+        <span class="hidden sm:inline">Cập nhật</span>
       </button>
 
-      <button id="btn_stop_top" onclick="stopCommand()" class="hidden bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold items-center gap-1.5 transition border border-rose-700/60 shadow-sm">
+      <button id="btn_stop_top" onclick="stopCommand()" class="hidden bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold items-center gap-1.5 transition border border-rose-700/60 shadow-sm active:scale-95">
         <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        <span>Stop</span>
+        <span class="hidden sm:inline">Stop</span>
       </button>
     </div>
   </header>
@@ -341,7 +496,9 @@
   <!-- ============================================================== -->
   <!-- 2. MAIN WORKSPACE (SIDEBAR + CONTENT SPLIT VIEW) -->
   <!-- ============================================================== -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative">
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="mobile_sidebar_backdrop" onclick="closeMobileSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 hidden md:hidden transition-opacity duration-200"></div>
     
     <!-- LEFT NAVIGATION TREE -->
     <aside id="app_sidebar" class="w-56 bg-[#090c13]/95 border-r border-[#171e2c] flex flex-col justify-between shrink-0 select-none transition-all duration-150">
@@ -353,6 +510,15 @@
             <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span class="nav-label truncate font-medium">Target</span>
           </div>
+        </button>
+
+        <!-- HOTSPOT (Wi-Fi Camera Testing) -->
+        <button onclick="switchTab('hotspot')" id="nav_hotspot" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Phát Wi-Fi Hotspot &amp; bắt gói tin Camera">
+          <div class="flex items-center gap-2 overflow-hidden">
+            <svg class="w-3.5 h-3.5 text-teal-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+            <span class="nav-label truncate font-medium">Hotspot</span>
+          </div>
+          <span id="sidebar_hotspot_badge" class="nav-label px-1 py-0.2 rounded text-[9px] font-mono bg-[#141824] text-[#64748b] border border-[#231b34] shrink-0">OFF</span>
         </button>
 
         <div class="my-1 border-t border-[#18202e]/60"></div>
@@ -368,7 +534,7 @@
         <!-- COMMECH -->
         <button onclick="switchTab('commech')" id="nav_commech" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item active" title="Dịch vụ truyền thông & an toàn giao thức">
           <div class="flex items-center gap-2 overflow-hidden">
-            <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
             <span class="nav-label truncate font-medium">ComMech</span>
           </div>
         </button>
@@ -378,7 +544,7 @@
         <!-- BRUTE-FORCE -->
         <button onclick="switchTab('lockout')" id="nav_lockout" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Kiểm thử phòng vệ vét cạn & khóa tài khoản">
           <div class="flex items-center gap-2 overflow-hidden">
-            <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             <span class="nav-label truncate font-medium">Brute-Force</span>
           </div>
         </button>
@@ -424,17 +590,6 @@
             <span class="nav-label truncate font-medium">Firmware</span>
           </div>
         </button>
-
-        <div class="my-1 border-t border-[#18202e]/60"></div>
-
-        <!-- EVIDENCE -->
-        <button onclick="switchTab('evidence')" id="nav_evidence" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Kho bằng chứng gói tin PCAP">
-          <div class="flex items-center gap-2 overflow-hidden">
-            <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <span class="nav-label truncate font-medium">Evidence</span>
-          </div>
-          <span id="sidebar_pcap_count" class="nav-label px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#141824] text-[#a855f7] border border-[#231b34] shrink-0">11</span>
-        </button>
       </div>
 
       <!-- Bottom Server Connection State & Collapse Toggle -->
@@ -460,10 +615,10 @@
     <!-- RIGHT MAIN CONTENT AREA -->
     <main class="flex-1 flex flex-col overflow-hidden bg-transparent relative">
       
-      <!-- NOTIFICATION TOAST BAR -->
-      <div id="toast_bar" class="hidden px-3 py-1.5 bg-[#1b2538] border-b border-[#2d3a54] text-xs flex items-center justify-between text-[#93c5fd]">
+      <!-- FLOATING HUD TOAST NOTIFICATION -->
+      <div id="toast_bar" class="text-xs">
         <span id="toast_text">Thông báo...</span>
-        <button onclick="hideToast()" class="text-[#64748b] hover:text-white">&times;</button>
+        <button onclick="hideToast()" class="text-[#64748b] hover:text-white ml-2 text-sm leading-none cursor-pointer">&times;</button>
       </div>
 
       <!-- UPPER PANEL: MODULE CONTENTS (SCROLLABLE) -->
@@ -509,11 +664,8 @@
               </div>
 
               <!-- Profile Selector In Target Form -->
-              <div class="bg-[#0b0e15] border border-[#272c3a] rounded p-2 flex items-center justify-between gap-2">
-                <span class="text-[11px] font-semibold text-[#94a3b8] flex items-center gap-1.5">
-                  <span>🎯</span> Profile mục tiêu:
-                </span>
-                <select id="tab_profile_select" onchange="onProfileSelectChange(this.value)" class="bg-[#10131a] text-xs font-mono text-cyan-300 border border-[#272c3a] rounded px-2.5 py-1 focus:border-cyan-400 focus:outline-none cursor-pointer">
+              <div>
+                <select id="tab_profile_select" onchange="onProfileSelectChange(this.value)" class="w-full bg-[#10131a] text-xs font-mono text-cyan-300 border border-[#272c3a] hover:border-cyan-500/50 rounded px-2.5 py-1.5 focus:border-cyan-400 focus:outline-none cursor-pointer shadow-sm transition" title="Target Profile">
                   <option value="" disabled selected>Đang tải...</option>
                 </select>
               </div>
@@ -526,7 +678,7 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">Model Camera:</label>
                   <input type="text" id="cfg_target_model" value="" placeholder="Generic IP Camera" oninput="updateSubfolderPreview()" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -537,7 +689,22 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="bg-[#141721] p-2.5 rounded border border-[#272c3a] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <label class="text-xs font-semibold text-cyan-400">Mã an toàn / Safety Code (Mật khẩu mặc định in trên tem):</label>
+                  </div>
+                  <div class="flex items-center gap-2 mt-1">
+                    <input type="text" id="cfg_safety_code" value="L259B7E6" placeholder="VD: L259B7E6" class="w-48 bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1 text-xs text-amber-300 font-mono font-bold focus:border-cyan-500 focus:outline-none">
+                    <span class="text-[11px] text-[#848c9e]">SSH: <code class="text-emerald-400 font-mono font-bold">7ujMko0[SafetyCode]</code></span>
+                  </div>
+                </div>
+                <button type="button" onclick="applySafetyCode()" class="px-3 py-1.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-700/60 text-xs text-cyan-300 font-medium shrink-0 transition" title="Tự động điền Pass Web = Safety Code và Pass SSH = 7ujMko0 + Safety Code">
+                  Điền mật khẩu theo Safety Code
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">User Web:</label>
                   <input type="text" id="cfg_target_user" value="" placeholder="admin" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -545,13 +712,13 @@
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">Pass Web:</label>
                   <div class="relative">
-                    <input type="password" id="cfg_target_pass" value="" placeholder="••••••••" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-                    <button type="button" onclick="togglePassVisibility('cfg_target_pass')" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Xem</button>
+                    <input type="text" id="cfg_target_pass" value="" placeholder="Mật khẩu Web" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
+                    <button type="button" onclick="togglePassVisibility('cfg_target_pass', this)" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Ẩn</button>
                   </div>
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">User SSH:</label>
                   <input type="text" id="cfg_ssh_user" value="" placeholder="admin / root" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -559,13 +726,13 @@
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">Pass SSH:</label>
                   <div class="relative">
-                    <input type="password" id="cfg_ssh_pass" value="" placeholder="••••••••" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-                    <button type="button" onclick="togglePassVisibility('cfg_ssh_pass')" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Xem</button>
+                    <input type="text" id="cfg_ssh_pass" value="" placeholder="Mật khẩu SSH" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
+                    <button type="button" onclick="togglePassVisibility('cfg_ssh_pass', this)" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Ẩn</button>
                   </div>
                 </div>
               </div>
 
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">User SNMPv3:</label>
                   <input type="text" id="cfg_snmp_user" value="" placeholder="admin" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -573,20 +740,20 @@
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">SNMP Auth Pass:</label>
                   <div class="relative">
-                    <input type="password" id="cfg_snmp_auth_pass" value="" placeholder="••••••••" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-                    <button type="button" onclick="togglePassVisibility('cfg_snmp_auth_pass')" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Xem</button>
+                    <input type="text" id="cfg_snmp_auth_pass" value="" placeholder="Mật khẩu Auth" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
+                    <button type="button" onclick="togglePassVisibility('cfg_snmp_auth_pass', this)" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Ẩn</button>
                   </div>
                 </div>
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">SNMP Priv Pass:</label>
                   <div class="relative">
-                    <input type="password" id="cfg_snmp_priv_pass" value="" placeholder="••••••••" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
-                    <button type="button" onclick="togglePassVisibility('cfg_snmp_priv_pass')" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Xem</button>
+                    <input type="text" id="cfg_snmp_priv_pass" value="" placeholder="Mật khẩu Priv" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
+                    <button type="button" onclick="togglePassVisibility('cfg_snmp_priv_pass', this)" class="absolute right-2 top-1.5 text-xs text-[#5c6475] hover:text-white">Ẩn</button>
                   </div>
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label class="block text-xs text-[#848c9e] mb-1">Đường dẫn RTSP:</label>
                   <input type="text" id="cfg_rtsp_path" list="rtsp_path_presets" value="/stream1" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -628,7 +795,7 @@
               </div>
 
               <div class="text-[10px] font-bold uppercase tracking-wider text-sky-400">Cổng dịch vụ Camera (Inbound)</div>
-              <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                 <div>
                   <label class="block text-[11px] text-[#848c9e] mb-0.5">HTTPS:</label>
                   <input type="number" id="cfg_port_https" value="443" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none">
@@ -673,7 +840,7 @@
 
               <div class="pt-1 border-t border-[#1e2433]">
                 <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1.5">Cổng Receiver &amp; Client Outbound</div>
-                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                   <div>
                     <label class="block text-[11px] text-[#848c9e] mb-0.5">MQTT TLS:</label>
                     <input type="number" id="cfg_port_mqtt_tls" value="8883" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2 py-1 text-xs text-white font-mono focus:outline-none">
@@ -734,7 +901,7 @@
                 <input type="text" id="cfg_host_iface" value="Đang nhận diện..." disabled class="w-full bg-[#0a0c10] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-[#38bdf8] font-mono cursor-not-allowed">
               </div>
 
-              <div class="pt-1.5 border-t border-[#272c3a] grid grid-cols-4 gap-2">
+              <div class="pt-1.5 border-t border-[#272c3a] grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button onclick="probeTargetPorts(true)" id="btn_probe_ports" class="py-1.5 rounded bg-[#162724] hover:bg-[#1d3632] text-xs font-medium text-emerald-300 border border-emerald-800/60" title="Tự động dò các cổng mở, hãng camera và đường dẫn RTSP/ONVIF">
                   Dò &amp; Điền cổng
                 </button>
@@ -852,15 +1019,14 @@
             </div>
           </div>
 
-          <div class="border border-[#272c3a] rounded overflow-hidden bg-[#14171f]">
-            <table class="w-full text-left border-collapse text-xs">
+          <div class="border border-[#272c3a] rounded overflow-x-auto custom-scrollbar bg-[#14171f]">
+            <table class="w-full min-w-[580px] text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
-                  <th class="p-2 border-r border-[#272c3a] w-56">Phương thức</th>
-                  <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
-                  <th class="p-2 border-r border-[#272c3a] w-48">Cơ chế xác thực</th>
-                  <th class="p-2 border-r border-[#272c3a]">Bộ lọc Wireshark & Thứ tự gói</th>
-                  <th class="p-2 w-36 text-center">Hành động</th>
+                  <th class="p-2 border-r border-[#272c3a]">Phương thức</th>
+                  <th class="p-2 border-r border-[#272c3a] w-24 text-center">Cổng</th>
+                  <th class="p-2 border-r border-[#272c3a] w-64">Cơ chế xác thực</th>
+                  <th class="p-2 w-48 text-center">Hành động</th>
                 </tr>
               </thead>
               <tbody id="authmech_table_body" class="divide-y divide-[#272c3a] text-[#e1e4ea]">
@@ -897,7 +1063,6 @@
                 <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Phân loại:</span>
                 <select id="commech_view_filter" onchange="filterComMechRows()" class="bg-transparent text-xs text-teal-300 font-mono outline-none cursor-pointer" title="Lọc hiển thị danh mục ComMech theo thể loại">
                   <option value="all" selected>Tất cả thể loại (Chi tiết)</option>
-                  <option value="ixit">Chỉ danh mục IXIT</option>
                   <option value="storage">Lưu trữ (SFTP / FTPS / FTP / SMB)</option>
                   <option value="mail">Thư điện tử (SMTPS / STARTTLS)</option>
                   <option value="media">Media & API (Web / ONVIF / RTSPS / CMS)</option>
@@ -933,8 +1098,8 @@
             </div>
           </div>
 
-          <div class="border border-[#272c3a] rounded overflow-hidden bg-[#14171f]">
-            <table class="w-full text-left border-collapse text-xs">
+          <div class="border border-[#272c3a] rounded overflow-x-auto custom-scrollbar bg-[#14171f]">
+            <table class="w-full min-w-[580px] text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
                   <th class="p-2 border-r border-[#272c3a]">Dịch vụ</th>
@@ -976,7 +1141,7 @@
           <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex items-center justify-between shadow-sm">
             <div class="flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
               </div>
               <h2 class="text-xs font-bold uppercase tracking-wider text-white">Brute-Force</h2>
             </div>
@@ -1750,60 +1915,28 @@
               <button onclick="runCommand('cat captures/input_validation_audit_*.json 2>/dev/null | tail -n 50 || echo \'Chưa có file audit json gần nhất.\'', 'Xem Log JSON Gần Nhất')" class="px-2.5 py-1 rounded bg-[#171e2c] hover:bg-[#202b3d] text-sky-300 border border-sky-800/50 text-[11px] font-medium transition">
                 Xem Log JSON
               </button>
-              <button onclick="switchTab('evidence')" class="px-2.5 py-1 rounded bg-[#171e2c] hover:bg-[#202b3d] text-cyan-300 border border-cyan-800/50 text-[11px] font-medium transition">
-                Kho Gói Tin PCAP
+              <button onclick="openEvidenceFolder('base')" class="px-2.5 py-1 rounded bg-[#171e2c] hover:bg-[#202b3d] text-cyan-300 border border-cyan-800/50 text-[11px] font-medium transition" title="Mở thư mục lưu trữ PCAP trên máy">
+                Mở Thư Mục PCAP
               </button>
             </div>
           </div>
         </div>
 
         <div id="tab_content_telemetry_geoip" class="tab-pane hidden space-y-3">
-          <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <!-- Header Banner: Minimalist single upload action -->
+          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
             <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1e1b4b] text-indigo-300 border border-indigo-800/60 font-bold tracking-wider">GEOIP</span>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Giám sát Kết nối & Telemetry</h2>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1e1b4b] text-indigo-300 border border-indigo-800/60 font-bold tracking-wider">TELEMETRY</span>
+              <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Giám Sát Lưu Lượng IP &amp; Dữ Liệu Đo Đạc Từ Xa</h2>
+                <p class="text-[11px] text-[#94a3b8] mt-0.5">Tải lên tệp PCAP/PCAPNG để tự động phân tích IP, Quốc gia, DNS/TLS và phát hiện rò rỉ dữ liệu đo đạc từ xa.</p>
+              </div>
             </div>
-            <div class="flex flex-wrap items-center gap-1.5">
-              <select id="geo_duration_select" class="bg-[#10131a] border border-[#272c3a] text-xs text-[#e1e4ea] px-2 py-1.5 rounded outline-none cursor-pointer">
-                <option value="15">15s</option>
-                <option value="20" selected>20s</option>
-                <option value="60">60s</option>
-                <option value="300">5p</option>
-                <option value="600">10p</option>
-              </select>
-              <button onclick="startLiveGeoAudit()" class="bg-[#4338ca] hover:bg-[#4f46e5] text-white px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 border border-indigo-500 transition shadow-sm" title="Bắt đầu đo theo thời gian đã chọn">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Đo Live</span>
-              </button>
-              <button onclick="startTenMinuteGeoAudit()" class="bg-[#0f766e] hover:bg-[#0d9488] text-white px-2.5 py-1.5 rounded text-xs font-semibold border border-teal-500 transition shadow-sm" title="Đo liên tục 10 phút">
-                <span>10p</span>
-              </button>
-              <button onclick="startTwoPhaseGeoAudit()" class="bg-[#b45309] hover:bg-[#d97706] text-white px-2.5 py-1.5 rounded text-xs font-semibold border border-amber-500 transition shadow-sm" title="5p bình thường + 5p mở hết chức năng">
-                <span>5p + 5p</span>
-              </button>
+            <div class="flex items-center gap-2">
               <input type="file" id="geo_pcap_upload_input" accept=".pcap,.pcapng,.cap" class="hidden" onchange="handleGeoPcapUpload(this)">
-              <button onclick="triggerGeoPcapUpload()" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-2.5 py-1.5 rounded text-xs font-semibold border border-blue-500 transition shadow-sm" title="Tải file PCAP lên để kiểm tra">
-                <span>Upload PCAP</span>
-              </button>
-              <button onclick="analyzeLatestPcapGeo()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] px-2.5 py-1.5 rounded text-xs font-medium border border-[#2e3547] transition" title="Phân tích PCAP gần nhất">
-                <span>PCAP cũ</span>
-              </button>
-              <button onclick="loadTelemetryGeoIPData()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#848c9e] hover:text-white px-2 py-1.5 rounded text-xs font-medium border border-[#2e3547] transition" title="Tải lại">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              </button>
-              <div class="h-4 w-[1px] bg-[#272c3a] mx-0.5"></div>
-              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 1.5 --no-pcap', 'Kích hoạt AuthMech (No PCAP)')" class="bg-[#1e1b4b] hover:bg-[#2e266d] text-indigo-300 border border-indigo-700/60 px-2 py-1.5 rounded text-xs font-medium transition flex items-center gap-1 shadow-sm" title="Kích hoạt xác thực Web, SSH, RTSPS, ONVIF (Không ghi đè PCAP)">
-                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                <span>+ AuthMech (No PCAP)</span>
-              </button>
-              <button onclick="runCommand('python tool17_commech_auditor.py --id all --auto-trigger --wait 1.5 --no-pcap', 'Kích hoạt ComMech (No PCAP)')" class="bg-[#0c2a4d] hover:bg-[#133d70] text-sky-300 border border-sky-700/60 px-2 py-1.5 rounded text-xs font-medium transition flex items-center gap-1 shadow-sm" title="Kích hoạt các luồng truyền thông ComMech 1-11 (Không ghi đè PCAP)">
-                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                <span>+ ComMech (No PCAP)</span>
-              </button>
-              <button onclick="runCommand('python tool17_commech_auditor.py --server-mode --no-pcap', 'Mở 5 Server ComMech (No PCAP - Chạy liên tục)')" class="bg-[#1e293b] hover:bg-[#334155] text-teal-300 border border-teal-700/60 px-2 py-1.5 rounded text-xs font-medium transition flex items-center gap-1 shadow-sm" title="Mở đồng thời 5 Server ComMech không lưu PCAP để chờ Camera gửi telemetry/sự kiện liên tục">
-                <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
-                <span>+ Bật Server ComMech (No PCAP)</span>
+              <button onclick="triggerGeoPcapUpload()" class="px-4 py-2 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm" title="Tải file PCAP lên để tự động phân tích IP và Telemetry">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span>Tải Lên PCAP</span>
               </button>
             </div>
           </div>
@@ -1853,7 +1986,9 @@
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[11px] font-bold text-[#848c9e] uppercase mr-1">Bộ lọc:</span>
               <button onclick="setGeoFilter('all')" id="btn_filter_all" class="px-2.5 py-1 rounded text-xs font-semibold bg-[#1d4ed8] text-white border border-blue-600 transition">Tất cả</button>
+              <button onclick="setGeoFilter('camera_only')" id="btn_filter_camera_only" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-teal-300 border border-[#2e3547] transition" title="Chỉ hiển thị lưu lượng do chính Camera gửi đi">Chỉ nguồn Camera</button>
               <button onclick="setGeoFilter('overseas')" id="btn_filter_overseas" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-rose-300 border border-[#2e3547] transition">Nước ngoài</button>
+              <button onclick="setGeoFilter('ixit_ok')" id="btn_filter_ixit_ok" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition" title="Dịch vụ nước ngoài hợp lệ theo cam kết IXIT (NTP/DNS)">Hợp lệ theo IXIT</button>
               <button onclick="setGeoFilter('vietnam')" id="btn_filter_vietnam" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] transition">Việt Nam</button>
               <button onclick="setGeoFilter('local')" id="btn_filter_local" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition">Nội bộ</button>
               <button onclick="setGeoFilter('telemetry')" id="btn_filter_telemetry" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-amber-300 border border-[#2e3547] transition">Telemetry</button>
@@ -1871,7 +2006,7 @@
               <span id="geo_pcap_label" class="text-[10px] font-mono text-[#848c9e] bg-[#10131a] px-2 py-0.5 rounded border border-[#272c3a]">Chưa nạp PCAP</span>
             </div>
             <div class="overflow-x-auto max-h-[340px] custom-scrollbar">
-              <table class="w-full text-left border-collapse text-xs">
+              <table class="w-full min-w-[760px] text-left border-collapse text-xs">
                 <thead class="bg-[#10131a] text-[#848c9e] border-b border-[#272c3a] sticky top-0 z-10">
                   <tr>
                     <th class="p-2 font-semibold">IP</th>
@@ -1913,46 +2048,6 @@
               </div>
               <div id="geo_leak_list" class="bg-[#10131a] p-2 rounded border border-[#272c3a] font-mono text-[11px] text-[#cad0dc] max-h-32 overflow-y-auto custom-scrollbar">
                 <div class="text-emerald-400">Không phát hiện dữ liệu nhạy cảm hoặc telemetry.</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Wireshark Quick Filters -->
-          <div class="bg-[#10131a] border border-[#272c3a] p-2.5 rounded space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-white">Bộ lọc Wireshark Display Filter</span>
-              <button onclick="openWiresharkForGeo()" class="bg-[#1d4ed8]/20 hover:bg-[#1d4ed8]/40 text-[#38bdf8] border border-blue-500/40 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <span>Mở Wireshark</span>
-              </button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono">
-              <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
-                <div>
-                  <div class="text-[#848c9e] text-[10px]">1. Outbound / Internet:</div>
-                  <div id="geo_filter_1_text" class="text-rose-300 select-all cursor-pointer" onclick="copyElText('geo_filter_1_text', 'Filter Outbound')">ip.src == ... &amp;&amp; !(ip.dst == 10.0.0.0/8 || ip.dst == 172.16.0.0/12 || ip.dst == 192.168.0.0/16 || ip.dst == 224.0.0.0/4 || ip.dst == 255.255.255.255)</div>
-                </div>
-                <button onclick="copyElText('geo_filter_1_text', 'Filter Outbound')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
-              </div>
-              <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
-                <div>
-                  <div class="text-[#848c9e] text-[10px]">2. DNS Query:</div>
-                  <div id="geo_filter_2_text" class="text-cyan-300 select-all cursor-pointer" onclick="copyElText('geo_filter_2_text', 'Filter DNS')">dns.flags.response == 0 &amp;&amp; ip.src == ...</div>
-                </div>
-                <button onclick="copyElText('geo_filter_2_text', 'Filter DNS')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
-              </div>
-              <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
-                <div>
-                  <div class="text-[#848c9e] text-[10px]">3. TLS SNI:</div>
-                  <div id="geo_filter_3_text" class="text-indigo-300 select-all cursor-pointer" onclick="copyElText('geo_filter_3_text', 'Filter TLS SNI')">tls.handshake.extension.type == 0 &amp;&amp; ip.src == ...</div>
-                </div>
-                <button onclick="copyElText('geo_filter_3_text', 'Filter TLS SNI')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
-              </div>
-              <div class="bg-[#14171f] p-2 rounded border border-[#272c3a] flex items-center justify-between card-interactive">
-                <div>
-                  <div class="text-[#848c9e] text-[10px]">4. Telemetry Payload:</div>
-                  <div class="text-amber-300 select-all cursor-pointer">frame matches &quot;(?i)telemetry|analytics|crashlog|coredump|heartbeat&quot;</div>
-                </div>
-                <button onclick="copyFilter('frame matches &quot;(?i)telemetry|analytics|crashlog|coredump|heartbeat&quot;')" class="text-xs text-[#5c6475] hover:text-white px-2 py-0.5 ml-2 border border-[#272c3a] rounded transition">Copy</button>
               </div>
             </div>
           </div>
@@ -2151,34 +2246,18 @@
         <!-- TAB: PHÂN TÍCH FIRMWARE & KHÓA MẬT MÃ (PHIÊN BẢN HIỆN TẠI) -->
         <!-- ============================================================== -->
         <div id="tab_content_firmware_update" class="tab-pane hidden space-y-3">
-          <!-- Top Header -->
+          <!-- Top Header: Minimal single-action header -->
           <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-3 rounded">
             <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Firmware Hiện Tại, Filesystem &amp; Khóa Mật Mã</h2>
-              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tự động nhận diện định dạng container, bóc tách cấu trúc filesystem và quét toàn diện chữ ký số, khóa công khai / chứng chỉ mật mã.</p>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Firmware &amp; Chữ Ký Số</h2>
+              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tải lên tệp firmware (.bin, .zip, .encap) để tự động nhận diện container và chữ ký số mật mã.</p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button onclick="runFirmwareAudit()" class="px-3.5 py-1.5 rounded text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center gap-1.5 shadow-sm">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Bắt Đầu Phân Tích Firmware</span>
+            <div class="flex items-center gap-2">
+              <button onclick="triggerFirmwareUpload()" class="px-4 py-2 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm" title="Tải tệp firmware từ máy tính lên để tự động phân tích">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span>Tải Lên Firmware</span>
               </button>
-              <button onclick="loadFirmwareSigningData()" class="px-3 py-1.5 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-[#94a3b8] hover:text-white border border-[#2e3547] transition flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Làm mới</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Cấu hình đầu vào đường dẫn Firmware -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center gap-3">
-            <div class="flex-1 min-w-[280px]">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] mb-1">Thư mục chứa Firmware (.bin / .encap / .img)</label>
-              <input id="fw_dir_input" type="text" value="" placeholder="Đường dẫn thư mục firmware theo Profile..." class="w-full bg-[#090c13] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-cyan-500" />
-            </div>
-            <div class="flex items-center gap-2 self-end">
-              <button onclick="initFirmwareDirInput()" class="px-2.5 py-1.5 rounded text-xs font-medium bg-[#1c2230] hover:bg-[#272f42] text-cyan-300 border border-[#2a354c] transition" title="Khôi phục đường dẫn mặc định theo Profile">
-                Nạp lại đường dẫn Profile
-              </button>
+              <input type="file" id="fw_upload_file_input" class="hidden" onchange="handleFirmwareUpload(this)" accept=".bin,.encap,.img,.tar,.gz,.tgz,.zip,.pkg,.rom,.dav,.fw,.iso" />
             </div>
           </div>
 
@@ -2243,7 +2322,7 @@
               <span id="fw_keys_count_badge" class="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/60">0 khóa</span>
             </div>
             <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
+              <table class="w-full min-w-[760px] text-left border-collapse text-xs">
                 <thead class="bg-[#0d1017] text-[#94a3b8] text-[10px] uppercase font-mono">
                   <tr>
                     <th class="px-3 py-2 border-b border-[#272c3a]">Nguồn / Tệp</th>
@@ -2262,50 +2341,143 @@
           </div>
         </div>
 
-        <!-- ============================================================== -->
-        <!-- TAB: BẰNG CHỨNG PCAP -->
-        <!-- ============================================================== -->
-        <div id="tab_content_evidence" class="tab-pane hidden space-y-3">
+        <!-- TAB CONTENT: HOTSPOT (Wi-Fi Camera Testing) -->
+        <div id="tab_content_hotspot" class="tab-pane hidden space-y-3">
+          <!-- Top Setting Action Bar -->
           <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <div class="flex items-center gap-3">
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Kho Dữ liệu PCAP</h2>
-              <div class="flex items-center gap-1.5 text-xs">
-                <span class="text-[#848c9e]">Thư mục:</span>
-                <span id="evidence_current_path_badge" class="font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60 truncate max-w-md">...</span>
-              </div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Trạm Phát Wi-Fi Hotspot (Kiểm thử Camera Không Dây)</h2>
+              <span id="hotspot_status_pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1e293b] text-[#94a3b8] border border-[#334155]">ĐANG TẮT</span>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="openEvidenceFolder('base')" class="bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 px-2.5 py-1 rounded text-xs font-medium border border-emerald-800/60 flex items-center gap-1 transition">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                <span>Mở Thư mục</span>
+              <!-- Minimalist Tactile ON/OFF Switch -->
+              <button onclick="toggleHotspot()" id="btn_hotspot_toggle" class="flex items-center gap-2 px-3 py-1.5 rounded bg-[#10141e] hover:bg-[#161c28] border border-[#273142] transition shadow-sm cursor-pointer select-none" title="Bật / Tắt Hotspot">
+                <span class="text-[11px] font-mono text-[#848c9e] font-semibold">HOTSPOT</span>
+                <div id="btn_hotspot_switch" class="w-10 h-5 rounded-full p-0.5 transition-colors duration-200 bg-[#232a3b] flex items-center">
+                  <div id="btn_hotspot_knob" class="w-4 h-4 rounded-full bg-[#848c9e] transition-transform duration-200 translate-x-0"></div>
+                </div>
+                <span id="btn_hotspot_label" class="font-mono text-xs font-bold text-[#848c9e] w-7 text-left">OFF</span>
               </button>
-              <button onclick="switchTab('target')" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-2.5 py-1 rounded text-xs font-medium border border-[#2e3547] flex items-center gap-1 transition">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span>Đổi Thư mục</span>
-              </button>
-              <button onclick="refreshEvidenceList()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#e1e4ea] px-2.5 py-1 rounded text-xs font-medium border border-[#2e3547] flex items-center gap-1 transition">
+              <button onclick="refreshHotspotStatus()" class="bg-[#1f2430] hover:bg-[#282f40] text-[#cbd5e1] p-1.5 rounded text-xs border border-[#2e3547] transition cursor-pointer" title="Làm mới trạng thái">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Làm mới</span>
               </button>
             </div>
           </div>
 
-          <div class="border border-[#272c3a] rounded overflow-hidden bg-[#14171f]">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] text-[11px] font-semibold">
-                  <th class="p-2 border-r border-[#272c3a]">Tên tệp PCAP</th>
-                  <th class="p-2 border-r border-[#272c3a] w-24">Kích thước</th>
-                  <th class="p-2 border-r border-[#272c3a] w-36">Thời gian ghi</th>
-                  <th class="p-2 border-r border-[#272c3a] w-32">Thư mục</th>
-                  <th class="p-2 border-r border-[#272c3a] w-20 text-center">Trạng thái</th>
-                  <th class="p-2 w-28 text-center">Hành động</th>
-                </tr>
-              </thead>
-              <tbody id="pcap_table_body" class="divide-y divide-[#272c3a] text-[#e1e4ea]">
-                <!-- Populated dynamically via API -->
-              </tbody>
-            </table>
+          <!-- Configuration & Network Bridge Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- AP Configuration Card -->
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
+              <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
+                <span class="font-bold text-xs text-white uppercase tracking-wider">1. Cấu hình Trạm phát Wi-Fi (AP Profile)</span>
+                <span id="hotspot_iface_badge" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#0b0e15] text-cyan-400 border border-[#272c3a]">wlp0s20f3</span>
+              </div>
+
+              <div>
+                <label class="block text-xs text-[#848c9e] mb-1">Tên Wi-Fi (SSID):</label>
+                <input type="text" id="hotspot_ssid" value="Merlin_2.4G" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block text-xs text-[#848c9e] mb-1">Mật khẩu (WPA2-PSK):</label>
+                <div class="relative">
+                  <input type="password" id="hotspot_password" value="Psitest135#" class="w-full bg-[#10131a] border border-[#272c3a] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-cyan-400 focus:outline-none pr-8">
+                  <button type="button" onclick="toggleHotspotPasswordVisibility()" class="absolute right-2 top-2 text-[#64748b] hover:text-white" title="Ẩn/Hiện mật khẩu">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] text-[#64748b]">Lưu ý: Camera Play 4Si chỉ nhận băng tần 2.4GHz.</span>
+                <button onclick="saveHotspotConfig()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1 rounded text-xs font-semibold border border-cyan-800/60 transition cursor-pointer">
+                  Áp dụng cấu hình
+                </button>
+              </div>
+            </div>
+
+            <!-- Network Bridge & Routing Status Card -->
+            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
+              <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
+                <span class="font-bold text-xs text-white uppercase tracking-wider">2. Định tuyến &amp; Thông số Kỹ thuật</span>
+                <span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">NAT ACTIVE</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-[#0b0e15] border border-[#272c3a] rounded p-2">
+                  <span class="text-[#64748b] block text-[10px]">Gateway IP máy tính:</span>
+                  <span id="hotspot_gw_ip" class="font-mono text-cyan-300 font-bold">10.42.0.1</span>
+                </div>
+                <div class="bg-[#0b0e15] border border-[#272c3a] rounded p-2">
+                  <span class="text-[#64748b] block text-[10px]">Băng tần phát:</span>
+                  <span class="font-semibold text-emerald-400">2.4 GHz (bg mode)</span>
+                </div>
+                <div class="bg-[#0b0e15] border border-[#272c3a] rounded p-2">
+                  <span class="text-[#64748b] block text-[10px]">Cổng Internet ra (Uplink):</span>
+                  <span class="font-mono text-[#cbd5e1] font-semibold">enp3s0 (Có dây)</span>
+                </div>
+                <div class="bg-[#0b0e15] border border-[#272c3a] rounded p-2">
+                  <span class="text-[#64748b] block text-[10px]">Mạng Wi-Fi hoàn trả:</span>
+                  <span id="hotspot_orig_wifi" class="font-mono text-[#cbd5e1] font-semibold">PSI_Xuan</span>
+                </div>
+              </div>
+
+              <div class="p-2 rounded bg-[#0b0e15]/70 border border-[#272c3a] text-[11px] text-[#94a3b8] flex items-center gap-2">
+                <svg class="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Các bài test (AuthMech, ComMech, Telemetry) tự động bắt gói tin PCAP tương ứng khi chạy kiểm thử.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connected Clients Section -->
+          <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5">
+            <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-xs text-white uppercase tracking-wider">3. Thiết bị đang kết nối vào Hotspot (Camera DUT / Phone)</span>
+                <span id="hotspot_client_count" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">0</span>
+              </div>
+              <span class="text-[11px] text-[#64748b]">Tự động cập nhật mỗi 3s khi Hotspot bật</span>
+            </div>
+
+            <!-- Connected Clients Container -->
+            <div id="hotspot_clients_container">
+              <div class="border border-[#272c3a] rounded overflow-x-auto custom-scrollbar bg-[#10131a]">
+                <table class="w-full min-w-[500px] text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] text-[11px] font-semibold">
+                      <th class="p-2.5 border-r border-[#272c3a]">Địa chỉ IP Thiết bị</th>
+                      <th class="p-2.5 border-r border-[#272c3a]">Địa chỉ MAC (OUI)</th>
+                      <th class="p-2.5 border-r border-[#272c3a] w-28 text-center">Trạng thái</th>
+                      <th class="p-2.5 w-64 text-center">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody id="hotspot_clients_body" class="divide-y divide-[#272c3a] text-[#e1e4ea]">
+                    <tr>
+                      <td colspan="4" class="p-4 text-center text-[#64748b] italic">Chưa có thiết bị nào kết nối hoặc Hotspot đang tắt.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Workflow Guide (Visible when no client) -->
+            <div id="hotspot_guide_box" class="p-3 bg-[#0b0e15] border border-[#272c3a] rounded space-y-2 text-xs">
+              <span class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider block">Hướng dẫn 3 bước kết nối Camera Play 4Si:</span>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                <div class="p-2 bg-[#14171f] rounded border border-[#1f293d] space-y-1">
+                  <span class="font-bold text-white block">1. Bật Hotspot</span>
+                  <span class="text-[#848c9e]">Bấm nút "Bật Hotspot" ở trên để máy tính phát Wi-Fi <code class="text-cyan-300 font-mono">Merlin_2.4G</code>.</span>
+                </div>
+                <div class="p-2 bg-[#14171f] rounded border border-[#1f293d] space-y-1">
+                  <span class="font-bold text-white block">2. Cài đặt trên App</span>
+                  <span class="text-[#848c9e]">Mở app FPT Life trên điện thoại, thêm camera và chọn kết nối vào Wi-Fi <code class="text-cyan-300 font-mono">Merlin_2.4G</code>.</span>
+                </div>
+                <div class="p-2 bg-[#14171f] rounded border border-[#1f293d] space-y-1">
+                  <span class="font-bold text-white block">3. Đặt làm Target</span>
+                  <span class="text-[#848c9e]">Khi camera nhận IP xuất hiện ở bảng trên, bấm <strong class="text-emerald-400">"Đặt làm Target IP"</strong> để bắt đầu test.</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2317,117 +2489,101 @@
       <!-- ============================================================== -->
       <div class="floating-minimized flex flex-col" id="docked_console_panel">
         <!-- DRAGGABLE CONSOLE RESIZER (TOP BAR) -->
-        <div id="console_resizer" class="console-resizer" title="Kéo chuột để tùy chỉnh chiều cao Console | Nhấp đúp để đặt 50%">
+        <div id="console_resizer" class="console-resizer" title="Kéo chuột để tùy chỉnh chiều cao | Nhấp đúp để đặt 50%">
           <div class="console-resizer-handle"></div>
         </div>
 
-        <!-- TERMINAL CHROME BAR -->
-        <div class="px-3 py-1.5 bg-[#0a0d14] border-b border-[#1c2436] flex items-center justify-between gap-2 select-none">
-          <!-- Left: Window Dots & Title & Multi-Terminal Selector -->
-          <div class="flex items-center gap-2 text-xs overflow-hidden">
-            <!-- macOS / Unix Window Controls -->
-            <div class="flex items-center gap-1.5 mr-1 shrink-0">
-              <button onclick="clearTerminal()" class="w-2.5 h-2.5 rounded-full bg-[#ef4444] hover:opacity-80 transition cursor-pointer" title="Xóa nội dung Console"></button>
-              <button onclick="toggleFloatingConsole()" class="w-2.5 h-2.5 rounded-full bg-[#f59e0b] hover:opacity-80 transition cursor-pointer" title="Thu nhỏ Console"></button>
-              <button onclick="toggleTerminalFullscreen()" class="w-2.5 h-2.5 rounded-full bg-[#10b981] hover:opacity-80 transition cursor-pointer" title="Toàn màn hình (F10 / Esc)"></button>
-            </div>
-
-            <div class="flex items-center gap-1.5 font-mono text-[11px] font-bold text-white tracking-wide shrink-0">
-              <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              <span>Audit Console</span>
-            </div>
-
-            <!-- Terminal Tabs / Split Mode Selector -->
-            <div class="flex items-center bg-[#141926] rounded border border-[#232d40] p-0.5 text-[10px] font-mono shrink-0 ml-1">
-              <button id="tab_term1_btn" onclick="setTerminalView('term1')" class="px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-cyan-900/60 text-cyan-200 border border-cyan-700/60" title="Chỉ hiển thị Terminal 1">
+        <!-- SLEEK PROFESSIONAL TERMINAL CHROME BAR -->
+        <div class="px-3 py-1.5 bg-[#0a0d14] border-b border-[#182030] flex items-center justify-between gap-2.5 select-none shrink-0">
+          <!-- Left: Segmented Terminal Switcher & Live Status -->
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <!-- Segmented Terminal View Switcher -->
+            <div class="flex items-center bg-[#10141f] rounded-md border border-[#1e273a] p-0.5 text-[10px] font-mono shrink-0 overflow-x-auto max-w-[55vw]">
+              <button id="tab_term1_btn" draggable="true" ondragstart="onTabDragStart(event, 'term1')" onclick="setTerminalView('term1')" class="px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1c273e] text-cyan-300 border border-cyan-700/50 cursor-pointer shrink-0" title="Kéo để chia đôi hoặc nhấp để xem Terminal 1">
                 <span id="term1_badge_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                 <span>Term 1</span>
               </button>
-              <button id="tab_term2_btn" onclick="setTerminalView('term2')" class="px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1" title="Chỉ hiển thị Terminal 2 (Server / Kênh phụ)">
+              <button id="tab_term2_btn" draggable="true" ondragstart="onTabDragStart(event, 'term2')" onclick="setTerminalView('term2')" class="px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0" title="Kéo để chia đôi hoặc nhấp để xem Terminal 2">
                 <span id="term2_badge_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                 <span>Term 2</span>
               </button>
-              <button id="tab_split_btn" onclick="setTerminalView('split')" class="px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1" title="Chia đôi màn hình: Hiện đồng thời cả Term 1 và Term 2">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v18m6-18v18M4 9h16M4 15h16"/></svg>
-                <span>Chia đôi</span>
+
+              <!-- Dynamic Multi-Shell Tabs Container -->
+              <div id="dynamic_shell_tabs" class="flex items-center gap-0.5"></div>
+
+              <!-- Add New Shell Instance Button (+) with Shell Picker Dropdown -->
+              <div class="relative flex items-center ml-0.5 shrink-0">
+                <button onclick="addNewShellTab()" class="px-1.5 py-0.5 rounded hover:bg-[#1a2336] text-[#94a3b8] hover:text-emerald-400 transition cursor-pointer flex items-center gap-0.5" title="Mở thêm Terminal mới (+)">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </button>
+                <button onclick="toggleShellPickerMenu(event)" class="px-0.5 py-0.5 rounded hover:bg-[#1a2336] text-[#64748b] hover:text-white transition cursor-pointer" title="Chọn loại Shell để mở">
+                  <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+
+                <!-- Shell Picker Dropdown Menu -->
+                <div id="shell_picker_menu" class="hidden absolute top-full left-0 mt-1 w-48 bg-[#0a0d14] border border-[#232d42] rounded-md shadow-2xl py-1 z-50 text-[11px] font-mono"></div>
+              </div>
+
+              <!-- Quick Split Button -->
+              <button id="tab_split_toggle_btn" onclick="toggleSplitSideBySide()" class="ml-1 px-1.5 py-0.5 rounded hover:bg-[#1a2336] text-[#94a3b8] hover:text-cyan-300 transition flex items-center gap-1 cursor-pointer shrink-0" title="Chia đôi màn hình trái - phải (Kéo tab hoặc bấm Split)">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v18m6-18v18"/></svg>
+                <span id="tab_split_label">Split</span>
               </button>
             </div>
 
-            <!-- Status Pill (Term 1 Summary) -->
-            <div id="console_status_pill" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#141926] text-[#94a3b8] border border-[#232d40] shrink-0">
+            <!-- Live Status & Timer Badge -->
+            <div id="console_status_pill" class="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#10141f] text-[#64748b] border border-[#1e273a] shrink-0">
               <span id="console_status_dot" class="w-1.5 h-1.5 rounded-full bg-[#64748b]"></span>
               <span id="console_status_label">IDLE</span>
             </div>
 
-            <!-- Running Stopwatch Timer -->
             <div id="console_timer_badge" class="hidden items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#0d2a1b] text-emerald-400 border border-emerald-800/60 shrink-0">
-              <svg class="w-3 h-3 animate-spin text-emerald-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <svg class="w-2.5 h-2.5 animate-spin text-emerald-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               <span id="console_timer_text">00:00</span>
             </div>
 
-            <!-- Line counter -->
-            <span id="console_line_count" class="text-[10px] font-mono text-[#64748b] hidden sm:inline shrink-0">0 dòng</span>
-
-            <!-- Active running command text -->
+            <!-- Running Command Preview & Line Count -->
             <span id="console_cmd_text" class="font-mono text-[#38bdf8] text-[11px] truncate max-w-xs hidden lg:inline" title=""></span>
+            <span id="console_line_count" class="text-[10px] font-mono text-[#475569] hidden xl:inline shrink-0">0 dòng</span>
           </div>
 
-          <!-- Right: Terminal Utility Actions -->
-          <div class="flex items-center gap-1.5 flex-wrap shrink-0">
-            <!-- Filter Log Search -->
-            <div class="relative hidden md:flex items-center">
-              <input type="text" id="term_search_input" oninput="filterTerminalLines()" placeholder="Lọc log..." class="bg-[#080a10] border border-[#232d40] rounded px-2 py-0.5 text-[11px] text-[#e2e8f0] font-mono w-24 focus:w-40 transition-all focus:border-cyan-500 focus:outline-none placeholder-[#475569]">
+          <!-- Right: Search, Auto-scroll, Copy, Clear, Fullscreen -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <!-- Filter Search -->
+            <div class="relative hidden sm:flex items-center">
+              <input type="text" id="term_search_input" oninput="filterTerminalLines()" placeholder="Lọc log..." class="bg-[#080b12] border border-[#1e273a] rounded px-2 py-0.5 text-[11px] text-[#e2e8f0] font-mono w-20 focus:w-36 transition-all focus:border-cyan-500 focus:outline-none placeholder-[#475569]">
               <span class="absolute right-1.5 text-[9px] text-[#475569] pointer-events-none">Ctrl+F</span>
             </div>
 
-            <!-- Wrap toggle -->
-            <button onclick="toggleTerminalWrap()" id="btn_term_wrap" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#141926] hover:bg-[#1d2538] text-[#94a3b8] border border-[#232d40] transition" title="Bật/Tắt ngắt dòng">Wrap: ON</button>
+            <!-- Auto-scroll Toggle -->
+            <button onclick="toggleAutoScroll()" id="btn_autoscroll" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950/60 text-cyan-300 border border-cyan-800/70 transition cursor-pointer" title="Tự động cuộn theo log mới">Auto: ON</button>
 
-            <!-- Font size controls -->
-            <div class="flex items-center bg-[#141926] rounded border border-[#232d40] overflow-hidden text-[10px] font-mono text-[#94a3b8]">
-              <button onclick="changeFontSize(-1)" class="px-1.5 py-0.5 hover:bg-[#1d2538] hover:text-white" title="Giảm cỡ chữ">A-</button>
-              <span id="term_font_size_label" class="px-1 text-[9px] text-[#64748b]">12px</span>
-              <button onclick="changeFontSize(1)" class="px-1.5 py-0.5 hover:bg-[#1d2538] hover:text-white" title="Tăng cỡ chữ">A+</button>
-            </div>
+            <!-- Copy & Clear -->
+            <button onclick="copyTerminal()" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#10141f] hover:bg-[#182030] text-[#94a3b8] hover:text-white border border-[#1e273a] transition cursor-pointer" title="Sao chép toàn bộ log">Sao chép</button>
+            <button onclick="clearTerminal()" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#10141f] hover:bg-[#182030] text-[#94a3b8] hover:text-white border border-[#1e273a] transition cursor-pointer" title="Xóa màn hình console">Xóa</button>
 
-            <!-- Auto-scroll toggle -->
-            <button onclick="toggleAutoScroll()" id="btn_autoscroll" class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-950/60 text-blue-300 border border-blue-800/70 transition">Tự cuộn: BẬT</button>
-
-            <!-- Clear & Copy -->
-            <button onclick="clearTerminal()" class="px-2 py-0.5 rounded text-[10px] font-medium bg-[#141926] hover:bg-[#1d2538] text-[#94a3b8] border border-[#232d40] transition">Xóa</button>
-            <button onclick="copyTerminal()" class="px-2 py-0.5 rounded text-[10px] font-medium bg-[#141926] hover:bg-[#1d2538] text-[#94a3b8] border border-[#232d40] transition">Sao chép</button>
-
-            <!-- View Sizing Presets (25%, 50%, 80%, Full) -->
-            <div class="flex items-center bg-[#141926] rounded border border-[#232d40] p-0.5 text-[10px] font-mono">
-              <button onclick="setTerminalPreset('25%')" id="btn_preset_25" class="px-1.5 py-0.5 rounded hover:bg-[#1d2538] text-[#94a3b8] transition" title="Thu nhỏ 25% chiều cao màn hình">25%</button>
-              <button onclick="setTerminalPreset('50%')" id="btn_preset_50" class="px-1.5 py-0.5 rounded hover:bg-[#1d2538] text-[#94a3b8] transition" title="Chia đôi 50/50">50%</button>
-              <button onclick="setTerminalPreset('80%')" id="btn_preset_80" class="px-1.5 py-0.5 rounded hover:bg-[#1d2538] text-[#94a3b8] transition" title="Mở rộng 80%">80%</button>
-              <button onclick="toggleTerminalFullscreen()" id="btn_term_fullscreen" class="px-2 py-0.5 rounded bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white font-bold flex items-center gap-1 border border-blue-500/50 transition" title="Toàn màn hình Terminal (100% Fullscreen - Esc / F10 để thoát)">
-                <svg id="icon_fullscreen_enter" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-                <svg id="icon_fullscreen_exit" class="w-3 h-3 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4l5 5m0 0H4m5 0V4m11 0l-5 5m0 0h5m-5 0V4M4 20l5-5m0 0H4m5 0v5m11 0l-5-5m0 0h5m-5 0v5"/></svg>
-                <span id="text_fullscreen_toggle">Toàn màn hình</span>
-              </button>
-            </div>
-
-            <!-- Minimize / Hide Floating Console -->
-            <button onclick="toggleFloatingConsole()" class="px-2 py-0.5 rounded text-[10px] font-medium bg-[#141926] hover:bg-[#1d2538] text-[#94a3b8] hover:text-white border border-[#232d40] transition flex items-center gap-1" title="Thu nhỏ Console (Ctrl + `)">
-              <svg class="w-3 h-3 text-[#94a3b8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-              <span>Ẩn</span>
+            <!-- Fullscreen -->
+            <button onclick="toggleTerminalFullscreen()" id="btn_term_fullscreen" class="px-2 py-0.5 rounded bg-[#152033] hover:bg-cyan-600 text-cyan-300 hover:text-white font-mono text-[10px] font-semibold flex items-center gap-1 border border-cyan-800/50 transition cursor-pointer" title="Toàn màn hình Terminal (Esc / F10 để thoát)">
+              <svg id="icon_fullscreen_enter" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+              <svg id="icon_fullscreen_exit" class="w-3 h-3 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4l5 5m0 0H4m5 0V4m11 0l-5 5m0 0h5m-5 0V4M4 20l5-5m0 0H4m5 0v5m11 0l-5-5m0 0h5m-5 0v5"/></svg>
+              <span id="text_fullscreen_toggle">Full</span>
             </button>
           </div>
         </div>
 
-        <!-- DUAL TERMINAL BODY WRAPPER (SPLIT VIEW OR SINGLE VIEW) -->
-        <div id="term_panes_wrapper" class="flex-1 flex overflow-hidden">
+        <!-- MULTI-TERMINAL & SPLIT VIEW BODY WRAPPER -->
+        <div id="term_panes_wrapper" class="flex-1 flex overflow-hidden relative" ondragover="onTerminalDragOver(event)" ondragleave="onTerminalDragLeave(event)" ondrop="onTerminalDrop(event)">
+          <!-- LEFT / MAIN PANE CONTAINER -->
+          <div id="pane_left_container" class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
           <!-- PANE 1: TERMINAL 1 (CHÍNH / AUDIT KIỂM THỬ) -->
-          <div id="pane_term1" class="flex-1 flex flex-col min-w-0 bg-[#07090e] border-r border-[#1c2333]/60">
-            <div id="subbar_term1" class="hidden px-2.5 py-1 bg-[#0b0e14] border-b border-[#1c2333] items-center justify-between text-[11px] font-mono select-none">
+          <div id="pane_term1" class="relative flex-1 flex flex-col min-w-0 bg-[#07090e] border-r border-[#151c2a]">
+            <div id="subbar_term1" class="hidden px-2.5 py-1 bg-[#090c13] border-b border-[#182030] items-center justify-between text-[11px] font-mono select-none">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span class="font-bold text-cyan-300 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
                   <span>T1: Kiểm thử chính</span>
                 </span>
-                <div id="t1_status_pill" class="flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#141926] text-[#94a3b8] border border-[#232d40]">
+                <div id="t1_status_pill" class="flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#10141f] text-[#94a3b8] border border-[#1e273a]">
                   <span id="t1_status_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                   <span id="t1_status_label">IDLE</span>
                 </div>
@@ -2435,27 +2591,32 @@
                 <span id="t1_cmd_text" class="text-[#38bdf8] truncate max-w-xs text-[10px]" title=""></span>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                <span id="t1_line_count" class="text-[9px] text-[#64748b]">0 dòng</span>
-                <button onclick="stopCommand('term1')" id="btn_stop_term1" class="hidden px-2 py-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white text-[10px] font-bold items-center gap-1 transition shadow-sm" title="Dừng tiến trình trên Terminal 1">
+                <span id="t1_line_count" class="text-[9px] text-[#475569]">0 dòng</span>
+                <button onclick="stopCommand('term1')" id="btn_stop_term1" class="hidden px-2 py-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white text-[10px] font-bold items-center gap-1 transition shadow-sm cursor-pointer" title="Dừng tiến trình trên Terminal 1">
                   <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   <span>Stop T1</span>
                 </button>
               </div>
             </div>
-            <div id="terminal_output" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto custom-scrollbar whitespace-pre-wrap select-text font-terminal">
-              <div class="text-[#64748b] text-[11px]">DUT: <span id="terminal_init_dut_ip" class="text-white font-semibold">Đang đồng bộ...</span> | Host: <span id="terminal_init_host_info" class="text-sky-400 font-semibold">--</span> | Sẵn sàng.</div>
+            <div id="terminal_output" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
+              <div class="text-[#475569] text-[11px]">DUT: <span id="terminal_init_dut_ip" class="text-white font-semibold">Đang đồng bộ...</span> | Host: <span id="terminal_init_host_info" class="text-sky-400 font-semibold">--</span> | Sẵn sàng.</div>
             </div>
+            <!-- Floating Jump to Bottom Button -->
+            <button id="btn_term1_scroll_bottom" onclick="scrollTerminalToBottom('term1')" class="term-jump-btn hidden" title="Cuộn xuống dòng mới nhất">
+              <svg class="w-3 h-3 text-cyan-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              <span>Cuộn xuống</span>
+            </button>
           </div>
 
           <!-- PANE 2: TERMINAL 2 (PHỤ / RECEIVER SERVERS / TELEMETRY TRAFFIC) -->
-          <div id="pane_term2" class="hidden flex-1 flex-col min-w-0 bg-[#07090e]">
-            <div id="subbar_term2" class="px-2.5 py-1 bg-[#0b0e14] border-b border-[#1c2333] flex items-center justify-between text-[11px] font-mono select-none">
+          <div id="pane_term2" class="relative hidden flex-1 flex-col min-w-0 bg-[#07090e]">
+            <div id="subbar_term2" class="px-2.5 py-1 bg-[#090c13] border-b border-[#182030] flex items-center justify-between text-[11px] font-mono select-none">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span class="font-bold text-teal-300 flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
                   <span>T2: Receiver Server / Lưu lượng</span>
                 </span>
-                <div id="t2_status_pill" class="flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#141926] text-[#94a3b8] border border-[#232d40]">
+                <div id="t2_status_pill" class="flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#10141f] text-[#94a3b8] border border-[#1e273a]">
                   <span id="t2_status_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                   <span id="t2_status_label">IDLE</span>
                 </div>
@@ -2463,15 +2624,52 @@
                 <span id="t2_cmd_text" class="text-[#2dd4bf] truncate max-w-xs text-[10px]" title=""></span>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                <span id="t2_line_count" class="text-[9px] text-[#64748b]">0 dòng</span>
-                <button onclick="stopCommand('term2')" id="btn_stop_term2" class="hidden px-2 py-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white text-[10px] font-bold items-center gap-1 transition shadow-sm" title="Dừng tiến trình trên Terminal 2">
+                <span id="t2_line_count" class="text-[9px] text-[#475569]">0 dòng</span>
+                <button onclick="stopCommand('term2')" id="btn_stop_term2" class="hidden px-2 py-0.5 rounded bg-rose-700/80 hover:bg-rose-600 text-white text-[10px] font-bold items-center gap-1 transition shadow-sm cursor-pointer" title="Dừng tiến trình trên Terminal 2">
                   <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   <span>Stop T2</span>
                 </button>
               </div>
             </div>
-            <div id="terminal_output_2" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto custom-scrollbar whitespace-pre-wrap select-text font-terminal">
-              <div class="text-[#64748b] text-[11px]">[Terminal 2] Kênh chạy ngầm các dịch vụ Receiver Server ComMech hoặc luồng kiểm tra lưu lượng Telemetry song song. Sẵn sàng.</div>
+            <div id="terminal_output_2" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
+              <div class="text-[#475569] text-[11px]">[Terminal 2] Kênh chạy ngầm các dịch vụ Receiver Server ComMech hoặc luồng kiểm tra lưu lượng Telemetry song song. Sẵn sàng.</div>
+            </div>
+            <!-- Floating Jump to Bottom Button -->
+            <button id="btn_term2_scroll_bottom" onclick="scrollTerminalToBottom('term2')" class="term-jump-btn hidden" title="Cuộn xuống dòng mới nhất">
+              <svg class="w-3 h-3 text-cyan-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              <span>Cuộn xuống</span>
+            </button>
+          </div>
+
+            <!-- SHELL LEFT HOLDER -->
+            <div id="pane_shell_left_slot" class="hidden flex-1 flex flex-col min-w-0 bg-[#07090e] h-full p-1.5 overflow-hidden"></div>
+          </div>
+
+          <!-- VERTICAL SPLIT RESIZER DIVIDER -->
+          <div id="split_vertical_resizer" class="hidden split-col-resizer" title="Kéo chuột để chỉnh tỉ lệ chia đôi 2 màn hình"></div>
+
+          <!-- RIGHT SPLIT PANE CONTAINER (Shown in Split Side-by-Side Mode) -->
+          <div id="pane_right_container" class="hidden flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#07090e] border-l border-[#1c2436] relative">
+            <div id="subbar_split_right" class="px-2.5 py-1 bg-[#090c13] border-b border-[#182030] flex items-center justify-between text-[11px] font-mono select-none">
+              <div class="flex items-center gap-2 overflow-hidden">
+                <span id="split_right_title" class="font-bold text-emerald-400 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span id="split_right_name">Shell</span>
+                </span>
+                <span id="split_right_subtitle" class="text-[10px] text-[#64748b] truncate max-w-xs">/home/merlin/PSI</span>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="closeSplitRight()" class="px-1.5 py-0.5 rounded text-[10px] text-[#94a3b8] hover:text-white hover:bg-[#1a2336] transition cursor-pointer" title="Đóng màn hình chia đôi (Quay lại 1 màn hình)">✕ Đóng chia đôi</button>
+              </div>
+            </div>
+            <div id="pane_shell_right_slot" class="flex-1 flex flex-col min-w-0 h-full p-1.5 overflow-hidden"></div>
+          </div>
+
+          <!-- DRAG & DROP OVERLAY HINT -->
+          <div id="term_drop_zone" class="term-drop-zone">
+            <div class="px-4 py-2.5 rounded-lg bg-[#0a1120]/95 border border-cyan-500/80 text-cyan-300 font-mono text-xs font-bold shadow-2xl flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v18m6-18v18"/></svg>
+              <span>Thả vào đây để chia đôi màn hình song song</span>
             </div>
           </div>
         </div>
@@ -2491,26 +2689,53 @@
     const WS_URL = IS_FILE_SCHEME 
       ? 'ws://127.0.0.1:8765/ws/run' 
       : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/run`;
+    const PTY_WS_URL = IS_FILE_SCHEME 
+      ? 'ws://127.0.0.1:8765/ws/pty' 
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/pty`;
 
-    // Toast UI
+    // Toast UI (Floating HUD Pill)
+    let toastTimeout = null;
     function showToast(msg, isError = false) {
       const bar = document.getElementById('toast_bar');
       const txt = document.getElementById('toast_text');
       if (!bar || !txt) return;
       txt.textContent = msg;
       bar.className = isError 
-        ? 'px-3 py-1.5 bg-[#381616] border-b border-[#5e2222] text-xs flex items-center justify-between text-[#fca5a5]'
-        : 'px-3 py-1.5 bg-[#1b2538] border-b border-[#2d3a54] text-xs flex items-center justify-between text-[#93c5fd]';
-      bar.classList.remove('hidden');
-      setTimeout(hideToast, 4000);
+        ? 'toast-active bg-[#261014]/95 border border-[#842029]/80 text-[#fca5a5] text-xs font-medium'
+        : 'toast-active bg-[#0d1624]/95 border border-[#233550]/80 text-[#7dd3fc] text-xs font-medium';
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(hideToast, 3500);
     }
     function hideToast() {
       const bar = document.getElementById('toast_bar');
-      if (bar) bar.classList.add('hidden');
+      if (bar) bar.classList.remove('toast-active');
+    }
+
+    // Mobile Sidebar Drawer
+    function toggleMobileSidebar() {
+      const sb = document.getElementById('app_sidebar');
+      const bd = document.getElementById('mobile_sidebar_backdrop');
+      if (!sb) return;
+      const isOpen = sb.classList.contains('mobile-open');
+      if (isOpen) {
+        closeMobileSidebar();
+      } else {
+        sb.classList.add('mobile-open');
+        if (bd) bd.classList.remove('hidden');
+      }
+    }
+    function closeMobileSidebar() {
+      const sb = document.getElementById('app_sidebar');
+      const bd = document.getElementById('mobile_sidebar_backdrop');
+      if (sb) sb.classList.remove('mobile-open');
+      if (bd) bd.classList.add('hidden');
     }
 
     // Tab switching with smooth micro-animation
     function switchTab(tabId) {
+      if (window.innerWidth < 768) {
+        closeMobileSidebar();
+      }
       document.querySelectorAll('.tab-pane').forEach(el => {
         el.classList.add('hidden');
         el.classList.remove('active');
@@ -2530,11 +2755,19 @@
         targetNav.classList.add('active');
       }
 
-      if (tabId === 'evidence') refreshEvidenceList();
       if (tabId === 'target') loadSettingsFromConfig();
       if (tabId === 'telemetry_geoip') loadTelemetryGeoIPData();
       if (tabId === 'firmware_update') loadFirmwareSigningData();
       if (tabId === 'dos') loadLatestDosReport();
+      if (tabId === 'hotspot') {
+        refreshHotspotStatus();
+        if (!hotspotPollTimer) hotspotPollTimer = setInterval(refreshHotspotStatus, 3000);
+      } else {
+        if (hotspotPollTimer) {
+          clearInterval(hotspotPollTimer);
+          hotspotPollTimer = null;
+        }
+      }
     }
 
     // ==============================================================
@@ -2630,6 +2863,7 @@
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         localStorage.setItem('psi_terminal_height', panel.style.height);
+        if (ptyFitAddon && ptyTerminal) setTimeout(() => ptyFitAddon.fit(), 50);
       });
 
       resizer.addEventListener('dblclick', () => {
@@ -2671,6 +2905,7 @@
 
       const term = document.getElementById('terminal_output');
       if (term && autoScroll) term.scrollTop = term.scrollHeight;
+      if (ptyFitAddon && ptyTerminal) setTimeout(() => ptyFitAddon.fit(), 80);
     }
 
     function setTerminalPreset(preset) {
@@ -2696,10 +2931,38 @@
       autoScroll = !autoScroll;
       const btn = document.getElementById('btn_autoscroll');
       if (btn) {
-        btn.textContent = autoScroll ? 'Tự cuộn: BẬT' : 'Tự cuộn: TẮT';
+        btn.textContent = autoScroll ? 'Auto: ON' : 'Auto: OFF';
         btn.className = autoScroll 
-          ? 'px-2 py-0.5 rounded text-[10px] font-medium bg-blue-950/60 text-blue-300 border border-blue-800/70 transition'
-          : 'px-2 py-0.5 rounded text-[10px] font-medium bg-[#141926] text-[#64748b] border border-[#232d40] transition';
+          ? 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950/60 text-cyan-300 border border-cyan-800/70 transition cursor-pointer'
+          : 'px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#10141f] text-[#64748b] border border-[#1e273a] transition cursor-pointer';
+      }
+    }
+
+    function initTerminalScrollListeners() {
+      ['term1', 'term2'].forEach(tid => {
+        const term = document.getElementById(tid === 'term2' ? 'terminal_output_2' : 'terminal_output');
+        const jumpBtn = document.getElementById(tid === 'term2' ? 'btn_term2_scroll_bottom' : 'btn_term1_scroll_bottom');
+        if (!term || !jumpBtn) return;
+
+        term.addEventListener('scroll', () => {
+          const distanceToBottom = term.scrollHeight - term.scrollTop - term.clientHeight;
+          if (distanceToBottom > 45) {
+            jumpBtn.classList.remove('hidden');
+          } else {
+            jumpBtn.classList.add('hidden');
+          }
+        }, { passive: true });
+      });
+    }
+
+    function scrollTerminalToBottom(tid) {
+      const term = document.getElementById(tid === 'term2' ? 'terminal_output_2' : 'terminal_output');
+      const jumpBtn = document.getElementById(tid === 'term2' ? 'btn_term2_scroll_bottom' : 'btn_term1_scroll_bottom');
+      if (term) {
+        term.scrollTop = term.scrollHeight;
+      }
+      if (jumpBtn) {
+        jumpBtn.classList.add('hidden');
       }
     }
 
@@ -2864,9 +3127,29 @@
       }
     });
 
-    function togglePassVisibility(inputId) {
+    function togglePassVisibility(inputId, btn) {
       const el = document.getElementById(inputId);
-      if (el) el.type = (el.type === 'password') ? 'text' : 'password';
+      if (el) {
+        const isPass = (el.type === 'password');
+        el.type = isPass ? 'text' : 'password';
+        const button = btn || (el.parentElement ? el.parentElement.querySelector('button') : null);
+        if (button) {
+          button.textContent = isPass ? 'Ẩn' : 'Xem';
+        }
+      }
+    }
+
+    function applySafetyCode() {
+      const sc = (document.getElementById('cfg_safety_code')?.value || '').trim();
+      if (!sc) {
+        showToast('Vui lòng nhập Safety Code (ví dụ: L259B7E6)', true);
+        return;
+      }
+      const passWebEl = document.getElementById('cfg_target_pass');
+      const passSshEl = document.getElementById('cfg_ssh_pass');
+      if (passWebEl) passWebEl.value = sc;
+      if (passSshEl) passSshEl.value = '7ujMko0' + sc;
+      showToast(`Đã điền mật khẩu mặc định: Pass Web = "${sc}", Pass SSH = "7ujMko0${sc}"`);
     }
 
     // ANSI Colors to HTML
@@ -2943,8 +3226,8 @@
       }
     }
 
-    // 2. DUAL TERMINAL & MULTI-CHANNEL PROCESS CONTROLLER
-    let currentTermView = 'term1'; // 'term1', 'term2', or 'split'
+    // 2. MULTI-TERMINAL & SPLIT-SCREEN CONTROLLER (XTERM.JS + PTY + DUAL TEST CHANNEL)
+    let currentTermView = 'term1'; // 'term1', 'term2', or shell_id
     let activeTargetTerm = 'term1';
 
     const termState = {
@@ -2952,40 +3235,574 @@
       term2: { running: false, timer: null, seconds: 0, cmd: '', tool: '' }
     };
 
-    function setTerminalView(mode) {
-      currentTermView = mode;
+    // Multi-shell session registry & split state
+    const shellSessions = {}; // sid -> { id, name, shellPath, terminal, fitAddon, socket, container }
+    let shellCounter = 0;
+    let activeLeftTabId = 'term1';   // 'term1', 'term2', or shell_id
+    let activeRightTabId = null;     // null if single pane, or 'term2', shell_id
+    let isSplitActive = false;
+    let draggedTabId = null;
+    let ptyAvailableShells = [];
+    let ptyDefaultShell = '';
+
+    // Shell Discovery & Menu Populator
+    function loadAvailableShells() {
+      fetch(`${API_BASE}/api/terminal/shells`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.shells && data.shells.length > 0) {
+            ptyAvailableShells = data.shells;
+            ptyDefaultShell = data.default || data.shells[0].path;
+            renderShellPickerMenu();
+
+            // Auto-create initial Shell 1 if none exists yet
+            if (Object.keys(shellSessions).length === 0) {
+              addNewShellTab(ptyDefaultShell, false);
+            }
+          }
+        })
+        .catch(err => console.warn('Cannot load available shells:', err));
+    }
+
+    function renderShellPickerMenu() {
+      const menu = document.getElementById('shell_picker_menu');
+      if (!menu) return;
+      menu.innerHTML = '';
+      ptyAvailableShells.forEach(s => {
+        const item = document.createElement('button');
+        item.className = 'w-full text-left px-3 py-1.5 hover:bg-[#151f33] text-[#cbd5e1] hover:text-emerald-300 flex items-center justify-between transition cursor-pointer';
+        item.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span class="font-semibold">${s.name}</span>
+          </div>
+          <span class="text-[9px] text-[#64748b] font-mono truncate max-w-[100px]">${s.path}</span>
+        `;
+        item.onclick = (e) => {
+          e.stopPropagation();
+          hideShellPickerMenu();
+          addNewShellTab(s.path, true);
+        };
+        menu.appendChild(item);
+      });
+    }
+
+    function toggleShellPickerMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('shell_picker_menu');
+      if (!menu) return;
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        const closeHandler = () => {
+          hideShellPickerMenu();
+          document.removeEventListener('click', closeHandler);
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
+      } else {
+        hideShellPickerMenu();
+      }
+    }
+
+    function hideShellPickerMenu() {
+      const menu = document.getElementById('shell_picker_menu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    // Spawn New Interactive Host Shell (xterm.js + PTY WebSocket)
+    function addNewShellTab(shellPath, shouldActivate = true) {
+      shellCounter++;
+      const sid = 'shell_' + shellCounter;
+      const path = shellPath || ptyDefaultShell || '';
+      const shellObj = ptyAvailableShells.find(s => s.path === path);
+      const shellName = shellObj ? `${shellObj.name} ${shellCounter}` : `Shell ${shellCounter}`;
+
+      // 1. Create tab button in dynamic bar
+      const tabsBar = document.getElementById('dynamic_shell_tabs');
+      if (tabsBar) {
+        const btn = document.createElement('button');
+        btn.id = `tab_btn_${sid}`;
+        btn.draggable = true;
+        btn.ondragstart = (e) => onTabDragStart(e, sid);
+        btn.onclick = () => switchTab(sid);
+        btn.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1.5 cursor-pointer shrink-0 border border-transparent';
+        btn.title = `Kéo để chia đôi hoặc nhấp để xem ${shellName} (${path})`;
+        btn.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span class="font-mono text-[10px]">${shellName}</span>
+          <span onclick="closeShellTab('${sid}', event)" class="hover:text-rose-400 hover:bg-rose-950/50 px-1 rounded text-[10px] ml-0.5 text-[#64748b]" title="Đóng Shell này">✕</span>
+        `;
+        tabsBar.appendChild(btn);
+      }
+
+      // 2. Create shell DOM container
+      const cont = document.createElement('div');
+      cont.id = `shell_cont_${sid}`;
+      cont.className = 'w-full h-full flex-1 overflow-hidden p-1';
+
+      // 3. Instantiate XTerm.js Terminal & FitAddon
+      let term = null;
+      let fitAddon = null;
+      if (typeof Terminal !== 'undefined') {
+        term = new Terminal({
+          cursorBlink: true,
+          cursorStyle: 'bar',
+          fontSize: 12,
+          fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
+          theme: {
+            background: '#07090e',
+            foreground: '#cbd5e1',
+            cursor: '#38bdf8',
+            selectionBackground: '#1d4ed8',
+            black: '#1e293b',
+            red: '#f87171',
+            green: '#4ade80',
+            yellow: '#fde047',
+            blue: '#60a5fa',
+            magenta: '#c084fc',
+            cyan: '#38bdf8',
+            white: '#f8fafc',
+            brightBlack: '#64748b',
+            brightRed: '#ef4444',
+            brightGreen: '#22c55e',
+            brightYellow: '#eab308',
+            brightBlue: '#3b82f6',
+            brightMagenta: '#a855f7',
+            brightCyan: '#06b6d4',
+            brightWhite: '#ffffff'
+          }
+        });
+        if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+          fitAddon = new FitAddon.FitAddon();
+          term.loadAddon(fitAddon);
+        }
+        term.open(cont);
+      }
+
+      // 4. WebSocket connection to Host PTY Server
+      const cols = term ? term.cols : 120;
+      const rows = term ? term.rows : 30;
+      const wsUrl = `${PTY_WS_URL}?shell=${encodeURIComponent(path)}&cols=${cols}&rows=${rows}`;
+      let sock = null;
+
+      try {
+        sock = new WebSocket(wsUrl);
+        sock.binaryType = 'arraybuffer';
+
+        sock.onopen = () => {
+          if (term) {
+            term.write(`\r\n\x1b[36mHost Shell Connected: ${shellName} (${path || 'system default'}).\x1b[0m\r\n\r\n`);
+            if (fitAddon) {
+              setTimeout(() => {
+                fitAddon.fit();
+                if (sock && sock.readyState === WebSocket.OPEN && term) {
+                  sock.send(JSON.stringify({ action: 'resize', cols: term.cols, rows: term.rows }));
+                }
+              }, 60);
+            }
+          }
+        };
+
+        sock.onmessage = (e) => {
+          if (term) {
+            if (e.data instanceof ArrayBuffer) {
+              term.write(new Uint8Array(e.data));
+            } else {
+              term.write(e.data);
+            }
+          }
+        };
+
+        sock.onclose = () => {
+          if (term) term.write('\r\n\x1b[33m[Phiên terminal đã kết thúc]\x1b[0m\r\n');
+        };
+
+        sock.onerror = () => {
+          if (term) term.write('\r\n\x1b[31m[Lỗi kết nối PTY WebSocket]\x1b[0m\r\n');
+        };
+      } catch (err) {
+        console.error('PTY WebSocket connection error:', err);
+      }
+
+      if (term && sock) {
+        term.onData(data => {
+          if (sock && sock.readyState === WebSocket.OPEN) {
+            sock.send(data);
+          }
+        });
+      }
+
+      shellSessions[sid] = {
+        id: sid,
+        name: shellName,
+        shellPath: path,
+        terminal: term,
+        fitAddon: fitAddon,
+        socket: sock,
+        container: cont
+      };
+
+      if (shouldActivate) {
+        if (isSplitActive) {
+          activeRightTabId = sid;
+          renderPanesLayout();
+        } else {
+          switchTab(sid);
+        }
+      }
+
+      return sid;
+    }
+
+    // Close Shell Tab
+    function closeShellTab(sid, event) {
+      if (event) event.stopPropagation();
+      const sess = shellSessions[sid];
+      if (!sess) return;
+
+      try {
+        if (sess.socket) sess.socket.close();
+        if (sess.terminal) sess.terminal.dispose();
+      } catch(e) {}
+      if (sess.container && sess.container.parentNode) {
+        sess.container.parentNode.removeChild(sess.container);
+      }
+      const btn = document.getElementById(`tab_btn_${sid}`);
+      if (btn) btn.remove();
+
+      delete shellSessions[sid];
+
+      if (activeRightTabId === sid) {
+        closeSplitRight();
+      }
+      if (activeLeftTabId === sid) {
+        const remaining = Object.keys(shellSessions);
+        if (remaining.length > 0) {
+          switchTab(remaining[0]);
+        } else {
+          switchTab('term1');
+        }
+      } else {
+        updateTabStyles();
+      }
+    }
+
+    // Tab Switcher
+    function switchTab(tabId) {
+      if (isSplitActive) {
+        // If clicked tab is currently the right pane, do nothing or keep it
+        if (activeRightTabId === tabId) {
+          // It's already displayed in right pane
+        } else {
+          activeLeftTabId = tabId;
+        }
+      } else {
+        activeLeftTabId = tabId;
+      }
+      renderPanesLayout();
+    }
+
+    // Drag and Drop Split Handlers
+    function onTabDragStart(event, tabId) {
+      draggedTabId = tabId;
+      event.dataTransfer.setData('text/plain', tabId);
+      event.dataTransfer.effectAllowed = 'copyMove';
+    }
+
+    function onTerminalDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      const dropZone = document.getElementById('term_drop_zone');
+      if (dropZone) dropZone.classList.add('active');
+    }
+
+    function onTerminalDragLeave(event) {
+      const wrapper = document.getElementById('term_panes_wrapper');
+      if (wrapper && !wrapper.contains(event.relatedTarget)) {
+        const dropZone = document.getElementById('term_drop_zone');
+        if (dropZone) dropZone.classList.remove('active');
+      }
+    }
+
+    function onTerminalDrop(event) {
+      event.preventDefault();
+      const dropZone = document.getElementById('term_drop_zone');
+      if (dropZone) dropZone.classList.remove('active');
+      const tabId = event.dataTransfer.getData('text/plain') || draggedTabId;
+      if (tabId) {
+        splitWithTabOnRight(tabId);
+        const name = tabId.startsWith('shell_') ? (shellSessions[tabId]?.name || 'Shell') : tabId.toUpperCase();
+        showToast(`Đã chia đôi màn hình với tab: ${name}`);
+      }
+      draggedTabId = null;
+    }
+
+    // Split Management
+    function splitWithTabOnRight(rightTabId) {
+      let targetRight = rightTabId;
+      if (activeLeftTabId === targetRight) {
+        if (targetRight === 'term1') {
+          const shells = Object.keys(shellSessions);
+          targetRight = shells.length > 0 ? shells[0] : 'term2';
+        } else {
+          activeLeftTabId = 'term1';
+        }
+      }
+
+      isSplitActive = true;
+      activeRightTabId = targetRight;
+      renderPanesLayout();
+    }
+
+    function closeSplitRight() {
+      isSplitActive = false;
+      activeRightTabId = null;
+
+      const splitLabel = document.getElementById('tab_split_label');
+      if (splitLabel) splitLabel.textContent = 'Split';
+      const splitBtn = document.getElementById('tab_split_toggle_btn');
+      if (splitBtn) splitBtn.className = 'ml-1 px-1.5 py-0.5 rounded hover:bg-[#1a2336] text-[#94a3b8] hover:text-cyan-300 transition flex items-center gap-1 cursor-pointer shrink-0';
+
+      const leftCont = document.getElementById('pane_left_container');
+      if (leftCont) leftCont.style.width = '100%';
+
+      const resizer = document.getElementById('split_vertical_resizer');
+      if (resizer) resizer.classList.add('hidden');
+
+      const rightCont = document.getElementById('pane_right_container');
+      if (rightCont) {
+        rightCont.classList.add('hidden');
+        rightCont.classList.remove('flex');
+      }
+
+      // Restore pane_term2 if it was moved to right pane
+      const p2 = document.getElementById('pane_term2');
+      if (p2 && p2.parentNode !== leftCont) {
+        leftCont.appendChild(p2);
+      }
+
+      renderPanesLayout();
+    }
+
+    function toggleSplitSideBySide() {
+      if (isSplitActive) {
+        closeSplitRight();
+      } else {
+        const shells = Object.keys(shellSessions);
+        let rightTab = null;
+        if (activeLeftTabId === 'term1') {
+          rightTab = (shells.length > 0) ? shells[0] : 'term2';
+        } else if (activeLeftTabId === 'term2') {
+          rightTab = (shells.length > 0) ? shells[0] : 'term1';
+        } else {
+          rightTab = 'term1';
+        }
+        splitWithTabOnRight(rightTab);
+      }
+    }
+
+    // Render Panes Layout & Synchronize DOM
+    function renderPanesLayout() {
+      const leftCont = document.getElementById('pane_left_container');
       const p1 = document.getElementById('pane_term1');
       const p2 = document.getElementById('pane_term2');
+      const pLeftSlot = document.getElementById('pane_shell_left_slot');
+      const rightCont = document.getElementById('pane_right_container');
+      const pRightSlot = document.getElementById('pane_shell_right_slot');
+      const resizer = document.getElementById('split_vertical_resizer');
+      const sub1 = document.getElementById('subbar_term1');
+      const sub2 = document.getElementById('subbar_term2');
+
+      currentTermView = activeLeftTabId;
+      activeTargetTerm = (activeLeftTabId === 'term2') ? 'term2' : 'term1';
+
+      // 1. RENDER LEFT PANE
+      if (activeLeftTabId === 'term1') {
+        if (p1) { p1.classList.remove('hidden'); p1.classList.add('flex'); }
+        if (p2 && p2.parentNode === leftCont) { p2.classList.add('hidden'); p2.classList.remove('flex'); }
+        if (pLeftSlot) { pLeftSlot.classList.add('hidden'); pLeftSlot.classList.remove('flex'); }
+        if (sub1) {
+          if (isSplitActive) { sub1.classList.remove('hidden'); sub1.classList.add('flex'); }
+          else { sub1.classList.add('hidden'); sub1.classList.remove('flex'); }
+        }
+      } else if (activeLeftTabId === 'term2') {
+        if (p1) { p1.classList.add('hidden'); p1.classList.remove('flex'); }
+        if (p2 && p2.parentNode === leftCont) { p2.classList.remove('hidden'); p2.classList.add('flex'); }
+        if (pLeftSlot) { pLeftSlot.classList.add('hidden'); pLeftSlot.classList.remove('flex'); }
+        if (sub2) {
+          if (isSplitActive) { sub2.classList.remove('hidden'); sub2.classList.add('flex'); }
+          else { sub2.classList.add('hidden'); sub2.classList.remove('flex'); }
+        }
+      } else if (shellSessions[activeLeftTabId]) {
+        // Left pane is a Host Shell
+        if (p1) { p1.classList.add('hidden'); p1.classList.remove('flex'); }
+        if (p2 && p2.parentNode === leftCont) { p2.classList.add('hidden'); p2.classList.remove('flex'); }
+        if (pLeftSlot) {
+          pLeftSlot.classList.remove('hidden');
+          pLeftSlot.classList.add('flex');
+          pLeftSlot.innerHTML = '';
+          pLeftSlot.appendChild(shellSessions[activeLeftTabId].container);
+        }
+      }
+
+      // 2. RENDER RIGHT PANE (IF SPLIT)
+      if (isSplitActive && activeRightTabId) {
+        if (resizer) resizer.classList.remove('hidden');
+        if (rightCont) {
+          rightCont.classList.remove('hidden');
+          rightCont.classList.add('flex');
+          if (!rightCont.style.width || rightCont.style.width === '0px') {
+            rightCont.style.width = '50%';
+            if (leftCont) leftCont.style.width = '50%';
+          }
+        }
+
+        const splitLabel = document.getElementById('tab_split_label');
+        if (splitLabel) splitLabel.textContent = 'Split ON';
+        const splitBtn = document.getElementById('tab_split_toggle_btn');
+        if (splitBtn) splitBtn.className = 'ml-1 px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 transition flex items-center gap-1 cursor-pointer shrink-0 font-bold';
+
+        const rightTitle = document.getElementById('split_right_name');
+        const rightSub = document.getElementById('split_right_subtitle');
+
+        if (activeRightTabId === 'term2') {
+          if (p2 && pRightSlot) {
+            pRightSlot.innerHTML = '';
+            pRightSlot.appendChild(p2);
+            p2.classList.remove('hidden');
+            p2.classList.add('flex');
+            if (sub2) { sub2.classList.remove('hidden'); sub2.classList.add('flex'); }
+          }
+          if (rightTitle) rightTitle.textContent = 'Term 2 (Receiver / Traffic)';
+          if (rightSub) rightSub.textContent = 'Internal Process';
+        } else if (shellSessions[activeRightTabId]) {
+          if (pRightSlot) {
+            pRightSlot.innerHTML = '';
+            pRightSlot.appendChild(shellSessions[activeRightTabId].container);
+          }
+          if (rightTitle) rightTitle.textContent = shellSessions[activeRightTabId].name;
+          if (rightSub) rightSub.textContent = shellSessions[activeRightTabId].shellPath || '/home/merlin/PSI';
+        }
+      } else {
+        if (resizer) resizer.classList.add('hidden');
+        if (rightCont) { rightCont.classList.add('hidden'); rightCont.classList.remove('flex'); }
+        if (leftCont) leftCont.style.width = '100%';
+        const splitLabel = document.getElementById('tab_split_label');
+        if (splitLabel) splitLabel.textContent = 'Split';
+        const splitBtn = document.getElementById('tab_split_toggle_btn');
+        if (splitBtn) splitBtn.className = 'ml-1 px-1.5 py-0.5 rounded hover:bg-[#1a2336] text-[#94a3b8] hover:text-cyan-300 transition flex items-center gap-1 cursor-pointer shrink-0';
+      }
+
+      updateTabStyles();
+      fitAllShells();
+      updateLineCounter();
+    }
+
+    // Tab Style Highlighting
+    function updateTabStyles() {
       const b1 = document.getElementById('tab_term1_btn');
       const b2 = document.getElementById('tab_term2_btn');
-      const bSp = document.getElementById('tab_split_btn');
-      const sb1 = document.getElementById('subbar_term1');
-      const sb2 = document.getElementById('subbar_term2');
+      if (b1) b1.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
+      if (b2) b2.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
 
-      [b1, b2, bSp].forEach(b => {
-        if (b) b.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1';
+      Object.keys(shellSessions).forEach(sid => {
+        const btn = document.getElementById(`tab_btn_${sid}`);
+        if (btn) btn.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1.5 cursor-pointer shrink-0 border border-transparent';
       });
 
-      if (mode === 'term1') {
-        if (p1) { p1.classList.remove('hidden'); p1.classList.add('flex'); p1.style.width = '100%'; }
-        if (p2) { p2.classList.add('hidden'); p2.classList.remove('flex'); }
-        if (sb1) { sb1.classList.add('hidden'); sb1.classList.remove('flex'); }
-        if (b1) b1.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-cyan-900/60 text-cyan-200 border border-cyan-700/60';
-        activeTargetTerm = 'term1';
-      } else if (mode === 'term2') {
-        if (p1) { p1.classList.add('hidden'); p1.classList.remove('flex'); }
-        if (p2) { p2.classList.remove('hidden'); p2.classList.add('flex'); p2.style.width = '100%'; }
-        if (sb2) { sb2.classList.add('hidden'); sb2.classList.remove('flex'); }
-        if (b2) b2.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-teal-900/60 text-teal-200 border border-teal-700/60';
-        activeTargetTerm = 'term2';
-      } else { // 'split'
-        if (p1) { p1.classList.remove('hidden'); p1.classList.add('flex'); p1.style.width = '50%'; }
-        if (p2) { p2.classList.remove('hidden'); p2.classList.add('flex'); p2.style.width = '50%'; }
-        if (sb1) { sb1.classList.remove('hidden'); sb1.classList.add('flex'); }
-        if (sb2) { sb2.classList.remove('hidden'); sb2.classList.add('flex'); }
-        if (bSp) bSp.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-indigo-900/60 text-indigo-200 border border-indigo-700/60';
+      // Highlight active left tab
+      if (activeLeftTabId === 'term1' && b1) {
+        b1.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1c273e] text-cyan-300 border border-cyan-700/50 cursor-pointer shrink-0';
+      } else if (activeLeftTabId === 'term2' && b2) {
+        b2.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#142624] text-teal-300 border border-teal-700/50 cursor-pointer shrink-0';
+      } else if (shellSessions[activeLeftTabId]) {
+        const btn = document.getElementById(`tab_btn_${activeLeftTabId}`);
+        if (btn) btn.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1.5 bg-[#0f241a] text-emerald-300 border border-emerald-700/60 cursor-pointer shrink-0';
       }
-      updateLineCounter();
+
+      // Highlight active right tab (if split)
+      if (isSplitActive && activeRightTabId) {
+        if (activeRightTabId === 'term2' && b2) {
+          b2.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#142624] text-teal-300 border border-teal-500/80 cursor-pointer shrink-0 shadow-sm';
+        } else if (shellSessions[activeRightTabId]) {
+          const btn = document.getElementById(`tab_btn_${activeRightTabId}`);
+          if (btn) btn.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1.5 bg-[#0f241a] text-emerald-300 border border-emerald-500/80 cursor-pointer shrink-0 shadow-sm';
+        }
+      }
+    }
+
+    // Fit all visible shells and notify PTY backend
+    function fitAllShells() {
+      setTimeout(() => {
+        Object.values(shellSessions).forEach(sess => {
+          if (sess && sess.fitAddon && sess.terminal && sess.container && sess.container.offsetParent !== null) {
+            try {
+              sess.fitAddon.fit();
+              if (sess.socket && sess.socket.readyState === WebSocket.OPEN) {
+                sess.socket.send(JSON.stringify({ action: 'resize', cols: sess.terminal.cols, rows: sess.terminal.rows }));
+              }
+            } catch(e) {}
+          }
+        });
+      }, 50);
+    }
+    window.addEventListener('resize', fitAllShells);
+
+    // Vertical Divider Resizer Initialization
+    function initSplitVerticalResizer() {
+      const resizer = document.getElementById('split_vertical_resizer');
+      const wrapper = document.getElementById('term_panes_wrapper');
+      const leftPane = document.getElementById('pane_left_container');
+      const rightPane = document.getElementById('pane_right_container');
+      if (!resizer || !wrapper || !leftPane || !rightPane) return;
+
+      let isDragging = false;
+
+      resizer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const rect = wrapper.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const pct = Math.max(20, Math.min(80, (offsetX / rect.width) * 100));
+        leftPane.style.width = `${pct}%`;
+        rightPane.style.width = `${100 - pct}%`;
+        leftPane.style.flex = 'none';
+        rightPane.style.flex = 'none';
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          fitAllShells();
+        }
+      });
+    }
+
+    // Backwards-compatible setTerminalView helper
+    function setTerminalView(mode) {
+      if (mode === 'split') {
+        activeLeftTabId = 'term1';
+        splitWithTabOnRight('term2');
+      } else if (mode === 'term1') {
+        if (isSplitActive && activeRightTabId === 'term1') {
+          closeSplitRight();
+        }
+        switchTab('term1');
+      } else if (mode === 'term2') {
+        if (isSplitActive && activeRightTabId === 'term2') {
+          closeSplitRight();
+        }
+        switchTab('term2');
+      } else {
+        switchTab(mode);
+      }
     }
 
     function startTermTimer(tid) {
@@ -3128,7 +3945,15 @@
       }
 
       updateLineCounter(tid);
-      if (autoScroll && term) term.scrollTop = term.scrollHeight;
+      if (autoScroll && term) {
+        const isNearBottom = (term.scrollHeight - term.scrollTop - term.clientHeight) < 60;
+        if (isNearBottom) {
+          term.scrollTop = term.scrollHeight;
+        } else {
+          const jumpBtn = document.getElementById(tid === 'term2' ? 'btn_term2_scroll_bottom' : 'btn_term1_scroll_bottom');
+          if (jumpBtn) jumpBtn.classList.remove('hidden');
+        }
+      }
     }
 
     function appendTerminalRaw(text, targetTerm) {
@@ -3136,7 +3961,15 @@
       const term = document.getElementById(tid === 'term2' ? 'terminal_output_2' : 'terminal_output');
       if (term) term.innerHTML += ansiToHtml(text) + '\n';
       updateLineCounter(tid);
-      if (autoScroll && term) term.scrollTop = term.scrollHeight;
+      if (autoScroll && term) {
+        const isNearBottom = (term.scrollHeight - term.scrollTop - term.clientHeight) < 60;
+        if (isNearBottom) {
+          term.scrollTop = term.scrollHeight;
+        } else {
+          const jumpBtn = document.getElementById(tid === 'term2' ? 'btn_term2_scroll_bottom' : 'btn_term1_scroll_bottom');
+          if (jumpBtn) jumpBtn.classList.remove('hidden');
+        }
+      }
     }
 
     function getTargetIp() {
@@ -3544,16 +4377,29 @@
     let rawGeoFlows = [];
     let currentGeoFilter = 'all';
 
+    function isIxitWhitelisted(f) {
+      if (!f) return false;
+      const protocols = f.protocols || [];
+      const isNtp = protocols.includes('NTP');
+      const isDnsIcmp = (protocols.includes('DNS') || protocols.includes('ICMP')) && (
+        f.remote_ip === '8.8.8.8' || f.remote_ip === '8.8.4.4' || f.remote_ip === '1.1.1.1' ||
+        (f.isp_org || '').includes('Google') || (f.isp_org || '').includes('Cloudflare')
+      );
+      return isNtp || isDnsIcmp;
+    }
+
     function setGeoFilter(type) {
       currentGeoFilter = type;
-      ['all', 'overseas', 'vietnam', 'local', 'telemetry'].forEach(t => {
+      ['all', 'camera_only', 'overseas', 'ixit_ok', 'vietnam', 'local', 'telemetry'].forEach(t => {
         const btn = document.getElementById('btn_filter_' + t);
         if (btn) {
           if (t === type) {
             btn.className = 'px-2.5 py-1 rounded text-xs font-semibold bg-[#1d4ed8] text-white border border-blue-600 transition shadow-sm';
           } else {
             let textColor = 'text-[#848c9e]';
+            if (t === 'camera_only') textColor = 'text-teal-300';
             if (t === 'overseas') textColor = 'text-rose-300';
+            if (t === 'ixit_ok') textColor = 'text-emerald-300';
             if (t === 'vietnam') textColor = 'text-cyan-300';
             if (t === 'local') textColor = 'text-emerald-300';
             if (t === 'telemetry') textColor = 'text-amber-300';
@@ -3570,7 +4416,9 @@
       if (!tbody) return;
 
       const filtered = rawGeoFlows.filter(f => {
+        if (currentGeoFilter === 'camera_only' && (f.packets_camera_sent || 0) === 0) return false;
         if (currentGeoFilter === 'overseas' && !f.is_overseas) return false;
+        if (currentGeoFilter === 'ixit_ok' && !isIxitWhitelisted(f)) return false;
         if (currentGeoFilter === 'vietnam' && (!f.is_vietnam || f.is_local)) return false;
         if (currentGeoFilter === 'local' && !f.is_local) return false;
         if (currentGeoFilter === 'telemetry' && (!f.telemetry_keywords || f.telemetry_keywords.length === 0)) return false;
@@ -3634,8 +4482,8 @@
             ? (f.total_bytes / 1024).toFixed(1) + ' KB' 
             : f.total_bytes + ' B';
 
-        const sentBytesFmt = (f.bytes_camera_sent >= 1024) ? (f.bytes_camera_sent / 1024).toFixed(1) + 'K' : f.bytes_camera_sent;
-        const recvBytesFmt = (f.bytes_camera_received >= 1024) ? (f.bytes_camera_received / 1024).toFixed(1) + 'K' : f.bytes_camera_received;
+        const sentBytesFmt = (f.bytes_camera_sent >= 1024) ? (f.bytes_camera_sent / 1024).toFixed(1) + 'K' : (f.bytes_camera_sent || 0);
+        const recvBytesFmt = (f.bytes_camera_received >= 1024) ? (f.bytes_camera_received / 1024).toFixed(1) + 'K' : (f.bytes_camera_received || 0);
         const countryLabel = f.is_local ? 'Nội bộ' : (f.country_name || 'Unknown');
         const citySub = (!f.is_local && f.city) ? `<div class="text-[10px] text-[#848c9e]">${f.city}</div>` : '';
         const ispLabel = f.is_local ? 'LAN' : (f.isp_org || '-');
@@ -3647,6 +4495,9 @@
           <tr class="hover:bg-[#1a1f2b] transition border-b border-[#1e2330]">
             <td class="p-2 font-bold text-white select-all">
               <span class="hover:text-cyan-300 cursor-pointer" onclick="copyFilter('ip.addr == ${f.remote_ip}')" title="Click để sao chép bộ lọc IP">${f.remote_ip}</span>
+              ${(f.packets_camera_sent > 0)
+                ? `<div class="text-[10px] text-teal-400 font-mono mt-0.5">↑ DUT Gửi (${f.packets_camera_sent})</div>`
+                : `<div class="text-[10px] text-[#5c6475] font-mono mt-0.5">↓ Chỉ nhận (${f.packets_camera_received || 0})</div>`}
             </td>
             <td class="p-2 text-[#cad0dc]">
               ${flagBox}
@@ -3670,7 +4521,10 @@
             <td class="p-2 text-right font-bold text-white">${totalBytesFmt}</td>
             <td class="p-2">${protoPills}</td>
             <td class="p-2 text-center">
-              <span class="px-2 py-0.5 rounded text-[10px] border ${badgeClass}">${badgeText}</span>
+              <div class="flex flex-col items-center gap-1">
+                <span class="px-2 py-0.5 rounded text-[10px] border ${badgeClass}">${badgeText}</span>
+                ${(f.is_overseas && isIxitWhitelisted(f)) ? `<span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-700/80 font-mono">IXIT OK</span>` : ''}
+              </div>
             </td>
             <td class="p-2 text-center">
               <button onclick="copyFilter('ip.addr == ${f.remote_ip}')" class="px-1.5 py-0.5 rounded bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] text-[10px] transition" title="Sao chép Wireshark Filter cho IP này">
@@ -3711,7 +4565,8 @@
     async function handleGeoPcapUpload(input) {
       const file = input?.files?.[0];
       if (!file) return;
-      showToast(`Đang tải lên ${file.name}...`);
+      const mbSize = (file.size / (1024 * 1024)).toFixed(1);
+      showToast(`Đang tải lên gói tin PCAP: ${file.name} (${mbSize} MB)...`);
       try {
         const res = await fetch(`${API_BASE}/api/telemetry_geoip/upload_pcap?filename=${encodeURIComponent(file.name)}`, {
           method: 'POST',
@@ -3724,10 +4579,13 @@
           return;
         }
         currentGeoPcap = data.pcap_path;
+        showToast(`Tải lên thành công: ${file.name}. Đang phân tích IP & Telemetry...`);
         const cmd = `python tool20_telemetry_geoip_auditor.py --pcap "${data.pcap_path}"`;
         runCommand(cmd, `Phân tích PCAP: ${file.name}`);
       } catch (err) {
-        showToast('Không thể tải lên PCAP: ' + err, true);
+        showToast('Không thể tải lên PCAP: ' + (err.message || err), true);
+      } finally {
+        input.value = '';
       }
     }
 
@@ -4373,30 +5231,15 @@
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="font-mono font-bold text-indigo-400">${escapeHtml(d.id)}</span>
                     <span class="text-[#e1e4ea] font-medium">- ${escapeHtml(d.name)}</span>
-                    ${d.ixit_declared ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700/60 uppercase" title="Nằm trong danh mục khai báo IXIT của Camera">IXIT</span>` : `<span class="px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700" title="Cơ chế mở rộng - Luôn sẵn sàng kiểm thử">Tùy chọn</span>`}
                   </div>
                   <div class="text-[10px] text-[#848c9e] font-mono mt-0.5">${escapeHtml(d.protocol)}</div>
                   ${d.auth_factor ? `<div class="text-[10px] text-slate-400 mt-0.5 font-sans">${escapeHtml(d.auth_factor)}</div>` : ''}
                 </td>
-                <td class="p-2.5 border-r border-[#272c3a] font-mono text-cyan-400 font-semibold">${escapeHtml(d.port)}/tcp</td>
-                <td class="p-2 border-r border-[#272c3a]">
+                <td class="p-2.5 border-r border-[#272c3a] font-mono text-cyan-400 font-semibold text-center">${escapeHtml(d.port)}/tcp</td>
+                <td class="p-2.5 border-r border-[#272c3a]">
                   ${getAuthMechSelectHtml(d, idx)}
                 </td>
-                <td class="p-2 border-r border-[#272c3a] text-[11px] text-slate-300 space-y-1">
-                  <div class="flex items-center justify-between gap-1">
-                    <div><span class="text-cyan-400 font-semibold">Cipher:</span> <code onclick="copyAuthFilter(${idx}, 'cipher')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-cyan-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">${escapeHtml(d.filter_cipher)}</code></div>
-                    <button onclick="copyAuthFilter(${idx}, 'cipher')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
-                  </div>
-                  <div class="flex items-center justify-between gap-1">
-                    <div><span class="text-amber-400 font-semibold">Mã hóa:</span> <code onclick="copyAuthFilter(${idx}, 'auth')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-amber-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">${escapeHtml(d.filter_auth)}</code></div>
-                    <button onclick="copyAuthFilter(${idx}, 'auth')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
-                  </div>
-                  <div class="flex items-center justify-between gap-1">
-                    <div><span class="text-purple-400 font-semibold">Sort:</span> <code onclick="copyAuthFilter(${idx}, 'sort')" class="bg-[#0b0e15] px-1 py-0.5 rounded text-[10px] text-purple-300 cursor-pointer hover:bg-blue-900/40 border border-transparent hover:border-blue-500/50 select-text" title="Click để copy">${escapeHtml(d.sort_hint)}</code></div>
-                    <button onclick="copyAuthFilter(${idx}, 'sort')" class="px-1.5 py-0.2 rounded text-[9px] bg-[#1a2233] hover:bg-blue-600 text-slate-300 hover:text-white border border-[#2b354d] shrink-0" title="Sao chép">Copy</button>
-                  </div>
-                </td>
-                <td class="p-2 text-center space-x-1 whitespace-nowrap">
+                <td class="p-2.5 text-center space-x-1 whitespace-nowrap">
                   <button onclick="runAuthMechCmd(${idx}, 'test')" class="px-2 py-0.5 rounded bg-[#202533] hover:bg-[#2b3345] text-[11px] text-[#e1e4ea] border border-[#31394d]" title="Đo kiểm trực tiếp">Test</button>
                   ${d.enum_cmd ? `<button onclick="runAuthMechCmd(${idx}, 'enum')" class="px-2 py-0.5 rounded bg-[#1a3329] hover:bg-[#234d3c] text-[11px] text-emerald-300 border border-emerald-700/60" title="Nmap Enum Ciphers">Enum</button>` : ''}
                   ${d.id.includes('CMS') ? `<button onclick="openCMS()" class="px-2 py-0.5 rounded bg-[#431407] hover:bg-[#7c2d12] text-[11px] text-amber-300 border border-amber-700/60 font-semibold" title="Mở phần mềm CMS hãng">Mở CMS</button>` : ''}
@@ -4464,7 +5307,6 @@
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-indigo-400 font-mono text-[11px] font-bold">[${escapeHtml(d.id)}]</span>
                     <span class="text-slate-200">${escapeHtml(d.name)}</span>
-                    ${d.ixit_declared ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-900/60 text-emerald-300 border border-emerald-700/60 uppercase" title="Nằm trong danh mục khai báo IXIT của Camera">IXIT</span>` : `<span class="px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700" title="Cơ chế mở rộng - Luôn sẵn sàng kiểm thử">Tùy chọn</span>`}
                   </div>
                 </td>
                 <td class="p-2 border-r border-[#272c3a] font-mono text-cyan-400">${escapeHtml(d.port)}</td>
@@ -4843,7 +5685,7 @@
           refreshEvidenceList();
           loadFirmwareSigningData();
 
-          showToast(`🎯 Đã kích hoạt profile: ${cfg.name || newProfileId} (${cfg.target_camera?.ip || ''})`);
+          showToast(`Đã kích hoạt profile: ${cfg.name || newProfileId} (${cfg.target_camera?.ip || ''})`);
         } else {
           showToast(`Lỗi chuyển profile: ${data.detail || 'Không xác định'}`, true);
           syncProfileSelects(_activeProfileId);
@@ -4872,6 +5714,10 @@
           if (tc.password) document.getElementById('cfg_target_pass').value = tc.password;
           if (tc.ssh_username) document.getElementById('cfg_ssh_user').value = tc.ssh_username;
           if (tc.ssh_password) document.getElementById('cfg_ssh_pass').value = tc.ssh_password;
+          if (tc.safety_code || data.safety_code) {
+            const scEl = document.getElementById('cfg_safety_code');
+            if (scEl) scEl.value = tc.safety_code || data.safety_code;
+          }
           if (s3.user) document.getElementById('cfg_snmp_user').value = s3.user;
           if (s3.auth_pass) document.getElementById('cfg_snmp_auth_pass').value = s3.auth_pass;
           if (s3.priv_pass) document.getElementById('cfg_snmp_priv_pass').value = s3.priv_pass;
@@ -4992,6 +5838,7 @@
         password: document.getElementById('cfg_target_pass').value.trim(),
         ssh_username: document.getElementById('cfg_ssh_user').value.trim(),
         ssh_password: document.getElementById('cfg_ssh_pass').value.trim(),
+        safety_code: (document.getElementById('cfg_safety_code')?.value || '').trim(),
         snmp_user: document.getElementById('cfg_snmp_user').value.trim(),
         snmp_auth_pass: document.getElementById('cfg_snmp_auth_pass').value.trim(),
         snmp_priv_pass: document.getElementById('cfg_snmp_priv_pass').value.trim(),
@@ -5220,6 +6067,9 @@
     window.addEventListener('DOMContentLoaded', () => {
       initWebSocket();
       initTerminalResizer();
+      initTerminalScrollListeners();
+      loadAvailableShells();
+      initSplitVerticalResizer();
 
       // Restore saved terminal height
       const savedH = localStorage.getItem('psi_terminal_height');
@@ -5254,7 +6104,234 @@
       setInterval(pollTargetStatus, 5000);
       loadSettingsFromConfig();
       refreshEvidenceList();
+      refreshHotspotStatus();
     });
+
+    // ==============================================================
+    // 7.5 WI-FI HOTSPOT BRIDGE ENGINE (DESLOPPED & UNIFIED TOGGLE)
+    // ==============================================================
+    let hotspotPollTimer = null;
+    let isHotspotActive = false;
+    let isHotspotBusy = false;
+
+    function toggleHotspotPasswordVisibility() {
+      const input = document.getElementById('hotspot_password');
+      if (input) input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    async function refreshHotspotStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/api/hotspot/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderHotspotUI(data);
+      } catch (err) {
+        console.error('Lỗi lấy trạng thái Hotspot:', err);
+      }
+    }
+
+    function renderHotspotUI(data) {
+      if (!data) return;
+      isHotspotActive = !!data.active;
+
+      const pill = document.getElementById('hotspot_status_pill');
+      const navBadge = document.getElementById('sidebar_hotspot_badge');
+      const gwIp = document.getElementById('hotspot_gw_ip');
+      const origWifi = document.getElementById('hotspot_orig_wifi');
+      const tbody = document.getElementById('hotspot_clients_body');
+      const countBadge = document.getElementById('hotspot_client_count');
+      const guideBox = document.getElementById('hotspot_guide_box');
+
+      // Update Top Status Pill & Sidebar Badge
+      if (pill) {
+        if (isHotspotActive) {
+          pill.textContent = 'ĐANG PHÁT (ACTIVE)';
+          pill.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-700 shadow-sm';
+          if (navBadge) {
+            navBadge.textContent = 'ON';
+            navBadge.className = 'nav-label px-1 py-0.2 rounded text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0 font-bold';
+          }
+        } else {
+          pill.textContent = 'ĐANG TẮT (INACTIVE)';
+          pill.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1e293b] text-[#94a3b8] border border-[#334155]';
+          if (navBadge) {
+            navBadge.textContent = 'OFF';
+            navBadge.className = 'nav-label px-1 py-0.2 rounded text-[9px] font-mono bg-[#141824] text-[#64748b] border border-[#231b34] shrink-0';
+          }
+        }
+      }
+
+      // Update Single Toggle Button
+      updateHotspotToggleButton(isHotspotActive);
+
+      if (gwIp && data.gateway_ip) gwIp.textContent = data.gateway_ip;
+      if (origWifi && data.original_wifi) origWifi.textContent = data.original_wifi;
+
+      // Render Connected Clients
+      if (tbody) {
+        const clients = data.clients || [];
+        if (countBadge) countBadge.textContent = clients.length;
+
+        if (clients.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-[#64748b] italic">${isHotspotActive ? 'Hotspot đang phát. Hãy kết nối camera vào Wi-Fi để xem địa chỉ IP...' : 'Hotspot đang tắt. Bấm nút Bật Hotspot để phát mạng kiểm thử.'}</td></tr>`;
+          if (guideBox) guideBox.classList.remove('hidden');
+        } else {
+          if (guideBox) guideBox.classList.add('hidden');
+          tbody.innerHTML = clients.map(c => `
+            <tr class="hover:bg-[#161c28] transition group">
+              <td class="p-2.5 font-mono font-bold text-cyan-300 border-r border-[#272c3a] flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>${c.ip}</span>
+              </td>
+              <td class="p-2.5 font-mono text-[#94a3b8] border-r border-[#272c3a]">${c.mac}</td>
+              <td class="p-2.5 border-r border-[#272c3a] text-center">
+                <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">${c.state}</span>
+              </td>
+              <td class="p-2.5 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button onclick="setAsTargetCamera('${c.ip}')" class="bg-[#065f46] hover:bg-[#047857] text-emerald-100 px-2.5 py-1 rounded text-[11px] font-bold border border-emerald-600 flex items-center gap-1 transition shadow-sm cursor-pointer">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Đặt làm Target IP</span>
+                  </button>
+                  <button onclick="pingHotspotClient('${c.ip}')" class="bg-[#1f2430] hover:bg-[#282f40] text-[#cbd5e1] px-2 py-1 rounded text-[11px] font-medium border border-[#2e3547] flex items-center gap-1 transition cursor-pointer" title="Ping thử độ trễ">
+                    <span>Ping</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+    }
+
+    function updateHotspotToggleButton(active) {
+      const btn = document.getElementById('btn_hotspot_toggle');
+      const sw = document.getElementById('btn_hotspot_switch');
+      const knob = document.getElementById('btn_hotspot_knob');
+      const label = document.getElementById('btn_hotspot_label');
+      if (!btn || !sw || !knob || !label || isHotspotBusy) return;
+
+      if (active) {
+        btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded bg-[#0b1f16] hover:bg-[#0f291e] border border-emerald-600/70 transition shadow-sm cursor-pointer select-none';
+        sw.className = 'w-10 h-5 rounded-full p-0.5 transition-colors duration-200 bg-emerald-500 flex items-center';
+        knob.className = 'w-4 h-4 rounded-full bg-white transition-transform duration-200 translate-x-5 shadow';
+        label.className = 'font-mono text-xs font-bold text-emerald-400 w-7 text-left';
+        label.textContent = 'ON';
+      } else {
+        btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded bg-[#10141e] hover:bg-[#161c28] border border-[#273142] transition shadow-sm cursor-pointer select-none';
+        sw.className = 'w-10 h-5 rounded-full p-0.5 transition-colors duration-200 bg-[#232a3b] flex items-center';
+        knob.className = 'w-4 h-4 rounded-full bg-[#848c9e] transition-transform duration-200 translate-x-0';
+        label.className = 'font-mono text-xs font-bold text-[#848c9e] w-7 text-left';
+        label.textContent = 'OFF';
+      }
+    }
+
+    // Single Unified Toggle Handler
+    async function toggleHotspot() {
+      if (isHotspotBusy) return;
+      isHotspotBusy = true;
+      const btn = document.getElementById('btn_hotspot_toggle');
+      const label = document.getElementById('btn_hotspot_label');
+      if (btn) btn.disabled = true;
+      if (label) label.textContent = '...';
+
+      if (isHotspotActive) {
+        showToast('Đang tắt Hotspot và khôi phục Wi-Fi cũ...');
+        try {
+          const res = await fetch(`${API_BASE}/api/hotspot/stop`, { method: 'POST' });
+          const data = await res.json();
+          if (data.status === 'ok') {
+            showToast('Đã tắt Hotspot, khôi phục Wi-Fi: ' + (data.data?.original_wifi || 'PSI_Xuan'));
+            renderHotspotUI(data.data);
+            if (hotspotPollTimer) {
+              clearInterval(hotspotPollTimer);
+              hotspotPollTimer = null;
+            }
+          } else {
+            showToast('Lỗi tắt Hotspot: ' + data.message, true);
+          }
+        } catch (err) {
+          showToast('Lỗi gọi API: ' + err.message, true);
+        }
+      } else {
+        const ssid = document.getElementById('hotspot_ssid')?.value.trim() || 'Merlin_2.4G';
+        const password = document.getElementById('hotspot_password')?.value.trim() || 'Psitest135#';
+        showToast('Đang bật Hotspot phát ' + ssid + '...');
+        try {
+          const res = await fetch(`${API_BASE}/api/hotspot/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ssid, password })
+          });
+          const data = await res.json();
+          if (data.status === 'ok') {
+            showToast('Đã phát Hotspot thành công: ' + ssid);
+            renderHotspotUI(data.data);
+            if (!hotspotPollTimer) hotspotPollTimer = setInterval(refreshHotspotStatus, 3000);
+          } else {
+            showToast('Lỗi bật Hotspot: ' + data.message, true);
+          }
+        } catch (err) {
+          showToast('Lỗi gọi API: ' + err.message, true);
+        }
+      }
+
+      isHotspotBusy = false;
+      if (btn) btn.disabled = false;
+      updateHotspotToggleButton(isHotspotActive);
+    }
+
+    async function saveHotspotConfig() {
+      const ssid = document.getElementById('hotspot_ssid')?.value.trim() || 'Merlin_2.4G';
+      const password = document.getElementById('hotspot_password')?.value.trim() || 'Psitest135#';
+      showToast('Đang áp dụng cấu hình Wi-Fi mới...');
+      try {
+        const res = await fetch(`${API_BASE}/api/hotspot/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ssid, password })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          showToast('Đã lưu cấu hình: ' + ssid);
+          renderHotspotUI(data.data);
+        } else {
+          showToast('Lỗi lưu cấu hình: ' + data.message, true);
+        }
+      } catch (err) {
+        showToast('Lỗi kết nối: ' + err.message, true);
+      }
+    }
+
+    async function setAsTargetCamera(ip) {
+      if (!ip) return;
+      showToast('Đang gán IP mục tiêu sang ' + ip + '...');
+      try {
+        const res = await fetch(`${API_BASE}/api/hotspot/set_target`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          showToast('Đã đặt ' + ip + ' làm Target IP thành công!');
+          const targetInput = document.getElementById('cfg_target_ip');
+          if (targetInput) targetInput.value = ip;
+          loadSettingsFromConfig();
+          pollTargetStatus();
+        } else {
+          showToast(data.detail || 'Lỗi cập nhật Target IP', true);
+        }
+      } catch (err) {
+        showToast('Lỗi gọi API: ' + err.message, true);
+      }
+    }
+
+    function pingHotspotClient(ip) {
+      if (!ip) return;
+      if (typeof openFloatingConsole === 'function') openFloatingConsole();
+      runCommand(`ping -c 4 ${ip}`, `Kiểm tra Ping Camera Hotspot (${ip})`);
+    }
 
     // 8. APP UPDATE ENGINE (GITHUB DIRECT SYNC)
     async function checkAppUpdate() {
@@ -5341,7 +6418,53 @@
     // ==============================================================
     // FIRMWARE ANALYSIS, FILESYSTEM & DIGITAL SIGNING AUDIT (TOOL 24)
     // ==============================================================
+    let _lastUploadedFwPath = '';
+
+    function triggerFirmwareUpload() {
+      const input = document.getElementById('fw_upload_file_input');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    async function handleFirmwareUpload(input) {
+      const file = input?.files?.[0];
+      if (!file) return;
+
+      const fwDir = (document.getElementById('fw_dir_input')?.value || '').trim();
+      const mbSize = (file.size / (1024 * 1024)).toFixed(1);
+      showToast(`Đang tải lên firmware: ${file.name} (${mbSize} MB)... Vui lòng đợi.`);
+
+      try {
+        const url = `${API_BASE}/api/firmware/upload?filename=${encodeURIComponent(file.name)}&target_dir=${encodeURIComponent(fwDir)}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: file
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok') {
+          showToast(data.detail || 'Lỗi khi tải lên tệp firmware', true);
+          return;
+        }
+
+        _lastUploadedFwPath = data.saved_path;
+        if (data.target_dir) {
+          const dirInput = document.getElementById('fw_dir_input');
+          if (dirInput) dirInput.value = data.target_dir;
+        }
+        showToast(`Tải lên thành công: ${data.filename} (${(data.size_bytes / (1024 * 1024)).toFixed(1)} MB). Đang bắt đầu phân tích...`);
+        runFirmwareAudit(data.saved_path);
+      } catch (err) {
+        showToast('Không thể tải lên tệp firmware: ' + err.message, true);
+      } finally {
+        input.value = '';
+      }
+    }
+
     async function initFirmwareDirInput() {
+      _lastUploadedFwPath = '';
       const input = document.getElementById('fw_dir_input');
       if (!input) return;
       try {
@@ -5355,10 +6478,16 @@
       }
     }
 
-    function runFirmwareAudit() {
+    function runFirmwareAudit(specificFwPath) {
+      const fwTarget = specificFwPath || _lastUploadedFwPath;
       const fwDir = (document.getElementById('fw_dir_input')?.value || '').trim();
-      const dirFlag = fwDir ? `--firmware-dir "${fwDir}"` : '';
-      const cmd = `python tool24_firmware_signing_auditor.py ${dirFlag}`.trim();
+      let flag = '';
+      if (fwTarget) {
+        flag = `--firmware "${fwTarget}"`;
+      } else if (fwDir) {
+        flag = `--firmware-dir "${fwDir}"`;
+      }
+      const cmd = `python tool24_firmware_signing_auditor.py ${flag}`.trim();
       runCommand(cmd, 'Tự động Phân tích Firmware, Filesystem & Chữ ký số');
     }
 
