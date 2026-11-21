@@ -22,16 +22,27 @@
       --text-main: #f1f5f9;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
-      --paper-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.038'/%3E%3C/svg%3E");
     }
     body {
       background-color: var(--bg-app);
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(28, 40, 64, 0.22) 0%, transparent 65%),
-        var(--paper-grain);
+        radial-gradient(circle at 50% 0%, rgba(28, 40, 64, 0.22) 0%, transparent 65%);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
+    }
+    /* Tactile Micro-Texture Grain Overlay across all surfaces */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.045;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
     }
     html, body {
       scroll-behavior: smooth;
@@ -41,9 +52,30 @@
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
     }
+    #term_panes_wrapper,
+    #pane_left_container,
+    #pane_right_container,
+    #pane_term1,
+    #pane_term2,
+    #pane_shell_left_slot,
+    #pane_shell_right_slot {
+      min-height: 0 !important;
+    }
+    #pane_term1,
+    #pane_term2,
+    #pane_shell_left_slot,
+    #pane_shell_right_slot {
+      height: 100% !important;
+    }
     #terminal_output, #terminal_output_2 {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      max-height: 100% !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
       scroll-behavior: auto !important; /* Critical: prevent streaming jerkiness */
       overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
     }
     * {
       scrollbar-width: thin;
@@ -240,7 +272,7 @@
       pointer-events: none;
       transition: all 0.24s var(--ease-spring) !important;
       z-index: 99999 !important;
-      border-radius: 9999px !important;
+      border-radius: 6px !important;
       padding: 6px 16px !important;
       display: flex !important;
       align-items: center;
@@ -253,6 +285,11 @@
       opacity: 1 !important;
       transform: translateX(-50%) translateY(0) scale(1) !important;
       pointer-events: auto !important;
+    }
+
+    /* Terminal Chrome top status items hidden */
+    #console_status_pill, #console_timer_badge, #console_cmd_text, #console_line_count {
+      display: none !important;
     }
 
     /* Responsive Mobile Drawer for Sidebar */
@@ -273,36 +310,36 @@
       }
     }
 
-    /* Tactile Border-State Navigation Items (Anti-AI Slop) */
+    /* Solid Tactical Contrast Navigation Items (Anti-AI Slop, 100% Pixel Precision) */
     .nav-item {
       position: relative;
+      border: 1px solid transparent;
       border-left: 3px solid transparent;
-      transition: all 0.18s var(--ease-spring);
+      border-radius: 6px;
+      transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
       background: transparent;
       touch-action: manipulation;
     }
-    .nav-item:hover {
-      background-color: rgba(18, 23, 36, 0.85);
+    .nav-item:hover:not(.active) {
+      background-color: rgba(30, 41, 59, 0.45);
       color: #f1f5f9;
       border-left-color: #334155;
-      transform: translateX(2px);
     }
     .nav-item.active {
-      background: rgba(20, 27, 40, 0.95) !important;
+      background-color: #1e293b !important;
+      border: 1px solid #334155 !important;
+      border-left: 3px solid #38bdf8 !important;
       color: #ffffff !important;
-      border-left-color: #38bdf8 !important;
       font-weight: 600;
-      box-shadow: inset 1px 0 0 0 rgba(56, 189, 248, 0.25);
-      transform: translateX(0);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
     }
     .nav-item.active svg {
       color: #38bdf8 !important;
       transform: scale(1.05);
-      transition: transform 0.18s var(--ease-spring);
+      transition: transform 0.15s ease;
     }
     .nav-item.running {
       border-left-color: #f59e0b !important;
-      background: rgba(245, 158, 11, 0.08) !important;
       color: #fde047 !important;
     }
 
@@ -437,8 +474,8 @@
   <!-- ============================================================== -->
   <!-- 1. TOP TOOLBAR & SYSTEM RIBBON -->
   <!-- ============================================================== -->
-  <header class="glass-header border-b border-[#171f2e] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 shrink-0 z-20">
-    <div class="flex items-center gap-2 sm:gap-3">
+  <header class="glass-header border-b border-[#171f2e] px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 z-20 overflow-x-auto custom-scrollbar">
+    <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
       <!-- Mobile Sidebar Toggle -->
       <button onclick="toggleMobileSidebar()" class="md:hidden p-1.5 -ml-1 rounded text-[#94a3b8] hover:text-white hover:bg-[#151c2a] transition focus:outline-none cursor-pointer" title="Menu điều hướng">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -446,51 +483,49 @@
 
       <!-- Clean Brand Identity -->
       <div class="flex items-center gap-2">
-        <img src="/icon.png" alt="Cumera Logo" class="w-6 h-6 sm:w-7 sm:h-7 rounded-md border border-[#28374f] shadow-sm object-cover">
-        <div class="flex items-center gap-1.5 sm:gap-2">
+        <img src="/icon.png" alt="Cumera Logo" class="w-6 h-6 rounded-md border border-[#28374f] shadow-sm object-cover">
+        <div class="flex items-center gap-1.5">
           <span class="font-bold text-xs sm:text-sm tracking-tight text-white">Cumera</span>
-          <span class="text-[9px] sm:text-[10px] font-mono px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded bg-[#131b28] text-[#38bdf8] border border-[#213047]">v2.4</span>
+          <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-[#131b28] text-[#38bdf8] border border-[#213047]">v2.4</span>
         </div>
       </div>
 
       <div class="h-4 w-px bg-[#1a2333] hidden sm:block"></div>
 
       <!-- Interactive Target Status Pill with Status Border -->
-      <button onclick="switchTab('target')" id="target_dut_pill" class="flex items-center gap-1.5 sm:gap-2 text-xs bg-[#090c13] hover:bg-[#111724] border border-[#232e42] hover:border-[#38bdf8] px-2.5 sm:px-3 py-1.5 rounded-md shadow-sm transition-all duration-150 cursor-pointer group" title="Bấm để mở cấu hình thiết bị DUT">
-        <span id="target_ping_indicator" class="w-1.5 h-3 rounded-full bg-amber-400 shrink-0"></span>
-        <span class="text-[#64748b] font-mono text-[11px] font-semibold">DUT</span>
-        <span id="target_ip_badge" class="font-mono font-bold text-[#38bdf8]">--</span>
-        <span class="hidden sm:inline text-[#253248]">•</span>
-        <span id="target_latency_badge" class="hidden sm:inline font-mono text-[11px] text-[#94a3b8] font-semibold">(đang kiểm tra...)</span>
-        <span class="hidden lg:inline text-[#253248]">•</span>
-        <span id="target_model_badge" class="hidden lg:inline text-white font-medium">--</span>
-        <span class="hidden xl:inline text-[#253248]">•</span>
-        <span id="target_iface_badge" class="hidden xl:inline font-mono text-[#94a3b8]">--</span>
-        <svg class="w-3.5 h-3.5 text-[#64748b] group-hover:text-[#38bdf8] transition-colors ml-0.5 sm:ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <button onclick="switchTab('target')" id="target_dut_pill" class="flex items-center gap-2 text-xs bg-[#090d16] hover:bg-[#0f1422] border border-[#1e273a] hover:border-cyan-500/50 px-2.5 py-1 rounded-md shadow-sm transition-all duration-150 cursor-pointer group" title="Bấm để mở cấu hình thiết bị DUT">
+        <span id="target_ping_indicator" class="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.6)]"></span>
+        <span class="text-[#64748b] font-mono text-[10px] font-bold tracking-wider">DUT</span>
+        <span id="target_ip_badge" class="font-mono font-bold text-cyan-300 text-xs">--</span>
+        <span id="target_latency_badge" class="font-mono text-[10px] text-emerald-400 font-medium">--</span>
+        <span class="hidden xl:inline-block w-px h-2.5 bg-[#1e273a]"></span>
+        <span id="target_model_badge" class="hidden xl:inline text-[11px] text-[#cbd5e1] font-medium">--</span>
+        <span class="hidden 2xl:inline-block w-px h-2.5 bg-[#1e273a]"></span>
+        <span id="target_iface_badge" class="hidden 2xl:inline font-mono text-[10px] text-[#64748b]">--</span>
+        <svg class="w-3 h-3 text-[#475569] group-hover:text-cyan-400 transition-colors ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       </button>
 
       <!-- Camera Profile Switcher Dropdown -->
-      <select id="header_profile_select" onchange="onProfileSelectChange(this.value)" class="bg-[#0b0f17] text-xs font-mono font-medium text-cyan-300 border border-[#232e42] hover:border-cyan-500/70 rounded-md px-2 sm:px-2.5 py-1.5 focus:border-cyan-400 focus:outline-none cursor-pointer shadow-sm transition max-w-[130px] sm:max-w-[200px] md:max-w-none truncate" title="Target Profile">
+      <select id="header_profile_select" onchange="onProfileSelectChange(this.value)" class="bg-[#0b0f17] text-xs font-mono font-medium text-cyan-300 border border-[#232e42] hover:border-cyan-500/70 rounded-md px-2 py-1 focus:border-cyan-400 focus:outline-none cursor-pointer shadow-sm transition max-w-[140px] sm:max-w-[180px] md:max-w-[220px] lg:max-w-[280px] truncate" title="Target Profile">
         <option value="" disabled selected>Đang tải profiles...</option>
       </select>
     </div>
 
     <!-- Quick Action Button Group -->
-    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+    <div class="flex items-center gap-1.5 shrink-0">
       <!-- Terminal Overlay Trigger Button -->
-      <button onclick="toggleFloatingConsole()" id="btn_floating_term_toggle" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-mono font-semibold bg-[#090c13] hover:bg-[#111724] text-[#94a3b8] hover:text-white border border-[#232e42] hover:border-[#38bdf8] transition-all shadow-sm cursor-pointer group active:scale-95" title="Bật/Tắt Terminal (Ctrl + `)">
+      <button onclick="toggleFloatingConsole()" id="btn_floating_term_toggle" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-[#090c13] hover:bg-[#111724] text-[#94a3b8] hover:text-white border border-[#232e42] hover:border-[#38bdf8] transition-all shadow-sm cursor-pointer group active:scale-95" title="Bật/Tắt Terminal (Ctrl + `)">
         <svg class="w-3.5 h-3.5 text-cyan-400 group-hover:text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <span class="hidden sm:inline">Console</span>
         <span id="floating_term_indicator_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
       </button>
 
-      <!-- Nút Kiểm tra & Cập nhật Cumera Trực tiếp -->
-      <button onclick="checkAppUpdate()" id="btn_check_update" class="bg-[#0b1615] hover:bg-[#102220] text-[#5eead4] hover:text-white px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-[#1d3d38] hover:border-[#2dd4bf] shadow-sm transition cursor-pointer active:scale-95" title="Kiểm tra và cập nhật Cumera trực tiếp từ GitHub">
-        <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        <span class="hidden sm:inline">Cập nhật</span>
+      <!-- Minimalist App Update Button -->
+      <button onclick="checkAppUpdate()" id="btn_check_update" class="p-1.5 rounded-md text-[#94a3b8] hover:text-[#5eead4] bg-[#090c13] hover:bg-[#111724] border border-[#232e42] hover:border-teal-500/50 transition-all shadow-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Kiểm tra & Cập nhật Cumera (GitHub)">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
 
-      <button id="btn_stop_top" onclick="stopCommand()" class="hidden bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-bold items-center gap-1.5 transition border border-rose-700/60 shadow-sm active:scale-95">
+      <button id="btn_stop_top" onclick="stopCommand()" class="hidden bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white px-2.5 py-1 rounded-md text-xs font-bold items-center gap-1.5 transition border border-rose-700/60 shadow-sm active:scale-95">
         <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         <span class="hidden sm:inline">Stop</span>
       </button>
@@ -506,7 +541,7 @@
     
     <!-- LEFT NAVIGATION TREE -->
     <aside id="app_sidebar" class="w-56 bg-[#090c13]/95 border-r border-[#171e2c] flex flex-col justify-between shrink-0 select-none transition-all duration-150">
-      <div class="p-2 space-y-1">
+      <div id="sidebar_nav_list" class="p-2 space-y-1">
         
         <!-- TARGET -->
         <button onclick="switchTab('target')" id="nav_target" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-r text-xs font-medium text-[#94a3b8] nav-item" title="Cấu hình thông số thiết bị & mạng">
@@ -995,13 +1030,13 @@
         <!-- TAB: 4 AUTHMECH AUDIT MATRIX TABLE -->
         <!-- ============================================================== -->
         <div id="tab_content_authmech" class="tab-pane space-y-3 hidden">
-          <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phương thức Xác thực (AuthMech)</h2>
-            <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2.5 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white shrink-0">Phương thức Xác thực (AuthMech)</h2>
+            <div class="flex items-center gap-2 flex-wrap">
               <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
                 <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Xác thực:</span>
                 <select id="authmech_global_auth" class="bg-transparent text-xs text-indigo-300 font-mono outline-none cursor-pointer">
-                  <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                  <option value="auto" selected>Auto</option>
                   <option value="digest-md5">Digest MD5</option>
                   <option value="digest-sha256">Digest SHA-256</option>
                   <option value="basic">Basic Auth</option>
@@ -1012,8 +1047,7 @@
               <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 3.0 --auth ' + (document.getElementById('authmech_global_auth')?.value || 'auto'), 'Chạy toàn bộ phương thức xác thực')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-semibold transition border border-indigo-500 shadow-sm">
                 Chạy tất cả
               </button>
-              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 1.5 --no-pcap --auth ' + (document.getElementById('authmech_global_auth')?.value || 'auto'), 'Kích hoạt AuthMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Chạy toàn bộ các cơ chế xác thực để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
-                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <button onclick="runCommand('python tool21_authmech_auditor.py --id all --wait 1.5 --no-pcap --auth ' + (document.getElementById('authmech_global_auth')?.value || 'auto'), 'Kích hoạt AuthMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm" title="Chạy toàn bộ các cơ chế xác thực để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
                 <span>Chạy (No PCAP)</span>
               </button>
               <button onclick="runCommand('python tool21_authmech_auditor.py --enum all', 'Liệt kê Toàn bộ Ciphersuite (Nmap Enum)')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition border border-emerald-500 shadow-sm flex items-center gap-1.5" title="Chạy Nmap ssl-enum-ciphers & ssh2-enum-algos bóc tách toàn bộ danh mục ciphersuite để chụp ảnh">
@@ -1039,34 +1073,21 @@
             </table>
           </div>
 
-          <!-- NMAP CIPHERSUITE ENUMERATION PANEL -->
-          <div class="bg-[#10131a] border border-[#272c3a] p-3 rounded space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                <span>Liệt kê Ciphersuite & KEX (Nmap)</span>
-              </div>
-              <button onclick="runCommand('python tool21_authmech_auditor.py --enum all', 'Chạy Nmap Enum Ciphers Toàn bộ')" class="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <span>Chạy Nmap Enum</span>
-              </button>
-            </div>
-            <div id="auth_nmap_grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px] font-mono">
-              <!-- Dynamic Nmap items rendered by loadAuthMechTable() -->
-            </div>
-          </div>
+          <!-- NMAP CIPHERSUITE ENUMERATION PANEL (Hidden, triggered via top bar button) -->
+          <div id="auth_nmap_grid" class="hidden"></div>
         </div>
 
         <!-- ============================================================== -->
         <!-- TAB: COMMUNICATION METHODS AUDIT MATRIX TABLE -->
         <!-- ============================================================== -->
         <div id="tab_content_commech" class="tab-pane space-y-3">
-          <div class="flex items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dịch vụ Truyền thông (ComMech)</h2>
-            <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2.5 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white shrink-0">Dịch vụ Truyền thông (ComMech)</h2>
+            <div class="flex items-center gap-2 flex-wrap">
               <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
                 <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Phân loại:</span>
                 <select id="commech_view_filter" onchange="filterComMechRows()" class="bg-transparent text-xs text-teal-300 font-mono outline-none cursor-pointer" title="Lọc hiển thị danh mục ComMech theo thể loại">
-                  <option value="all" selected>Tất cả thể loại (Chi tiết)</option>
+                  <option value="all" selected>Tất cả thể loại</option>
                   <option value="storage">Lưu trữ (SFTP / FTPS / FTP / SMB)</option>
                   <option value="mail">Thư điện tử (SMTPS / STARTTLS)</option>
                   <option value="media">Media & API (Web / ONVIF / RTSPS / CMS)</option>
@@ -1076,7 +1097,7 @@
               <div class="flex items-center gap-1.5 bg-[#10141f] px-2 py-1 rounded border border-[#272c3a]">
                 <span class="text-[11px] text-[#848c9e] whitespace-nowrap">Xác thực:</span>
                 <select id="commech_global_auth" class="bg-transparent text-xs text-blue-300 font-mono outline-none cursor-pointer">
-                  <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                  <option value="auto" selected>Auto</option>
                   <option value="digest-md5">Digest MD5</option>
                   <option value="digest-sha256">Digest SHA-256</option>
                   <option value="basic">Basic Auth</option>
@@ -1091,8 +1112,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
                 <span>Bật 5 Server (Liên tục)</span>
               </button>
-              <button onclick="runCommand('python tool17_commech_auditor.py --id all --auto-trigger --wait 1.5 --no-pcap --auth ' + (document.getElementById('commech_global_auth')?.value || 'auto'), 'Kích hoạt ComMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm flex items-center gap-1" title="Kích hoạt toàn bộ các kênh truyền thông để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
-                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <button onclick="runCommand('python tool17_commech_auditor.py --id all --auto-trigger --wait 1.5 --no-pcap --auth ' + (document.getElementById('commech_global_auth')?.value || 'auto'), 'Kích hoạt ComMech không lưu PCAP')" class="bg-[#1f2430] hover:bg-[#2b3345] text-amber-300 border border-amber-500/50 px-2.5 py-1 rounded text-xs font-semibold transition shadow-sm" title="Kích hoạt toàn bộ các kênh truyền thông để kích thích lưu lượng/kiểm tra TelData mà không ghi đè file PCAP bằng chứng">
                 <span>Chạy (No PCAP)</span>
               </button>
               <button onclick="runCommand('python tool17_commech_auditor.py --enum all', 'Liệt kê Toàn bộ Ciphersuite ComMech (Nmap Enum)')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition border border-emerald-500 shadow-sm flex items-center gap-1.5" title="Chạy Nmap ssl-enum-ciphers & ssh2-enum-algos bóc tách toàn bộ danh mục ciphersuite ComMech để chụp ảnh">
@@ -1102,17 +1122,17 @@
             </div>
           </div>
 
-          <div class="border border-[#272c3a] rounded overflow-x-auto custom-scrollbar bg-[#14171f]">
-            <table class="w-full min-w-[580px] text-left border-collapse text-xs">
+          <div class="border border-[#272c3a] rounded-lg overflow-x-auto custom-scrollbar bg-[#14171f] shadow-sm">
+            <table class="w-full min-w-[1220px] text-left border-collapse text-xs">
               <thead>
-                <tr class="bg-[#1b202b] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
-                  <th class="p-2 border-r border-[#272c3a]">Dịch vụ</th>
-                  <th class="p-2 border-r border-[#272c3a] w-20">Cổng</th>
-                  <th class="p-2 border-r border-[#272c3a] w-24">Hướng</th>
-                  <th class="p-2 border-r border-[#272c3a] w-48">Cơ chế xác thực</th>
-                  <th class="p-2 border-r border-[#272c3a]">Bảo mật</th>
-                  <th class="p-2 border-r border-[#272c3a]">Hạ cấp</th>
-                  <th class="p-2 w-44 text-center">Hành động</th>
+                <tr class="bg-[#181d27] text-[#848c9e] border-b border-[#272c3a] font-semibold text-[11px]">
+                  <th class="px-3.5 py-2.5 min-w-[220px]">Dịch vụ</th>
+                  <th class="px-3 py-2.5 w-28 text-center">Cổng</th>
+                  <th class="px-3 py-2.5 min-w-[190px]">Hướng</th>
+                  <th class="px-3 py-2.5 min-w-[190px]">Cơ chế xác thực</th>
+                  <th class="px-3.5 py-2.5 min-w-[280px]">Bảo mật (Ciphers & Protocols)</th>
+                  <th class="px-3.5 py-2.5 min-w-[280px]">Chính sách Hạ cấp & Bảo vệ</th>
+                  <th class="px-3 py-2.5 w-48 text-center">Hành động</th>
                 </tr>
               </thead>
               <tbody id="commech_table_body" class="divide-y divide-[#272c3a] text-[#e1e4ea]">
@@ -1121,28 +1141,15 @@
             </table>
           </div>
 
-          <!-- NMAP CIPHERSUITE ENUMERATION PANEL -->
-          <div class="bg-[#10131a] border border-[#272c3a] p-3 rounded space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                <span>Liệt kê Ciphersuite & KEX (Nmap)</span>
-              </div>
-              <button onclick="runCommand('python tool17_commech_auditor.py --enum all', 'Chạy Nmap Enum Ciphers Toàn bộ ComMech')" class="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1">
-                <span>Chạy Nmap Enum</span>
-              </button>
-            </div>
-            <div id="comm_nmap_grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px] font-mono">
-              <!-- Dynamic Nmap items rendered by loadComMechTable() -->
-            </div>
-          </div>
+          <!-- NMAP CIPHERSUITE ENUMERATION PANEL (Hidden, triggered via top bar button) -->
+          <div id="comm_nmap_grid" class="hidden"></div>
         </div>
 
         <!-- ============================================================== -->
         <!-- TAB: LOCKOUT & RATE LIMIT (CLAUSE 2.1.5) -->
         <!-- ============================================================== -->
         <div id="tab_content_lockout" class="tab-pane hidden space-y-3">
-          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex items-center justify-between shadow-sm">
+          <div class="hidden bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex items-center justify-between shadow-sm">
             <div class="flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                 <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -1168,7 +1175,7 @@
                     <div class="w-6 h-6 rounded bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
                       <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
                     </div>
-                    <span class="font-bold text-xs text-white">1. ONVIF SOAP (Device Service)</span>
+                    <span class="font-bold text-xs text-white">ONVIF SOAP</span>
                   </div>
                   <span id="bf_onvif_badge" class="font-mono text-sky-400 text-[11px] bg-[#162233] px-2 py-0.5 rounded border border-sky-800/40">TCP 443 / 80</span>
                 </div>
@@ -1254,7 +1261,7 @@
                     <div class="flex items-center gap-2">
                       <label class="text-[#848c9e] whitespace-nowrap text-[11px]">Xác thực:</label>
                       <select id="onvif_auth_type" class="w-full bg-[#141924] border border-[#2a3449] focus:border-blue-500 rounded px-2 py-1 text-white font-mono text-xs outline-none transition cursor-pointer" title="Cơ chế xác thực ONVIF SOAP (Auto, WS-Security SHA-1, SHA-256, PasswordText, HTTP Digest)">
-                        <option value="auto" selected>Auto (Tự động nhận diện)</option>
+                        <option value="auto" selected>Auto</option>
                         <option value="wsse_sha1">WS-Security Digest (SHA-1)</option>
                         <option value="wsse_sha256">WS-Security SHA-256</option>
                         <option value="wsse_text">WS-Security PasswordText</option>
@@ -1286,7 +1293,7 @@
                     <div class="w-6 h-6 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                       <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     </div>
-                    <span class="font-bold text-xs text-white">2. Luồng Media RTSP / RTSPS</span>
+                    <span class="font-bold text-xs text-white">RTSP / RTSPS</span>
                   </div>
                   <span id="bf_rtsp_badge" class="font-mono text-indigo-400 text-[11px] bg-[#1a1c33] px-2 py-0.5 rounded border border-indigo-800/40">TCP 443 / 554</span>
                 </div>
@@ -1405,7 +1412,7 @@
                     <div class="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                       <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     </div>
-                    <span class="font-bold text-xs text-white">3. Dòng lệnh Quản trị SSH (Linux OS)</span>
+                    <span class="font-bold text-xs text-white">SSH</span>
                   </div>
                   <span id="bf_ssh_badge" class="font-mono text-emerald-400 text-[11px] bg-[#12241d] px-2 py-0.5 rounded border border-emerald-800/40">TCP 22</span>
                 </div>
@@ -1515,7 +1522,7 @@
                     <div class="w-6 h-6 rounded bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                       <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
-                    <span class="font-bold text-xs text-white">4. Giao diện Quản trị Web Admin (HTTPS/HTTP)</span>
+                    <span class="font-bold text-xs text-white">Web Admin (HTTPS/HTTP)</span>
                   </div>
                   <span id="bf_web_badge" class="font-mono text-rose-400 text-[11px] bg-[#29161e] px-2 py-0.5 rounded border border-rose-800/40">TCP 443</span>
                 </div>
@@ -1632,7 +1639,7 @@
         <!-- ============================================================== -->
         <div id="tab_content_dos" class="tab-pane hidden space-y-3">
           <!-- Header Banner -->
-          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <div class="hidden bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-sm">
             <div class="flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-md bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                 <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -1655,10 +1662,6 @@
             <!-- Left Panel (7 cols): Test Configuration & Controls -->
             <div class="lg:col-span-7 space-y-3.5">
               <div class="border border-[#222938] rounded-xl p-4 bg-[#10141f] space-y-4 shadow-sm">
-                <div class="flex items-center justify-between pb-2.5 border-b border-[#1f2637]">
-                  <span class="font-bold text-xs text-white">Cấu hình Bão kết nối</span>
-                  <span class="font-mono text-cyan-400 text-[11px] bg-[#122229] px-2 py-0.5 rounded border border-cyan-800/40">Target Credentials</span>
-                </div>
 
                 <!-- Parameters Grid -->
                 <div class="bg-[#0b0e15] p-3.5 rounded-lg border border-[#1d2331] grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
@@ -1696,7 +1699,7 @@
                 </div>
 
                 <!-- Fast Presets -->
-                <div class="space-y-1.5">
+                <div class="space-y-1.5 hidden">
                   <div class="text-[11px] text-[#848c9e] font-medium">Kịch bản nhanh:</div>
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button onclick="runMassReconnectPreset('standard')" class="py-1.5 px-2 rounded bg-[#141924] hover:bg-[#1f2637] text-cyan-300 border border-[#2a3449] hover:border-cyan-700/60 text-[11px] font-mono transition text-center" title="Chuẩn QCVN 11: 50 conn × 5 waves, delay 2s">
@@ -1737,7 +1740,7 @@
                       <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                       <span class="font-bold text-xs text-white">Kết quả Đo kiểm Gần nhất</span>
                     </div>
-                    <span id="dos_summary_badge" class="font-mono text-cyan-400 text-[10px] bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">-</span>
+                    <span id="dos_summary_badge" class="hidden font-mono text-cyan-400 text-[10px] bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">-</span>
                   </div>
 
                   <!-- Quick Info Row -->
@@ -1802,27 +1805,13 @@
         <!-- TAB: XÁC THỰC ĐẦU VÀO WEB (SQLi, XSS, CSRF) -->
         <!-- ============================================================== -->
         <div id="tab_content_fuzzer" class="tab-pane hidden space-y-3">
-          <!-- Header Banner -->
-          <div class="bg-[#10141f] border border-[#222938] px-3.5 py-2.5 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-              </div>
-              <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Xác thực Dữ liệu Đầu vào (Input Validation)</h2>
-                <p class="text-[11px] text-[#848c9e] font-mono">QCVN 11:2026/BCA Điều 2.10.1 &amp; Phương pháp đo 3.10.1.3 • IXIT 29-InpVal</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="runInpValSuite('all')" class="bg-[#1d4ed8] hover:bg-[#2563eb] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-blue-500 transition shadow-sm">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Tất cả InpVal</span>
-              </button>
-              <button onclick="openInpValEvidence()" class="bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 px-3 py-1.5 rounded text-xs font-medium border border-cyan-700/50 transition flex items-center gap-1.5" title="Mở báo cáo bằng chứng HTML">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span>Báo cáo HTML</span>
-              </button>
-            </div>
+          <!-- Top Action Bar -->
+          <div class="flex items-center justify-end">
+            <button onclick="runInpValSuite('all')" class="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-[#1d4ed8] hover:bg-[#2563eb] active:scale-[0.98] text-white transition flex items-center gap-1.5 border border-blue-500 shadow-sm cursor-pointer">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Chạy Tất cả InpVal</span>
+            </button>
+            <button onclick="openInpValEvidence()" class="hidden"></button>
           </div>
 
           <!-- 3 InpVal Cards Grid -->
@@ -1927,22 +1916,13 @@
         </div>
 
         <div id="tab_content_telemetry_geoip" class="tab-pane hidden space-y-3">
-          <!-- Header Banner: Minimalist single upload action -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-3 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1e1b4b] text-indigo-300 border border-indigo-800/60 font-bold tracking-wider">TELEMETRY</span>
-              <div>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Giám Sát Lưu Lượng IP &amp; Dữ Liệu Đo Đạc Từ Xa</h2>
-                <p class="text-[11px] text-[#94a3b8] mt-0.5">Tải lên tệp PCAP/PCAPNG để tự động phân tích IP, Quốc gia, DNS/TLS và phát hiện rò rỉ dữ liệu đo đạc từ xa.</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <input type="file" id="geo_pcap_upload_input" accept=".pcap,.pcapng,.cap" class="hidden" onchange="handleGeoPcapUpload(this)">
-              <button onclick="triggerGeoPcapUpload()" class="px-4 py-2 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm" title="Tải file PCAP lên để tự động phân tích IP và Telemetry">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                <span>Tải Lên PCAP</span>
-              </button>
-            </div>
+          <!-- Top Action Bar: Upload PCAP Button -->
+          <div class="flex items-center justify-end">
+            <input type="file" id="geo_pcap_upload_input" accept=".pcap,.pcapng,.cap" class="hidden" onchange="handleGeoPcapUpload(this)">
+            <button onclick="triggerGeoPcapUpload()" class="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer" title="Tải tệp PCAP/PCAPNG lên để tự động phân tích">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Tải Lên PCAP</span>
+            </button>
           </div>
 
           <!-- Hidden Compatibility IDs for JS Engine -->
@@ -1992,7 +1972,6 @@
               <button onclick="setGeoFilter('all')" id="btn_filter_all" class="px-2.5 py-1 rounded text-xs font-semibold bg-[#1d4ed8] text-white border border-blue-600 transition">Tất cả</button>
               <button onclick="setGeoFilter('camera_only')" id="btn_filter_camera_only" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-teal-300 border border-[#2e3547] transition" title="Chỉ hiển thị lưu lượng do chính Camera gửi đi">Chỉ nguồn Camera</button>
               <button onclick="setGeoFilter('overseas')" id="btn_filter_overseas" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-rose-300 border border-[#2e3547] transition">Nước ngoài</button>
-              <button onclick="setGeoFilter('ixit_ok')" id="btn_filter_ixit_ok" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition" title="Dịch vụ nước ngoài hợp lệ theo cam kết IXIT (NTP/DNS)">Hợp lệ theo IXIT</button>
               <button onclick="setGeoFilter('vietnam')" id="btn_filter_vietnam" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-cyan-300 border border-[#2e3547] transition">Việt Nam</button>
               <button onclick="setGeoFilter('local')" id="btn_filter_local" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-emerald-300 border border-[#2e3547] transition">Nội bộ</button>
               <button onclick="setGeoFilter('telemetry')" id="btn_filter_telemetry" class="px-2.5 py-1 rounded text-xs font-medium bg-[#1f2430] hover:bg-[#282f40] text-amber-300 border border-[#2e3547] transition">Telemetry</button>
@@ -2060,77 +2039,99 @@
         <!-- ============================================================== -->
         <!-- TAB: DÒ QUÉT & BỀ MẶT TẤN CÔNG -->
         <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- TAB: DÒ QUÉT & BỀ MẶT TẤN CÔNG -->
+        <!-- ============================================================== -->
         <div id="tab_content_surface" class="tab-pane hidden space-y-3">
-          <!-- Header Banner -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <!-- Top Action Bar -->
+          <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-[#0c2438] text-cyan-300 border border-cyan-800/60 font-bold tracking-wider">API &amp; PORTS</span>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Dò quét Bề mặt API, Dịch vụ &amp; Fuzzing Giao thức</h2>
+              <span class="text-xs font-bold text-white uppercase tracking-wider">Dò Quét Bề Mặt API, Dịch Vụ &amp; Fuzzing Giao Thức</span>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="runApiScan()" class="bg-[#0e7490] hover:bg-[#0891b2] text-white px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 border border-cyan-500 transition shadow-sm">
+              <button onclick="runApiScan()" class="bg-[#0e7490] hover:bg-[#0891b2] active:scale-[0.98] text-white px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 border border-cyan-500 shadow-sm transition cursor-pointer">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <span>Quét Toàn bộ API</span>
               </button>
-              <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535)')" class="bg-[#122135] hover:bg-[#1a2f4c] text-[#bae6fd] hover:text-white px-3 py-1.5 rounded text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5">
+              <button onclick="runCommand('python service_discovery.py --full ' + getTargetIp(), 'Dò quét Cổng Toàn diện (1 - 65535)')" class="bg-[#122135] hover:bg-[#1a2f4c] active:scale-[0.98] text-[#bae6fd] hover:text-white px-3.5 py-1.5 rounded-md text-xs font-semibold border border-[#1d3d63] transition flex items-center gap-1.5 cursor-pointer shadow-sm">
                 <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Dò quét Cổng Toàn diện</span>
               </button>
             </div>
           </div>
 
-          <!-- Main Grid of Tools -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <!-- Main Grid of 6 Tools -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             <!-- Tool 1: Service Discovery -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                  <span>1. Cổng &amp; Dịch vụ Mạng</span>
+            <div class="border border-[#222938] hover:border-sky-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                    <span>1. Cổng &amp; Dịch vụ Mạng</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">service_discovery.py</span>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div><strong class="text-white font-sans">• Cổng RTSP:</strong> 554 (Cleartext), 322 (TLS Stream)</div>
+                  <div><strong class="text-white font-sans">• ONVIF/Web:</strong> 80, 8080, 443, 8000 (Core/DeviceIO)</div>
+                  <div><strong class="text-white font-sans">• Banner Grabbing:</strong> Nhận diện dịch vụ &amp; OS nhúng</div>
+                  <div><strong class="text-white font-sans">• Backdoor Check:</strong> Quét cổng dịch vụ bảo trì ẩn</div>
+                </div>
               </div>
-              <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Dò quét Cổng, Dịch vụ & API ngoài')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Chạy Dò quét Cổng</span>
-              </button>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runCommand('python service_discovery.py ' + getTargetIp() + ' --auto', 'Dò quét Cổng, Dịch vụ & API ngoài')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                  <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Chạy Dò quét Cổng</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tool 2: Full API Scan -->
-            <div class="border border-cyan-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                  <span>2. Quét Toàn diện API</span>
+            <div class="border border-[#222938] hover:border-cyan-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>2. Quét Toàn diện API</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40 font-bold">tool18 --mode scan</span>
                 </div>
-                <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40 font-bold">tool18 --mode scan</span>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div><strong class="text-white font-sans">• ONVIF APIs:</strong> Core, Media, PTZ, Event, Analytics</div>
+                  <div><strong class="text-white font-sans">• RESTful &amp; SOAP:</strong> Thẩm tra toàn bộ endpoint công khai</div>
+                  <div><strong class="text-white font-sans">• Token Header:</strong> Xác thực cơ chế truyền Token an toàn</div>
+                  <div><strong class="text-white font-sans">• Unauthenticated:</strong> Phát hiện rò rỉ endpoint không bảo vệ</div>
+                </div>
               </div>
-              <button onclick="runApiScan()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-cyan-300 px-3 py-1.5 rounded text-xs font-semibold border border-cyan-800/50 transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <span>Quét Toàn bộ API</span>
-              </button>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runApiScan()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-cyan-300 px-3 py-1.5 rounded text-xs font-semibold border border-cyan-800/50 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                  <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                  <span>Quét Toàn bộ API</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tool 3: RTSP / RTSPS Stream Fuzzer -->
-            <div class="border border-rose-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+            <div class="border border-[#222938] hover:border-rose-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
                     <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     <span>3. Fuzzing Luồng RTSP/RTSPS</span>
                   </div>
                   <span id="api_rtsp_port_badge" class="text-[10px] font-mono text-rose-400 bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-800/40 font-bold">CỔNG 322</span>
                 </div>
-                <div class="grid grid-cols-2 gap-1.5 bg-[#10131a] p-1.5 rounded border border-[#272c3a]">
+                <div class="grid grid-cols-2 gap-1.5 bg-[#0b0e15] p-2 rounded border border-[#1f2637]">
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Cổng:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Cổng:</label>
                     <select id="rtsp_fuzz_port" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                       <option value="322" selected>322 (TLS)</option>
                       <option value="554">554 (Clear)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Dạng:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Dạng:</label>
                     <select id="rtsp_fuzz_type" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                       <option value="all" selected>All</option>
                       <option value="methods">Methods</option>
@@ -2141,78 +2142,100 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Số lần:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Số lần:</label>
                     <input type="number" id="rtsp_fuzz_iters" value="10" min="1" max="100" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                   </div>
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Tốc độ:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Tốc độ:</label>
                     <input type="number" id="rtsp_fuzz_rate" value="4.0" step="0.5" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                   </div>
                 </div>
               </div>
-              <button onclick="runRtspFuzzer()" class="w-full bg-[#be123c] hover:bg-[#9f1239] text-white px-3 py-1.5 rounded text-xs font-semibold border border-rose-500 transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Fuzzing RTSP</span>
-              </button>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runRtspFuzzer()" class="w-full bg-[#be123c] hover:bg-[#9f1239] text-white px-3 py-1.5 rounded text-xs font-semibold border border-rose-500 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Fuzzing RTSP</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tool 4: Proprietary / Raw Socket Fuzzer -->
-            <div class="border border-purple-900/40 rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+            <div class="border border-[#222938] hover:border-purple-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
                     <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
                     <span>4. Socket Riêng (Phi HTTP)</span>
                   </div>
                   <span class="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/40 font-bold">TCP RAW</span>
                 </div>
-                <div class="grid grid-cols-2 gap-1.5 bg-[#10131a] p-1.5 rounded border border-[#272c3a]">
+                <div class="grid grid-cols-2 gap-1.5 bg-[#0b0e15] p-2 rounded border border-[#1f2637]">
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Cổng Socket:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Cổng Socket:</label>
                     <input type="number" id="custom_fuzz_port" value="322" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                   </div>
                   <div>
-                    <label class="block text-[9px] text-[#848c9e] uppercase">Số mẫu:</label>
+                    <label class="block text-[9px] text-[#848c9e] uppercase font-sans">Số mẫu:</label>
                     <input type="number" id="custom_fuzz_iters" value="10" class="w-full bg-[#14171f] border border-[#272c3a] rounded px-1.5 py-0.5 text-xs text-white font-mono">
                   </div>
                 </div>
+                <div class="text-[10px] text-[#848c9e] font-mono px-1">Fuzzing payload nhị phân thô, kiểm tra tràn bộ đệm socket daemon nhúng.</div>
               </div>
-              <button onclick="runCustomProtoFuzzer()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-3 py-1.5 rounded text-xs font-semibold border border-purple-800/50 transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span>Fuzz Socket Riêng</span>
-              </button>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runCustomProtoFuzzer()" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-3 py-1.5 rounded text-xs font-semibold border border-purple-800/50 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                  <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  <span>Fuzz Socket Riêng</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tool 5: Security Parameters -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  <span>5. Tham số An toàn &amp; Quyền</span>
+            <div class="border border-[#222938] hover:border-indigo-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span>5. Tham số An toàn &amp; Quyền</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
                 </div>
-                <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool13_security_params</span>
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div><strong class="text-white font-sans">• Phân quyền User:</strong> Admin, Operator, User roles</div>
+                  <div><strong class="text-white font-sans">• Chính sách Password:</strong> Độ dài, ký tự, lockout</div>
+                  <div><strong class="text-white font-sans">• Privilege Escalation:</strong> Ngăn ngừa leo thang quyền</div>
+                  <div><strong class="text-white font-sans">• Sensitive Config:</strong> Thẩm tra file cấu hình camera</div>
+                </div>
               </div>
-              <button onclick="runCommand('python tool13_security_params_auditor.py --ip ' + getTargetIp(), 'Đo kiểm Tham số An toàn & Phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5">
-                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>Đo kiểm Tham số</span>
-              </button>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <button onclick="runCommand('python tool13_security_params_auditor.py --ip ' + getTargetIp(), 'Đo kiểm Tham số An toàn & Phân quyền')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-[#e1e4ea] px-3 py-1.5 rounded text-xs font-semibold border border-[#2e3b52] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                  <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>Đo kiểm Tham số &amp; Quyền</span>
+                </button>
+              </div>
             </div>
 
             <!-- Tool 6: RTSPS & Cleartext Verification -->
-            <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2 card-interactive flex flex-col justify-between">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between border-b border-[#272c3a] pb-2">
-                  <div class="font-bold text-xs text-white flex items-center gap-1.5">
+            <div class="border border-[#222938] hover:border-amber-700/50 rounded-xl p-3.5 bg-[#10141f] space-y-3 transition flex flex-col justify-between shadow-sm card-interactive">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-[#1f2637]">
+                  <div class="font-bold text-xs text-white flex items-center gap-2">
                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     <span>6. Đối soát Wireshark &amp; Bản rõ</span>
                   </div>
                   <span class="text-[10px] font-mono text-[#94a3b8] bg-[#0c0f17] px-1.5 py-0.5 rounded border border-[#272c3a]">tool14 &amp; tool2</span>
                 </div>
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py --auto --ip ' + getTargetIp(), 'Đối soát Wireshark RTSPS (Toàn diện)')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-2 py-1.5 rounded text-xs font-semibold border border-purple-800/40 transition">
+                <div class="bg-[#0b0e15] p-2.5 rounded border border-[#1f2637] text-[11px] text-[#94a3b8] space-y-1 font-mono">
+                  <div><strong class="text-white font-sans">• RTSPS TLS Audit:</strong> Kiểm tra mã hóa luồng truyền hình ảnh</div>
+                  <div><strong class="text-white font-sans">• Cleartext Protocol:</strong> Quét các dịch vụ truyền bản rõ</div>
+                  <div><strong class="text-white font-sans">• Downgrade Attack:</strong> Cảnh báo tấn công hạ cấp kênh an toàn</div>
+                </div>
+              </div>
+              <div class="pt-2 border-t border-[#1f2637]">
+                <div class="grid grid-cols-2 gap-2">
+                  <button onclick="runCommand('python tool14_rtsp_wireshark_verifier.py --auto --ip ' + getTargetIp(), 'Đối soát Wireshark RTSPS (Toàn diện)')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-purple-300 px-2 py-1.5 rounded text-xs font-semibold border border-purple-800/40 transition cursor-pointer shadow-sm">
                     RTSPS Wireshark
                   </button>
-                  <button onclick="runCommand('python tool2_unencrypted_protocols.py ' + getTargetIp(), 'Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-amber-300 px-2 py-1.5 rounded text-xs font-semibold border border-amber-800/40 transition">
+                  <button onclick="runCommand('python tool2_unencrypted_protocols.py ' + getTargetIp(), 'Kiểm tra Giao thức Bản rõ & Hạ cấp Kênh')" class="w-full bg-[#1b2230] hover:bg-[#252f42] text-amber-300 px-2 py-1.5 rounded text-xs font-semibold border border-amber-800/40 transition cursor-pointer shadow-sm">
                     Bản rõ / Hạ cấp
                   </button>
                 </div>
@@ -2221,22 +2244,25 @@
           </div>
 
           <!-- Wireshark Filter Panel for API Scan & Stream Fuzzing -->
-          <div class="bg-[#14171f] border border-[#272c3a] p-2.5 rounded space-y-2">
+          <div class="bg-[#10141f] border border-[#222938] p-3 rounded-xl space-y-2.5 shadow-sm">
             <div class="font-bold text-xs text-white flex items-center justify-between">
-              <span>Bộ lọc Wireshark Display Filter (API &amp; Protocol Fuzzing)</span>
-              <span class="text-[10px] text-emerald-400 font-mono">DUT Integrity Enforced</span>
+              <span class="flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                <span>Bộ lọc Wireshark Display Filter (API &amp; Protocol Fuzzing)</span>
+              </span>
+              <span class="text-[10px] text-emerald-400 font-mono bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">DUT Integrity Enforced</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-rose-400">rtsp.status &gt;= 400</span>
+              <div class="flex items-center justify-between bg-[#0b0e15] px-2.5 py-1.5 rounded border border-[#1f2637]">
+                <span class="text-rose-400 select-all">rtsp.status &gt;= 400</span>
                 <span class="text-[10px] text-[#848c9e]">Mã lỗi từ chối RTSP</span>
               </div>
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span class="text-amber-400">tcp.flags.reset == 1</span>
+              <div class="flex items-center justify-between bg-[#0b0e15] px-2.5 py-1.5 rounded border border-[#1f2637]">
+                <span class="text-amber-400 select-all">tcp.flags.reset == 1</span>
                 <span class="text-[10px] text-[#848c9e]">Ngắt kết nối an toàn</span>
               </div>
-              <div class="flex items-center justify-between bg-[#10131a] px-2 py-1.5 rounded border border-[#272c3a]">
-                <span id="api_wireshark_rtsp_filter" class="text-cyan-400">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
+              <div class="flex items-center justify-between bg-[#0b0e15] px-2.5 py-1.5 rounded border border-[#1f2637]">
+                <span id="api_wireshark_rtsp_filter" class="text-cyan-400 select-all">tcp.port == 322 &amp;&amp; (rtsp || tls)</span>
                 <span class="text-[10px] text-[#848c9e]">Phiên đo kiểm RTSPS</span>
               </div>
             </div>
@@ -2250,19 +2276,13 @@
         <!-- TAB: PHÂN TÍCH FIRMWARE & KHÓA MẬT MÃ (PHIÊN BẢN HIỆN TẠI) -->
         <!-- ============================================================== -->
         <div id="tab_content_firmware_update" class="tab-pane hidden space-y-3">
-          <!-- Top Header: Minimal single-action header -->
-          <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-3 rounded">
-            <div>
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Phân Tích Firmware &amp; Chữ Ký Số</h2>
-              <p class="text-[11px] text-[#94a3b8] mt-0.5">Tải lên tệp firmware (.bin, .zip, .encap) để tự động nhận diện container và chữ ký số mật mã.</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="triggerFirmwareUpload()" class="px-4 py-2 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-sm" title="Tải tệp firmware từ máy tính lên để tự động phân tích">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                <span>Tải Lên Firmware</span>
-              </button>
-              <input type="file" id="fw_upload_file_input" class="hidden" onchange="handleFirmwareUpload(this)" accept=".bin,.encap,.img,.tar,.gz,.tgz,.zip,.pkg,.rom,.dav,.fw,.iso" />
-            </div>
+          <!-- Top Action Bar: Upload Firmware Button -->
+          <div class="flex items-center justify-end">
+            <input type="file" id="fw_upload_file_input" class="hidden" onchange="handleFirmwareUpload(this)" accept=".bin,.encap,.img,.tar,.gz,.tgz,.zip,.pkg,.rom,.dav,.fw,.iso" />
+            <button onclick="triggerFirmwareUpload()" class="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer" title="Tải tệp firmware từ máy tính lên để tự động phân tích">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Tải Lên Firmware</span>
+            </button>
           </div>
 
           <!-- Khối 1: Thông tin Firmware & Container -->
@@ -2350,7 +2370,7 @@
           <!-- Top Setting Action Bar -->
           <div class="flex flex-wrap items-center justify-between gap-3 bg-[#14171f] border border-[#272c3a] p-2.5 rounded">
             <div class="flex items-center gap-2.5">
-              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Trạm Phát Wi-Fi Hotspot (Kiểm thử Camera Không Dây)</h2>
+              <h2 class="text-xs font-bold uppercase tracking-wider text-white">Trạm Phát Wi-Fi Hotspot</h2>
               <span id="hotspot_status_pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1e293b] text-[#94a3b8] border border-[#334155]">ĐANG TẮT</span>
             </div>
             <div class="flex items-center gap-2">
@@ -2373,7 +2393,7 @@
             <!-- AP Configuration Card -->
             <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
               <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
-                <span class="font-bold text-xs text-white uppercase tracking-wider">1. Cấu hình Trạm phát Wi-Fi (AP Profile)</span>
+                <span class="font-bold text-xs text-white uppercase tracking-wider">Cấu hình Trạm phát Wi-Fi</span>
                 <span id="hotspot_iface_badge" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#0b0e15] text-cyan-400 border border-[#272c3a]">wlp0s20f3</span>
               </div>
 
@@ -2403,7 +2423,7 @@
             <!-- Network Bridge & Routing Status Card -->
             <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5 card-interactive">
               <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
-                <span class="font-bold text-xs text-white uppercase tracking-wider">2. Định tuyến &amp; Thông số Kỹ thuật</span>
+                <span class="font-bold text-xs text-white uppercase tracking-wider">Định tuyến &amp; Thông số Kỹ thuật</span>
                 <span class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">NAT ACTIVE</span>
               </div>
 
@@ -2437,7 +2457,7 @@
           <div class="border border-[#272c3a] rounded p-3 bg-[#14171f] space-y-2.5">
             <div class="flex items-center justify-between pb-1.5 border-b border-[#272c3a]">
               <div class="flex items-center gap-2">
-                <span class="font-bold text-xs text-white uppercase tracking-wider">3. Thiết bị đang kết nối vào Hotspot (Camera DUT / Phone)</span>
+                <span class="font-bold text-xs text-white uppercase tracking-wider">Thiết bị đang kết nối vào Hotspot</span>
                 <span id="hotspot_client_count" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">0</span>
               </div>
               <span class="text-[11px] text-[#64748b]">Tự động cập nhật mỗi 3s khi Hotspot bật</span>
@@ -2502,12 +2522,12 @@
           <!-- Left: Segmented Terminal Switcher & Live Status -->
           <div class="flex items-center gap-2.5 overflow-hidden">
             <!-- Segmented Terminal View Switcher -->
-            <div class="flex items-center bg-[#10141f] rounded-md border border-[#1e273a] p-0.5 text-[10px] font-mono shrink-0 overflow-x-auto max-w-[55vw]">
-              <button id="tab_term1_btn" draggable="true" ondragstart="onTabDragStart(event, 'term1')" onclick="setTerminalView('term1')" class="px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1c273e] text-cyan-300 border border-cyan-700/50 cursor-pointer shrink-0" title="Kéo để chia đôi hoặc nhấp để xem Terminal 1">
+            <div id="console_segmented_bar" class="flex items-center bg-[#10141f] rounded-md border border-[#1e273a] p-0.5 text-[10px] font-mono shrink-0 overflow-x-auto max-w-[55vw]">
+              <button id="tab_term1_btn" draggable="true" ondragstart="onTabDragStart(event, 'term1')" onclick="setTerminalView('term1')" class="px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1e293b] text-cyan-300 border border-[#334155] cursor-pointer shrink-0 shadow-sm" title="Kéo để chia đôi hoặc nhấp để xem Terminal 1">
                 <span id="term1_badge_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                 <span>Term 1</span>
               </button>
-              <button id="tab_term2_btn" draggable="true" ondragstart="onTabDragStart(event, 'term2')" onclick="setTerminalView('term2')" class="px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0" title="Kéo để chia đôi hoặc nhấp để xem Terminal 2">
+              <button id="tab_term2_btn" draggable="true" ondragstart="onTabDragStart(event, 'term2')" onclick="setTerminalView('term2')" class="px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent" title="Kéo để chia đôi hoặc nhấp để xem Terminal 2">
                 <span id="term2_badge_dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                 <span>Term 2</span>
               </button>
@@ -2576,11 +2596,11 @@
         </div>
 
         <!-- MULTI-TERMINAL & SPLIT VIEW BODY WRAPPER -->
-        <div id="term_panes_wrapper" class="flex-1 flex overflow-hidden relative" ondragover="onTerminalDragOver(event)" ondragleave="onTerminalDragLeave(event)" ondrop="onTerminalDrop(event)">
+        <div id="term_panes_wrapper" class="flex-1 flex min-h-0 overflow-hidden relative" ondragover="onTerminalDragOver(event)" ondragleave="onTerminalDragLeave(event)" ondrop="onTerminalDrop(event)">
           <!-- LEFT / MAIN PANE CONTAINER -->
-          <div id="pane_left_container" class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+          <div id="pane_left_container" class="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden relative">
           <!-- PANE 1: TERMINAL 1 (CHÍNH / AUDIT KIỂM THỬ) -->
-          <div id="pane_term1" class="relative flex-1 flex flex-col min-w-0 bg-[#07090e] border-r border-[#151c2a]">
+          <div id="pane_term1" class="relative flex-1 flex flex-col min-w-0 min-h-0 h-full bg-[#07090e] border-r border-[#151c2a]">
             <div id="subbar_term1" class="hidden px-2.5 py-1 bg-[#090c13] border-b border-[#182030] items-center justify-between text-[11px] font-mono select-none">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span class="font-bold text-cyan-300 flex items-center gap-1">
@@ -2602,7 +2622,7 @@
                 </button>
               </div>
             </div>
-            <div id="terminal_output" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
+            <div id="terminal_output" class="flex-1 min-h-0 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
               <div class="text-[#475569] text-[11px]">DUT: <span id="terminal_init_dut_ip" class="text-white font-semibold">Đang đồng bộ...</span> | Host: <span id="terminal_init_host_info" class="text-sky-400 font-semibold">--</span> | Sẵn sàng.</div>
             </div>
             <!-- Floating Jump to Bottom Button -->
@@ -2613,7 +2633,7 @@
           </div>
 
           <!-- PANE 2: TERMINAL 2 (PHỤ / RECEIVER SERVERS / TELEMETRY TRAFFIC) -->
-          <div id="pane_term2" class="relative hidden flex-1 flex-col min-w-0 bg-[#07090e]">
+          <div id="pane_term2" class="relative hidden flex-1 flex-col min-w-0 min-h-0 h-full bg-[#07090e]">
             <div id="subbar_term2" class="px-2.5 py-1 bg-[#090c13] border-b border-[#182030] flex items-center justify-between text-[11px] font-mono select-none">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span class="font-bold text-teal-300 flex items-center gap-1">
@@ -2635,7 +2655,7 @@
                 </button>
               </div>
             </div>
-            <div id="terminal_output_2" class="flex-1 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
+            <div id="terminal_output_2" class="flex-1 min-h-0 p-3 font-mono text-[12px] leading-relaxed text-[#cbd5e1] bg-[#07090e] overflow-y-auto whitespace-pre-wrap select-text font-terminal">
               <div class="text-[#475569] text-[11px]">[Terminal 2] Kênh chạy ngầm các dịch vụ Receiver Server ComMech hoặc luồng kiểm tra lưu lượng Telemetry song song. Sẵn sàng.</div>
             </div>
             <!-- Floating Jump to Bottom Button -->
@@ -2646,14 +2666,14 @@
           </div>
 
             <!-- SHELL LEFT HOLDER -->
-            <div id="pane_shell_left_slot" class="hidden flex-1 flex flex-col min-w-0 bg-[#07090e] h-full p-1.5 overflow-hidden"></div>
+            <div id="pane_shell_left_slot" class="hidden flex-1 flex flex-col min-w-0 min-h-0 bg-[#07090e] h-full p-1.5 overflow-hidden"></div>
           </div>
 
           <!-- VERTICAL SPLIT RESIZER DIVIDER -->
           <div id="split_vertical_resizer" class="hidden split-col-resizer" title="Kéo chuột để chỉnh tỉ lệ chia đôi 2 màn hình"></div>
 
           <!-- RIGHT SPLIT PANE CONTAINER (Shown in Split Side-by-Side Mode) -->
-          <div id="pane_right_container" class="hidden flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#07090e] border-l border-[#1c2436] relative">
+          <div id="pane_right_container" class="hidden flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden bg-[#07090e] border-l border-[#1c2436] relative">
             <div id="subbar_split_right" class="px-2.5 py-1 bg-[#090c13] border-b border-[#182030] flex items-center justify-between text-[11px] font-mono select-none">
               <div class="flex items-center gap-2 overflow-hidden">
                 <span id="split_right_title" class="font-bold text-emerald-400 flex items-center gap-1">
@@ -2666,7 +2686,7 @@
                 <button onclick="closeSplitRight()" class="px-1.5 py-0.5 rounded text-[10px] text-[#94a3b8] hover:text-white hover:bg-[#1a2336] transition cursor-pointer" title="Đóng màn hình chia đôi (Quay lại 1 màn hình)">✕ Đóng chia đôi</button>
               </div>
             </div>
-            <div id="pane_shell_right_slot" class="flex-1 flex flex-col min-w-0 h-full p-1.5 overflow-hidden"></div>
+            <div id="pane_shell_right_slot" class="flex-1 flex flex-col min-w-0 min-h-0 h-full p-1.5 overflow-hidden"></div>
           </div>
 
           <!-- DRAG & DROP OVERLAY HINT -->
@@ -3716,26 +3736,26 @@
       updateLineCounter();
     }
 
-    // Tab Style Highlighting
+    // Tab Style Highlighting (Solid Tactical Contrast, Zero Misalignment)
     function updateTabStyles() {
       const b1 = document.getElementById('tab_term1_btn');
       const b2 = document.getElementById('tab_term2_btn');
-      if (b1) b1.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
-      if (b2) b2.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
+      if (b1) b1.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white hover:bg-[#151f33] transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
+      if (b2) b2.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white hover:bg-[#151f33] transition flex items-center gap-1 cursor-pointer shrink-0 border border-transparent';
 
       Object.keys(shellSessions).forEach(sid => {
         const btn = document.getElementById(`tab_btn_${sid}`);
-        if (btn) btn.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1.5 cursor-pointer shrink-0 border border-transparent';
+        if (btn) btn.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white hover:bg-[#151f33] transition flex items-center gap-1.5 cursor-pointer shrink-0 border border-transparent';
       });
 
-      // Highlight active left tab
+      // Highlight active left tab with solid tactical contrast
       if (activeLeftTabId === 'term1' && b1) {
-        b1.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1c273e] text-cyan-300 border border-cyan-700/50 cursor-pointer shrink-0';
+        b1.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1e293b] text-cyan-300 border border-[#334155] cursor-pointer shrink-0 shadow-sm';
       } else if (activeLeftTabId === 'term2' && b2) {
-        b2.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#142624] text-teal-300 border border-teal-700/50 cursor-pointer shrink-0';
+        b2.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1 bg-[#1e293b] text-teal-300 border border-[#334155] cursor-pointer shrink-0 shadow-sm';
       } else if (shellSessions[activeLeftTabId]) {
         const btn = document.getElementById(`tab_btn_${activeLeftTabId}`);
-        if (btn) btn.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1.5 bg-[#0f241a] text-emerald-300 border border-emerald-700/60 cursor-pointer shrink-0';
+        if (btn) btn.className = 'px-2 py-0.5 rounded font-bold transition flex items-center gap-1.5 bg-[#1e293b] text-emerald-300 border border-[#334155] cursor-pointer shrink-0 shadow-sm';
       }
 
       // Highlight active right tab (if split)
@@ -3764,7 +3784,14 @@
         });
       }, 50);
     }
-    window.addEventListener('resize', fitAllShells);
+    window.addEventListener('resize', () => {
+      fitAllShells();
+      if (window.innerWidth < 1024 && !isSidebarCollapsed) {
+        toggleSidebarCollapse();
+      } else if (window.innerWidth >= 1280 && isSidebarCollapsed && localStorage.getItem('psi_sidebar_collapsed') !== '1') {
+        toggleSidebarCollapse();
+      }
+    });
 
     // Vertical Divider Resizer Initialization
     function initSplitVerticalResizer() {
@@ -4408,7 +4435,7 @@
 
     function setGeoFilter(type) {
       currentGeoFilter = type;
-      ['all', 'camera_only', 'overseas', 'ixit_ok', 'vietnam', 'local', 'telemetry'].forEach(t => {
+      ['all', 'camera_only', 'overseas', 'vietnam', 'local', 'telemetry'].forEach(t => {
         const btn = document.getElementById('btn_filter_' + t);
         if (btn) {
           if (t === type) {
@@ -4417,7 +4444,6 @@
             let textColor = 'text-[#848c9e]';
             if (t === 'camera_only') textColor = 'text-teal-300';
             if (t === 'overseas') textColor = 'text-rose-300';
-            if (t === 'ixit_ok') textColor = 'text-emerald-300';
             if (t === 'vietnam') textColor = 'text-cyan-300';
             if (t === 'local') textColor = 'text-emerald-300';
             if (t === 'telemetry') textColor = 'text-amber-300';
@@ -4436,7 +4462,6 @@
       const filtered = rawGeoFlows.filter(f => {
         if (currentGeoFilter === 'camera_only' && (f.packets_camera_sent || 0) === 0) return false;
         if (currentGeoFilter === 'overseas' && !f.is_overseas) return false;
-        if (currentGeoFilter === 'ixit_ok' && !isIxitWhitelisted(f)) return false;
         if (currentGeoFilter === 'vietnam' && (!f.is_vietnam || f.is_local)) return false;
         if (currentGeoFilter === 'local' && !f.is_local) return false;
         if (currentGeoFilter === 'telemetry' && (!f.telemetry_keywords || f.telemetry_keywords.length === 0)) return false;
@@ -4541,7 +4566,6 @@
             <td class="p-2 text-center">
               <div class="flex flex-col items-center gap-1">
                 <span class="px-2 py-0.5 rounded text-[10px] border ${badgeClass}">${badgeText}</span>
-                ${(f.is_overseas && isIxitWhitelisted(f)) ? `<span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-700/80 font-mono">IXIT OK</span>` : ''}
               </div>
             </td>
             <td class="p-2 text-center">
@@ -4907,21 +4931,21 @@
 
           const dutPill = document.getElementById('target_dut_pill');
           if (data.online) {
-            if (dot) dot.className = 'w-1.5 h-3 rounded-full bg-emerald-400 shrink-0';
+            if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.6)]';
             if (dutPill) {
-              dutPill.classList.remove('border-rose-700/60', 'border-amber-700/60');
-              dutPill.classList.add('border-emerald-600/50');
+              dutPill.classList.remove('border-rose-900/40', 'border-amber-900/40');
+              dutPill.classList.add('border-emerald-900/40');
             }
-            latBadge.textContent = `(${data.latency_ms || '<1'}ms)`;
-            latBadge.className = 'font-mono text-[11px] text-emerald-400';
+            latBadge.textContent = `${data.latency_ms || '<1'}ms`;
+            latBadge.className = 'font-mono text-[10px] text-emerald-400 font-medium';
           } else {
-            if (dot) dot.className = 'w-1.5 h-3 rounded-full bg-rose-500 shrink-0';
+            if (dot) dot.className = 'w-2 h-2 rounded-full bg-rose-500 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.6)]';
             if (dutPill) {
-              dutPill.classList.remove('border-emerald-600/50', 'border-amber-700/60');
-              dutPill.classList.add('border-rose-600/60');
+              dutPill.classList.remove('border-emerald-900/40', 'border-amber-900/40');
+              dutPill.classList.add('border-rose-900/40');
             }
-            latBadge.textContent = '(OFFLINE)';
-            latBadge.className = 'font-mono text-[11px] text-rose-400';
+            latBadge.textContent = 'OFFLINE';
+            latBadge.className = 'font-mono text-[10px] text-rose-400 font-medium';
           }
         })
         .catch(() => {
@@ -4988,7 +5012,7 @@
       let options = [];
       if (id.includes('web')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'digest-md5', text: 'Digest MD5' },
           { val: 'digest-sha256', text: 'Digest SHA-256' },
           { val: 'basic', text: 'Basic Auth' },
@@ -4996,14 +5020,14 @@
         ];
       } else if (id.includes('rtsp')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'digest-md5', text: 'Digest MD5' },
           { val: 'digest-sha256', text: 'Digest SHA-256' },
           { val: 'basic', text: 'Basic Auth' },
         ];
       } else if (id.includes('onvif')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'wsse_sha1', text: 'WS-Security Digest (SHA-1)' },
           { val: 'wsse_sha256', text: 'WS-Security SHA-256' },
           { val: 'wsse_text', text: 'WS-Security PasswordText' },
@@ -5021,7 +5045,7 @@
         ];
       } else {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'basic', text: 'Basic Auth' },
           { val: 'digest', text: 'Digest Auth' },
         ];
@@ -5038,7 +5062,7 @@
       let options = [];
       if (id.includes('web')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'digest-md5', text: 'Digest MD5' },
           { val: 'digest-sha256', text: 'Digest SHA-256' },
           { val: 'basic', text: 'Basic Auth' },
@@ -5046,7 +5070,7 @@
         ];
       } else if (id.includes('onvif')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'wsse_sha1', text: 'WS-Security Digest (SHA-1)' },
           { val: 'wsse_sha256', text: 'WS-Security SHA-256' },
           { val: 'wsse_text', text: 'WS-Security PasswordText' },
@@ -5054,7 +5078,7 @@
         ];
       } else if (id.includes('rtsp')) {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
           { val: 'digest-md5', text: 'Digest MD5' },
           { val: 'digest-sha256', text: 'Digest SHA-256' },
           { val: 'basic', text: 'Basic Auth' },
@@ -5096,7 +5120,7 @@
         options = [
           { val: 'auto', text: 'Explicit AUTH TLS (Cổng 21)' },
           { val: 'implicit_tls', text: 'Implicit FTPS (Cổng 990)' },
-          { val: 'auto_detect', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto_detect', text: 'Auto' },
         ];
       } else if (id === 'commech-ftp' || id.endsWith('-ftp')) {
         options = [
@@ -5128,7 +5152,7 @@
         ];
       } else {
         options = [
-          { val: 'auto', text: 'Auto (Tự động nhận diện)' },
+          { val: 'auto', text: 'Auto' },
         ];
       }
       return `
@@ -5321,25 +5345,29 @@
           if (tbody) {
             tbody.innerHTML = _commechDefs.map((d, idx) => `
               <tr class="hover:bg-[#1a1f2b] transition" data-commech-id="${escapeHtml(d.id)}" data-ixit="${d.ixit_declared ? '1' : '0'}">
-                <td class="p-2 border-r border-[#272c3a] font-medium">
+                <td class="px-3.5 py-2.5 font-medium min-w-[220px]">
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-indigo-400 font-mono text-[11px] font-bold">[${escapeHtml(d.id)}]</span>
-                    <span class="text-slate-200">${escapeHtml(d.name)}</span>
+                    <span class="text-slate-200 font-medium">${escapeHtml(d.name)}</span>
                   </div>
                 </td>
-                <td class="p-2 border-r border-[#272c3a] font-mono text-cyan-400">${escapeHtml(d.port)}</td>
-                <td class="p-2 border-r border-[#272c3a] text-[#848c9e]">${escapeHtml(d.direction)}</td>
-                <td class="p-2 border-r border-[#272c3a]">
+                <td class="px-3 py-2.5 font-mono text-cyan-400 text-center w-28">${escapeHtml(d.port)}</td>
+                <td class="px-3 py-2.5 text-[#94a3b8] min-w-[190px]">
+                  <span class="inline-block px-2 py-0.5 rounded text-[11px] bg-[#161d2b] border border-[#26334a] text-slate-300 font-mono">${escapeHtml(d.direction)}</span>
+                </td>
+                <td class="px-3 py-2.5 min-w-[190px]">
                   ${getComMechSelectHtml(d, idx)}
                 </td>
-                <td class="p-2 border-r border-[#272c3a] font-mono text-[11px] text-slate-300">${escapeHtml(d.protocol)}</td>
-                <td class="p-2 border-r border-[#272c3a] text-emerald-400 text-[11px]">${escapeHtml(d.downgrade)}</td>
-                <td class="p-2 text-center space-x-1 whitespace-nowrap">
-                  <button onclick="runComMechCmd(${idx}, 'test')" class="px-2 py-0.5 rounded bg-[#202533] hover:bg-[#2b3345] text-[11px] text-[#e1e4ea] border border-[#31394d]" title="Kiểm thử trực tiếp">Test</button>
-                  ${d.enum_cmd ? `<button onclick="runComMechCmd(${idx}, 'enum')" class="px-2 py-0.5 rounded bg-[#1a3329] hover:bg-[#234d3c] text-[11px] text-emerald-300 border border-emerald-700/60" title="Chạy Nmap Enum / Liệt kê mã hóa">Enum</button>` : ''}
-                  ${d.server_cmd ? `<button onclick="runComMechCmd(${idx}, 'server')" class="px-2 py-0.5 rounded bg-[#1e293b] hover:bg-[#334155] text-[11px] text-teal-300 border border-teal-700/60" title="Chạy Server liên tục">Server</button>` : ''}
-                  ${d.id.includes('CMS') ? `<button onclick="openCMS()" class="px-2 py-0.5 rounded bg-[#431407] hover:bg-[#7c2d12] text-[11px] text-amber-300 border border-amber-700/60 font-semibold" title="Mở phần mềm CMS hãng">Mở CMS</button>` : ''}
-                  ${d.pcap_name ? `<button onclick="runComMechCmd(${idx}, 'pcap')" class="px-2 py-0.5 rounded bg-[#101e33] hover:bg-[#162b47] text-[11px] text-cyan-300 border border-cyan-800/60" title="Mở file PCAP">PCAP</button>` : ''}
+                <td class="px-3.5 py-2.5 font-mono text-[11px] text-slate-300 leading-relaxed min-w-[280px]">${escapeHtml(d.protocol)}</td>
+                <td class="px-3.5 py-2.5 text-emerald-400 text-[11px] leading-relaxed min-w-[280px]">${escapeHtml(d.downgrade)}</td>
+                <td class="px-3 py-2.5 text-center w-48 whitespace-nowrap">
+                  <div class="flex items-center justify-center gap-1 flex-nowrap">
+                    <button onclick="runComMechCmd(${idx}, 'test')" class="px-2 py-1 rounded bg-[#202533] hover:bg-[#2b3345] text-[11px] text-[#e1e4ea] border border-[#31394d] transition" title="Kiểm thử trực tiếp">Test</button>
+                    ${d.enum_cmd ? `<button onclick="runComMechCmd(${idx}, 'enum')" class="px-2 py-1 rounded bg-[#1a3329] hover:bg-[#234d3c] text-[11px] text-emerald-300 border border-emerald-700/60 transition" title="Chạy Nmap Enum / Liệt kê mã hóa">Enum</button>` : ''}
+                    ${d.server_cmd ? `<button onclick="runComMechCmd(${idx}, 'server')" class="px-2 py-1 rounded bg-[#1e293b] hover:bg-[#334155] text-[11px] text-teal-300 border border-teal-700/60 transition" title="Chạy Server liên tục">Server</button>` : ''}
+                    ${d.id.includes('CMS') ? `<button onclick="openCMS()" class="px-2 py-1 rounded bg-[#431407] hover:bg-[#7c2d12] text-[11px] text-amber-300 border border-amber-700/60 font-semibold transition" title="Mở phần mềm CMS hãng">Mở CMS</button>` : ''}
+                    ${d.pcap_name ? `<button onclick="runComMechCmd(${idx}, 'pcap')" class="px-2 py-1 rounded bg-[#101e33] hover:bg-[#162b47] text-[11px] text-cyan-300 border border-cyan-800/60 transition" title="Mở file PCAP">PCAP</button>` : ''}
+                  </div>
                 </td>
               </tr>
             `).join('');
@@ -6102,9 +6130,11 @@
         changeFontSize(parseInt(savedFontSize) - currentTermFontSize);
       }
 
-      // Restore sidebar state
-      if (localStorage.getItem('psi_sidebar_collapsed') === '1') {
-        toggleSidebarCollapse();
+      // Responsive sidebar state (auto-compact on narrow / split screens)
+      if (window.innerWidth < 1024 && localStorage.getItem('psi_sidebar_collapsed') !== '0') {
+        if (!isSidebarCollapsed) toggleSidebarCollapse();
+      } else if (localStorage.getItem('psi_sidebar_collapsed') === '1') {
+        if (!isSidebarCollapsed) toggleSidebarCollapse();
       }
 
       updateLineCounter();
