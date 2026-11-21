@@ -24,14 +24,18 @@
       --text-dim: #64748b;
     }
     body {
-      background-color: var(--bg-app);
+      background-color: #06080d;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(28, 40, 64, 0.22) 0%, transparent 65%);
+        radial-gradient(circle at 50% -5%, rgba(30, 58, 100, 0.35) 0%, transparent 65%),
+        radial-gradient(circle at 50% 60%, transparent 35%, rgba(3, 4, 7, 0.85) 100%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px, 24px 24px;
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
     }
-    /* Tactile Micro-Texture Grain Overlay across all surfaces */
+    /* Tactile 3D Embossed Rough Grit Surface (Hardware Cockpit Aesthetic) */
     body::before {
       content: "";
       position: fixed;
@@ -40,8 +44,9 @@
       height: 100vh;
       pointer-events: none;
       z-index: 9999;
-      opacity: 0.045;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      opacity: 0.13;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='bump'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='4' result='noise'/%3E%3CfeDiffuseLighting in='noise' lighting-color='%23fff' surfaceScale='2.6'%3E%3CfeDistantLight azimuth='55' elevation='48'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23bump)'/%3E%3C/svg%3E");
       background-repeat: repeat;
     }
     html, body {
@@ -146,8 +151,8 @@
       min-height: 100px;
       max-height: calc(100% - 70px);
       background: #07090e;
-      border-top: 1px solid #1a2234;
-      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.6);
+      border-top: 1px solid #28364e;
+      box-shadow: 0 -4px 28px rgba(0, 0, 0, 0.75);
       z-index: 30;
       display: flex;
       flex-direction: column;
@@ -360,10 +365,12 @@
 
     .card-interactive {
       transition: border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring), transform 0.2s var(--ease-spring);
+      border-color: #2a364f !important;
+      box-shadow: 0 4px 18px -2px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
     }
     .card-interactive:hover {
-      border-color: #28344c;
-      box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.08);
+      border-color: #3b4f73 !important;
+      box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(56, 189, 248, 0.16) !important;
       transform: translateY(-1px);
     }
 
@@ -378,30 +385,30 @@
       border-left: none !important;
     }
     table thead tr {
-      background-color: #0c1018 !important;
-      border-bottom: 1px solid #1a2334 !important;
+      background-color: #111723 !important;
+      border-bottom: 1px solid #26334a !important;
     }
     table thead th {
-      color: #64748b !important;
+      color: #94a3b8 !important;
       font-weight: 600 !important;
-      border-bottom: 1px solid #1a2334 !important;
-      padding: 8px 12px !important;
+      border-bottom: 1px solid #26334a !important;
+      padding: 9px 12px !important;
     }
     table tbody td {
-      border-bottom: 1px solid rgba(24, 32, 48, 0.5) !important;
-      padding: 8px 12px !important;
+      border-bottom: 1px solid rgba(38, 51, 74, 0.65) !important;
+      padding: 9px 12px !important;
     }
     table tbody tr {
       transition: background-color 0.12s ease;
     }
     table tbody tr:nth-child(even) {
-      background-color: rgba(14, 18, 28, 0.5) !important;
+      background-color: rgba(14, 19, 30, 0.6) !important;
     }
     table tbody tr:nth-child(odd) {
-      background-color: transparent !important;
+      background-color: rgba(10, 14, 22, 0.4) !important;
     }
     table tbody tr:hover {
-      background-color: rgba(26, 35, 54, 0.7) !important;
+      background-color: rgba(28, 38, 58, 0.8) !important;
     }
 
     /* Tactile Table Action Buttons */
@@ -421,16 +428,23 @@
       transform: translateY(0);
     }
 
-    /* Cohesive Dark Panels & Containers */
+    /* Cohesive Dark Panels & Containers (Tactical Steel Elevation & Micro-Shadow) */
     .tab-pane > div {
       border-radius: 6px !important;
+      border-color: #2a364f !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
     }
     .tab-pane .border {
-      border-color: #171f2e !important;
+      border-color: #2a364f !important;
     }
-    .tab-pane .bg-\[\#14171f\], .tab-pane .bg-\[\#10131a\] {
-      background-color: rgba(12, 16, 25, 0.8) !important;
-      backdrop-filter: blur(8px);
+    .tab-pane .border-t,
+    .tab-pane .border-b,
+    .tab-pane .border-r,
+    .tab-pane .border-l {
+      border-color: #222d40 !important;
+    }
+    .tab-pane .bg-\[\#14171f\], .tab-pane .bg-\[\#10131a\], .tab-pane .bg-\[\#10141f\] {
+      background-color: #0c1018 !important;
     }
 
     .glass-header {
@@ -438,6 +452,10 @@
       background-image: var(--paper-grain);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid #222d40 !important;
+    }
+    aside#app_sidebar {
+      border-right: 1px solid #222d40 !important;
     }
     /* ANSI colors for raw terminal streaming */
     .ansi-bold { font-weight: 700; }
@@ -2547,12 +2565,6 @@
                 <!-- Shell Picker Dropdown Menu -->
                 <div id="shell_picker_menu" class="hidden absolute top-full left-0 mt-1 w-48 bg-[#0a0d14] border border-[#232d42] rounded-md shadow-2xl py-1 z-50 text-[11px] font-mono"></div>
               </div>
-
-              <!-- Quick Split Button -->
-              <button id="tab_split_toggle_btn" onclick="toggleSplitSideBySide()" class="ml-1 px-1.5 py-0.5 rounded hover:bg-[#1a2336] text-[#94a3b8] hover:text-cyan-300 transition flex items-center gap-1 cursor-pointer shrink-0" title="Chia đôi màn hình trái - phải (Kéo tab hoặc bấm Split)">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v18m6-18v18"/></svg>
-                <span id="tab_split_label">Split</span>
-              </button>
             </div>
 
             <!-- Live Status & Timer Badge -->
@@ -2571,19 +2583,12 @@
             <span id="console_line_count" class="text-[10px] font-mono text-[#475569] hidden xl:inline shrink-0">0 dòng</span>
           </div>
 
-          <!-- Right: Search, Auto-scroll, Copy, Clear, Fullscreen -->
+          <!-- Right: Auto-scroll, Clear, Fullscreen -->
           <div class="flex items-center gap-1.5 shrink-0">
-            <!-- Filter Search -->
-            <div class="relative hidden sm:flex items-center">
-              <input type="text" id="term_search_input" oninput="filterTerminalLines()" placeholder="Lọc log..." class="bg-[#080b12] border border-[#1e273a] rounded px-2 py-0.5 text-[11px] text-[#e2e8f0] font-mono w-20 focus:w-36 transition-all focus:border-cyan-500 focus:outline-none placeholder-[#475569]">
-              <span class="absolute right-1.5 text-[9px] text-[#475569] pointer-events-none">Ctrl+F</span>
-            </div>
-
             <!-- Auto-scroll Toggle -->
             <button onclick="toggleAutoScroll()" id="btn_autoscroll" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-950/60 text-cyan-300 border border-cyan-800/70 transition cursor-pointer" title="Tự động cuộn theo log mới">Auto: ON</button>
 
-            <!-- Copy & Clear -->
-            <button onclick="copyTerminal()" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#10141f] hover:bg-[#182030] text-[#94a3b8] hover:text-white border border-[#1e273a] transition cursor-pointer" title="Sao chép toàn bộ log">Sao chép</button>
+            <!-- Clear -->
             <button onclick="clearTerminal()" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#10141f] hover:bg-[#182030] text-[#94a3b8] hover:text-white border border-[#1e273a] transition cursor-pointer" title="Xóa màn hình console">Xóa</button>
 
             <!-- Fullscreen -->
