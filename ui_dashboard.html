@@ -106,24 +106,22 @@
       --duration-normal: 220ms;
     }
 
-    /* Bottom Docked Console Drawer (Slide Up From Bottom) */
+    /* Bottom Docked Console Panel (Responsive Docked Split Pane) */
     #docked_console_panel {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      width: 100vw;
-      height: 380px;
-      max-height: calc(100vh - 64px);
+      position: relative;
+      width: 100%;
+      height: 360px;
+      min-height: 100px;
+      max-height: calc(100% - 70px);
       background: #07090e;
       border-top: 1px solid #1a2234;
-      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.85);
-      z-index: 50;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.6);
+      z-index: 30;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transform: translateY(0);
-      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+      transition: height 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
     }
     .term-jump-btn {
       position: absolute;
@@ -182,8 +180,15 @@
       display: flex;
     }
     #docked_console_panel.floating-minimized {
-      transform: translateY(100%);
-      pointer-events: none;
+      height: 0 !important;
+      min-height: 0 !important;
+      border-top: none !important;
+      box-shadow: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    #docked_console_panel.resizing-active {
+      transition: none !important;
     }
     #docked_console_panel.terminal-fullscreen {
       position: fixed !important;
@@ -201,8 +206,7 @@
     }
     @media (max-width: 767px) {
       #docked_console_panel {
-        height: 55vh;
-        max-height: calc(100vh - 56px);
+        max-height: calc(100% - 50px);
       }
     }
 
@@ -621,8 +625,8 @@
         <button onclick="hideToast()" class="text-[#64748b] hover:text-white ml-2 text-sm leading-none cursor-pointer">&times;</button>
       </div>
 
-      <!-- UPPER PANEL: MODULE CONTENTS (SCROLLABLE) -->
-      <div class="flex-1 overflow-y-auto p-3 custom-scrollbar" id="main_content_scrollable">
+      <!-- UPPER PANEL: MODULE CONTENTS (SCROLLABLE & RESPONSIVE DOCKED) -->
+      <div class="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar" id="main_content_scrollable">
 
         <!-- ============================================================== -->
         <!-- TAB: CÀI ĐẶT THÔNG SỐ & MỤC TIÊU (SETTINGS HUB) -->
@@ -2794,7 +2798,16 @@
     function openFloatingConsole() {
       const panel = document.getElementById('docked_console_panel');
       const btn = document.getElementById('btn_floating_term_toggle');
-      if (panel) panel.classList.remove('floating-minimized');
+      if (panel) {
+        panel.classList.remove('floating-minimized');
+        const savedH = localStorage.getItem('psi_terminal_height') || savedTerminalHeight || '360px';
+        panel.style.height = savedH;
+        setTimeout(() => {
+          fitAllShells();
+          const term = document.getElementById('terminal_output');
+          if (term && autoScroll) term.scrollTop = term.scrollHeight;
+        }, 60);
+      }
       if (btn) {
         btn.classList.add('border-[#38bdf8]', 'text-white', 'bg-[#151d2c]');
       }
@@ -2842,6 +2855,7 @@
         startY = e.clientY;
         startH = panel.offsetHeight;
         resizer.classList.add('resizing');
+        panel.classList.add('resizing-active');
         document.body.style.cursor = 'row-resize';
         document.body.style.userSelect = 'none';
         e.preventDefault();
@@ -2850,8 +2864,9 @@
       window.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
         const dy = startY - e.clientY;
-        const minH = 120;
-        const maxH = window.innerHeight - 70;
+        const minH = 100;
+        const mainEl = document.querySelector('main');
+        const maxH = (mainEl ? mainEl.offsetHeight : window.innerHeight) - 80;
         const newH = Math.min(maxH, Math.max(minH, startH + dy));
         panel.style.height = newH + 'px';
       });
@@ -2860,10 +2875,11 @@
         if (!isDragging) return;
         isDragging = false;
         resizer.classList.remove('resizing');
+        panel.classList.remove('resizing-active');
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         localStorage.setItem('psi_terminal_height', panel.style.height);
-        if (ptyFitAddon && ptyTerminal) setTimeout(() => ptyFitAddon.fit(), 50);
+        fitAllShells();
       });
 
       resizer.addEventListener('dblclick', () => {
@@ -2881,50 +2897,52 @@
       isTerminalFullscreen = !isTerminalFullscreen;
 
       if (isTerminalFullscreen) {
-        savedTerminalHeight = panel.style.height || '320px';
+        savedTerminalHeight = panel.style.height || '360px';
         panel.classList.add('terminal-fullscreen');
-        panel.style.height = '100vh';
         if (iconEnter) iconEnter.classList.add('hidden');
         if (iconExit) iconExit.classList.remove('hidden');
-        if (textToggle) textToggle.textContent = 'Thu nhỏ (Esc)';
+        if (textToggle) textToggle.textContent = 'Exit';
         if (btnToggle) {
-          btnToggle.className = 'px-2 py-0.5 rounded bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white font-bold flex items-center gap-1 border border-emerald-500/50 transition';
+          btnToggle.className = 'px-2 py-0.5 rounded bg-cyan-600 text-white font-mono text-[10px] font-semibold flex items-center gap-1 border border-cyan-400 transition cursor-pointer';
         }
-        showToast('Terminal ở chế độ Toàn màn hình (Nhấn Esc hoặc phím F10 để thoát)');
+        showToast('Toàn màn hình Terminal (Bấm Exit hoặc Esc để thoát)');
       } else {
         panel.classList.remove('terminal-fullscreen');
         panel.style.height = savedTerminalHeight;
         if (iconEnter) iconEnter.classList.remove('hidden');
         if (iconExit) iconExit.classList.add('hidden');
-        if (textToggle) textToggle.textContent = 'Toàn màn hình';
+        if (textToggle) textToggle.textContent = 'Full';
         if (btnToggle) {
-          btnToggle.className = 'px-2 py-0.5 rounded bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white font-bold flex items-center gap-1 border border-blue-500/50 transition';
+          btnToggle.className = 'px-2 py-0.5 rounded bg-[#152033] hover:bg-cyan-600 text-cyan-300 hover:text-white font-mono text-[10px] font-semibold flex items-center gap-1 border border-cyan-800/50 transition cursor-pointer';
         }
         showToast('Đã thu nhỏ Terminal về dạng chia màn hình');
       }
 
       const term = document.getElementById('terminal_output');
       if (term && autoScroll) term.scrollTop = term.scrollHeight;
-      if (ptyFitAddon && ptyTerminal) setTimeout(() => ptyFitAddon.fit(), 80);
+      fitAllShells();
     }
 
     function setTerminalPreset(preset) {
       const panel = document.getElementById('docked_console_panel');
+      const mainEl = document.querySelector('main');
       if (!panel) return;
       if (isTerminalFullscreen) {
         toggleTerminalFullscreen();
       }
+      const totalH = mainEl ? mainEl.offsetHeight : window.innerHeight;
       if (preset === '25%') {
-        panel.style.height = '25vh';
+        panel.style.height = Math.round(totalH * 0.25) + 'px';
       } else if (preset === '50%') {
-        panel.style.height = '50vh';
+        panel.style.height = Math.round(totalH * 0.50) + 'px';
       } else if (preset === '80%') {
-        panel.style.height = '80vh';
+        panel.style.height = Math.round(totalH * 0.80) + 'px';
       }
       localStorage.setItem('psi_terminal_height', panel.style.height);
       const term = document.getElementById('terminal_output');
       if (term && autoScroll) term.scrollTop = term.scrollHeight;
       showToast(`Đã chuyển Terminal sang kích thước ${preset}`);
+      fitAllShells();
     }
 
     function toggleAutoScroll() {
@@ -3324,7 +3342,7 @@
         btn.id = `tab_btn_${sid}`;
         btn.draggable = true;
         btn.ondragstart = (e) => onTabDragStart(e, sid);
-        btn.onclick = () => switchTab(sid);
+        btn.onclick = () => switchTerminalTab(sid);
         btn.className = 'px-2 py-0.5 rounded text-[#94a3b8] hover:text-white transition flex items-center gap-1.5 cursor-pointer shrink-0 border border-transparent';
         btn.title = `Kéo để chia đôi hoặc nhấp để xem ${shellName} (${path})`;
         btn.innerHTML = `
@@ -3447,7 +3465,7 @@
           activeRightTabId = sid;
           renderPanesLayout();
         } else {
-          switchTab(sid);
+          switchTerminalTab(sid);
         }
       }
 
@@ -3478,17 +3496,17 @@
       if (activeLeftTabId === sid) {
         const remaining = Object.keys(shellSessions);
         if (remaining.length > 0) {
-          switchTab(remaining[0]);
+          switchTerminalTab(remaining[0]);
         } else {
-          switchTab('term1');
+          switchTerminalTab('term1');
         }
       } else {
         updateTabStyles();
       }
     }
 
-    // Tab Switcher
-    function switchTab(tabId) {
+    // Terminal Tab Switcher
+    function switchTerminalTab(tabId) {
       if (isSplitActive) {
         // If clicked tab is currently the right pane, do nothing or keep it
         if (activeRightTabId === tabId) {
@@ -3794,14 +3812,14 @@
         if (isSplitActive && activeRightTabId === 'term1') {
           closeSplitRight();
         }
-        switchTab('term1');
+        switchTerminalTab('term1');
       } else if (mode === 'term2') {
         if (isSplitActive && activeRightTabId === 'term2') {
           closeSplitRight();
         }
-        switchTab('term2');
+        switchTerminalTab('term2');
       } else {
-        switchTab(mode);
+        switchTerminalTab(mode);
       }
     }
 
