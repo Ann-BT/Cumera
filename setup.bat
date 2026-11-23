@@ -109,7 +109,7 @@ if not exist "captures\evidence\AuthMech" mkdir "captures\evidence\AuthMech"
 
 echo [*] Dang tao bieu tuong Cumera tren Desktop...
 set "CUMERA_DIR=%CD%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desk = [Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut((Join-Path $desk 'Cumera.lnk')); $s.TargetPath = Join-Path $env:CUMERA_DIR 'run_app.bat'; $s.IconLocation = Join-Path $env:CUMERA_DIR 'assets\cumera.ico'; $s.WorkingDirectory = $env:CUMERA_DIR; $s.Save()" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desk = [Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut((Join-Path $desk 'Cumera.lnk')); $s.TargetPath = Join-Path $env:CUMERA_DIR 'run_app.bat'; $s.WindowStyle = 7; $s.IconLocation = Join-Path $env:CUMERA_DIR 'assets\cumera.ico'; $s.WorkingDirectory = $env:CUMERA_DIR; $s.Save()" >nul 2>nul
 if not errorlevel 1 (
     echo [OK] Da tao shortcut Cumera tren Desktop!
 ) else (

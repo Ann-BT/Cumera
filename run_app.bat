@@ -33,6 +33,10 @@ if not defined PYTHON_BIN (
     exit /b 1
 )
 
+set "PYTHONW_BIN="
+set "TEMP_PYW=%PYTHON_BIN:python.exe=pythonw.exe%"
+if exist "%TEMP_PYW%" set "PYTHONW_BIN=%TEMP_PYW%"
+
 echo ==========================================================
 echo   CUMERA - KHOI CHAY UNG DUNG
 echo ==========================================================
@@ -46,9 +50,13 @@ if not errorlevel 1 (
     goto :OPEN_APP
 )
 
-:: 2. Khoi chay Backend Web Server o cua so thu nho (/MIN)
+:: 2. Khoi chay Backend Web Server chay ngam (khong tao them cua so console)
 echo [*] Dang khoi dong Backend Web Server tren cong 8765...
-start "Cumera Web Server" /MIN /D "%CD%" "%PYTHON_BIN%" toolkit_web_server.py
+if defined PYTHONW_BIN (
+    start "" /D "%CD%" "%PYTHONW_BIN%" toolkit_web_server.py
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "Start-Process -FilePath '%PYTHON_BIN%' -ArgumentList 'toolkit_web_server.py' -WorkingDirectory '%CD%' -WindowStyle Hidden"
+)
 
 :: 3. Cho toi khi Server phan hoi HTTP 200 (toi da ~15 giay)
 echo [*] Dang cho Backend Server san sang...
