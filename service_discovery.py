@@ -504,7 +504,14 @@ def scan_ports_with_nmap(ip: str) -> Optional[List[int]]:
         return None
     try:
         cmd = ["nmap", "-p-", "--min-rate", "1500", "-T4", "--open", "-n", ip]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        extra_kw = {}
+        if sys.platform == "win32":
+            extra_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            extra_kw["startupinfo"] = si
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30, **extra_kw)
         open_ports = []
         for line in res.stdout.splitlines():
             if "/tcp" in line and "open" in line:

@@ -80,7 +80,14 @@ def _get_arp_neighbors() -> Dict[str, str]:
             pass
     elif platform.system() == "Windows":
         try:
-            proc = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=2)
+            extra_kw = {}
+            if sys.platform == "win32":
+                extra_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0
+                extra_kw["startupinfo"] = si
+            proc = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=2, **extra_kw)
             for line in proc.stdout.splitlines():
                 m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F-]{17})\s+dynamic", line)
                 if m:

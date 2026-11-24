@@ -50,11 +50,13 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from toolkit_config import (
+    WIN_CREATE_NO_WINDOW,
     detect_host_network,
     get_active_profile,
     get_profile,
     get_service_ports,
     get_target_info,
+    get_win_subprocess_kwargs,
     list_profiles,
     load_config as tc_load_config,
     normalize_service_ports,
@@ -205,15 +207,18 @@ async def get_target_status():
     host_iface, host_ip = detect_host_network(ip, cfg)
 
     # Lệnh ping tương thích đa nền tảng (Windows: -n 1 -w 1000, Linux/macOS: -c 1 -W 1)
+    extra_kw = {}
     if sys.platform == "win32":
         cmd = ["ping", "-n", "1", "-w", "1000", ip]
+        extra_kw["creationflags"] = WIN_CREATE_NO_WINDOW
     else:
         cmd = ["ping", "-c", "1", "-W", "1", ip]
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        **extra_kw
     )
     stdout, _ = await proc.communicate()
     out = stdout.decode("utf-8", errors="ignore")
@@ -487,6 +492,9 @@ async def discover_cameras_api():
         sub_env = os.environ.copy()
         sub_env["PYTHONUTF8"] = "1"
         sub_env["PYTHONIOENCODING"] = "utf-8"
+        proc_kw = {}
+        if sys.platform == "win32":
+            proc_kw["creationflags"] = WIN_CREATE_NO_WINDOW
         proc = await asyncio.create_subprocess_exec(
             str(VENV_PYTHON),
             "-c",
@@ -495,7 +503,8 @@ async def discover_cameras_api():
             "print(json.dumps(discover_onvif_cameras(timeout=1.8)))",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=sub_env
+            env=sub_env,
+            **proc_kw
         )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore").strip()
@@ -532,6 +541,9 @@ async def auto_link_api():
         sub_env = os.environ.copy()
         sub_env["PYTHONUTF8"] = "1"
         sub_env["PYTHONIOENCODING"] = "utf-8"
+        proc_kw = {}
+        if sys.platform == "win32":
+            proc_kw["creationflags"] = WIN_CREATE_NO_WINDOW
         proc = await asyncio.create_subprocess_exec(
             str(VENV_PYTHON),
             str(script),
@@ -539,7 +551,8 @@ async def auto_link_api():
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(BASE_DIR),
-            env=sub_env
+            env=sub_env,
+            **proc_kw
         )
         stdout, stderr = await proc.communicate()
         out = stdout.decode("utf-8", errors="ignore")
@@ -1098,7 +1111,14 @@ def _get_local_commit() -> str:
     git_dir = BASE_DIR / ".git"
     if git_dir.exists():
         try:
-            proc = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="ignore")
+            proc = subprocess.run(
+                ["git", "-C", str(BASE_DIR), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                **get_win_subprocess_kwargs()
+            )
             if proc.returncode == 0 and proc.stdout.strip():
                 return proc.stdout.strip()
         except Exception:
@@ -1172,7 +1192,8 @@ async def perform_update():
         try:
             proc = subprocess.run(
                 ["git", "-C", str(BASE_DIR), "pull", "origin", "main"],
-                capture_output=True, text=True, encoding="utf-8", errors="ignore", check=True
+                capture_output=True, text=True, encoding="utf-8", errors="ignore", check=True,
+                **get_win_subprocess_kwargs()
             )
             logs.append(proc.stdout)
         except Exception as e:
@@ -1222,7 +1243,14 @@ async def perform_update():
     # Cập nhật các thư viện phụ thuộc nếu có thay đổi trong requirements.txt
     try:
         pip_cmd = [str(VENV_PYTHON), "-m", "pip", "install", "--prefer-binary", "-r", str(BASE_DIR / "requirements.txt")]
-        proc = subprocess.run(pip_cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        proc = subprocess.run(
+            pip_cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            **get_win_subprocess_kwargs()
+        )
         if proc.returncode == 0:
             logs.append("[OK] Đã kiểm tra và đồng bộ thư viện requirements.txt.")
         else:
@@ -1461,14 +1489,18 @@ async def websocket_pty(websocket: WebSocket):
         # Windows fallback
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
+        win_popen_kwargs = {
+            "stdin": subprocess.PIPE,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "cwd": working_dir,
+            "env": env,
+            "bufsize": 0,
+        }
+        win_popen_kwargs.update(get_win_subprocess_kwargs())
         proc = subprocess.Popen(
             [shell_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=working_dir,
-            env=env,
-            bufsize=0,
+            **win_popen_kwargs
         )
 
         async def win_reader():
@@ -1612,6 +1644,8 @@ async def websocket_run(websocket: WebSocket):
                 }
                 if sys.platform != "win32":
                     proc_kwargs["preexec_fn"] = os.setsid
+                else:
+                    proc_kwargs["creationflags"] = WIN_CREATE_NO_WINDOW
 
                 proc = await asyncio.create_subprocess_exec(*exec_cmd, **proc_kwargs)
                 ch.process = proc

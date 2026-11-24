@@ -47,7 +47,14 @@ def detect_outbound_interface(dest_ip: str) -> str:
             local_ip = s.getsockname()[0]
             s.close()
             tshark_bin = _find_tshark_bin()
-            res = subprocess.run([tshark_bin, "-D"], capture_output=True, text=True, timeout=3)
+            extra_kw = {}
+            if sys.platform == "win32":
+                extra_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0
+                extra_kw["startupinfo"] = si
+            res = subprocess.run([tshark_bin, "-D"], capture_output=True, text=True, timeout=3, **extra_kw)
             if res.returncode == 0:
                 for line in res.stdout.splitlines():
                     if local_ip in line:
@@ -116,7 +123,14 @@ def start_pcap_capture(
     tshark_bin = _find_tshark_bin()
     tshark_cmd = sudo_prefix + [tshark_bin, "-i", iface, "-f", bpf_filter, "-w", pcap_file, "-q"]
     try:
-        proc = subprocess.Popen(tshark_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        popen_kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if sys.platform == "win32":
+            popen_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            popen_kw["startupinfo"] = si
+        proc = subprocess.Popen(tshark_cmd, **popen_kw)
         proc.pcap_file = pcap_file
         proc.use_sudo = use_sudo
         time.sleep(0.8)

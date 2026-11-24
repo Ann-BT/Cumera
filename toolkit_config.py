@@ -13,6 +13,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import time
 import urllib.request
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -334,8 +335,30 @@ def get_service_ports(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return normalize_service_ports(sp)
 
 
-def list_local_ipv4_interfaces() -> List[Tuple[str, str]]:
+WIN_CREATE_NO_WINDOW: int = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
+def get_win_subprocess_kwargs() -> Dict[str, Any]:
+    """Return creationflags and hidden startupinfo on Windows to prevent terminal window flashing."""
+    if sys.platform == "win32":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0
+        return {
+            "creationflags": WIN_CREATE_NO_WINDOW,
+            "startupinfo": si,
+        }
+    return {}
+
+_LOCAL_IFACES_CACHE: Tuple[float, List[Tuple[str, str]]] = (0.0, [])
+
+
+def list_local_ipv4_interfaces(force_refresh: bool = False) -> List[Tuple[str, str]]:
     """Return list of (interface_name, ipv4_addr) for active non-loopback IPv4 interfaces."""
+    global _LOCAL_IFACES_CACHE
+    now = time.time()
+    if not force_refresh and (now - _LOCAL_IFACES_CACHE[0] < 15.0) and _LOCAL_IFACES_CACHE[1]:
+        return _LOCAL_IFACES_CACHE[1]
+
     results: List[Tuple[str, str]] = []
     if platform.system() == "Linux":
         try:
@@ -353,7 +376,13 @@ def list_local_ipv4_interfaces() -> List[Tuple[str, str]]:
             pass
     elif platform.system() == "Windows":
         try:
-            proc = subprocess.run(["ipconfig"], capture_output=True, text=True, timeout=3)
+            proc = subprocess.run(
+                ["ipconfig"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                **get_win_subprocess_kwargs()
+            )
             cur_iface = "Ethernet"
             for line in proc.stdout.splitlines():
                 if line and not line.startswith(" ") and line.strip().endswith(":"):
@@ -364,11 +393,20 @@ def list_local_ipv4_interfaces() -> List[Tuple[str, str]]:
                         results.append((cur_iface, ip))
         except Exception:
             pass
+        if not results:
+            try:
+                for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+                    if ip and not ip.startswith("127."):
+                        results.append(("Ethernet", ip))
+            except Exception:
+                pass
+    _LOCAL_IFACES_CACHE = (now, results)
     return results
 
 
-def _iface_for_ip(ip: str) -> str:
-    for iface, addr in list_local_ipv4_interfaces():
+def _iface_for_ip(ip: str, cached_ifaces: Optional[List[Tuple[str, str]]] = None) -> str:
+    ifaces = cached_ifaces if cached_ifaces is not None else list_local_ipv4_interfaces()
+    for iface, addr in ifaces:
         if addr == ip:
             return iface
     return "unknown"
@@ -383,10 +421,19 @@ def detect_host_network(target_ip: Optional[str] = None, cfg: Optional[Dict[str,
     if not target_ip:
         target_ip = get_target_info(data)["ip"]
 
-    local_ifaces = list_local_ipv4_interfaces()
-    local_ips = {ip for _, ip in local_ifaces}
+    # 1. Fast cross-platform UDP socket source address lookup toward target_ip (0 subprocesses)
+    if target_ip:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((target_ip, 80))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return _iface_for_ip(ip), ip
+        except Exception:
+            pass
 
-    # 1. Linux kernel route lookup for target_ip
+    # 2. Linux kernel route lookup for target_ip
     if platform.system() == "Linux" and target_ip:
         try:
             proc = subprocess.run(
@@ -405,17 +452,8 @@ def detect_host_network(target_ip: Optional[str] = None, cfg: Optional[Dict[str,
         except Exception:
             pass
 
-    # 2. Cross-platform UDP socket source address lookup toward target_ip
-    if target_ip:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect((target_ip, 80))
-            ip = s.getsockname()[0]
-            s.close()
-            if ip and not ip.startswith("127."):
-                return _iface_for_ip(ip), ip
-        except Exception:
-            pass
+    local_ifaces = list_local_ipv4_interfaces()
+    local_ips = {ip for _, ip in local_ifaces}
 
     # 3. Same /24 local interface heuristic
     if target_ip and "." in target_ip:
@@ -428,7 +466,7 @@ def detect_host_network(target_ip: Optional[str] = None, cfg: Optional[Dict[str,
     th = data.get("test_host", {}) if isinstance(data, dict) else {}
     cfg_ip = str(th.get("ip") or "").strip()
     if cfg_ip and cfg_ip in local_ips:
-        return _iface_for_ip(cfg_ip), cfg_ip
+        return _iface_for_ip(cfg_ip, local_ifaces), cfg_ip
 
     # 5. Any active non-loopback wired interface, then general local interface
     for iface, addr in local_ifaces:
